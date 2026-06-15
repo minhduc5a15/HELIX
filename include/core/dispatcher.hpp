@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "core/tensor.hpp"
 
 namespace helix {
@@ -18,6 +20,9 @@ namespace helix {
 
         // Unary Operations
         static Tensor neg(const Tensor& a);
+
+        static Tensor sum(const Tensor& a, std::optional<size_t> axis = std::nullopt, bool keepdim = false);
+        static Tensor mean(const Tensor& a, std::optional<size_t> axis = std::nullopt, bool keepdim = false);
     };
 
 }  // namespace helix

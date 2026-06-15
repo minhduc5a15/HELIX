@@ -118,6 +118,26 @@ namespace helix {
         return clone().view(std::move(new_shape));
     }
 
+    Tensor Tensor::flatten() const { return reshape(Shape{numel()}); }
+
+    Tensor Tensor::slice(size_t dim, size_t start, size_t end) const {
+        if (dim >= rank()) {
+            throw std::out_of_range("slice dimension out of range");
+        }
+        if (start >= end || end > shape()[dim]) {
+            throw std::invalid_argument("invalid slice bounds");
+        }
+
+        std::vector<size_t> new_dims = shape().vec();
+        new_dims[dim] = end - start;
+
+        size_t new_offset = impl_->storage_offset() + start * stride()[dim];
+
+        auto new_impl =
+            std::make_shared<TensorImpl>(impl_->storage(), new_offset, Shape(new_dims), stride(), dtype(), device());
+        return Tensor(new_impl);
+    }
+
     Tensor Tensor::transpose(size_t dim0, size_t dim1) const {
         if (dim0 >= rank() || dim1 >= rank()) {
             throw std::out_of_range("transpose dimensions out of range");
@@ -152,5 +172,10 @@ namespace helix {
     Tensor Tensor::operator/(const Tensor& other) const { return Dispatcher::div(*this, other); }
     Tensor Tensor::operator-() const { return Dispatcher::neg(*this); }
     Tensor Tensor::matmul(const Tensor& other) const { return Dispatcher::matmul(*this, other); }
+
+    Tensor Tensor::sum(std::optional<size_t> axis, bool keepdim) const { return Dispatcher::sum(*this, axis, keepdim); }
+    Tensor Tensor::mean(std::optional<size_t> axis, bool keepdim) const {
+        return Dispatcher::mean(*this, axis, keepdim);
+    }
 
 }  // namespace helix
