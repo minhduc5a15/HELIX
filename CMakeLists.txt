@@ -13,6 +13,13 @@ include_directories(include)
 add_library(helix 
     src/core/value.cpp 
     src/core/ops.cpp 
+    src/core/allocator.cpp
+    src/core/storage.cpp
+    src/core/tensor.cpp
+    src/core/dispatcher.cpp
+    src/core/broadcast.cpp
+    src/backend/kernels/ops.cpp
+    src/backend/kernels/matmul.cpp
     src/autograd/backward.cpp
 )
 target_include_directories(helix PUBLIC include)

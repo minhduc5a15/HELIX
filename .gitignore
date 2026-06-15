@@ -10,6 +10,8 @@ dist/
 build/
 cmake-build-debug
 CMakeUserPresets.json
+compile_commands.json
+.cache
 
 # IDEs and editors
 .idea/
@@ -46,4 +48,4 @@ plantests/
 # others
 .agents/
 plan/
-tests/
+*.sh
