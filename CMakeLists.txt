@@ -19,6 +19,7 @@ add_library(helix
     src/core/dispatcher.cpp
     src/core/broadcast.cpp
     src/backend/kernels/ops.cpp
+    src/backend/kernels/reduce.cpp
     src/backend/kernels/matmul.cpp
     src/autograd/backward.cpp
 )

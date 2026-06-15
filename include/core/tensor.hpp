@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include "core/tensor_impl.hpp"
@@ -48,6 +49,9 @@ namespace helix {
         Tensor view(Shape new_shape) const;
         Tensor reshape(Shape new_shape) const;
         Tensor transpose(size_t dim0, size_t dim1) const;
+        Tensor flatten() const;
+        Tensor slice(size_t dim, size_t start, size_t end) const;
+
         // Broadcast
         Tensor broadcast_to(Shape new_shape) const;
 
@@ -60,6 +64,10 @@ namespace helix {
 
         // Unary
         Tensor operator-() const;
+
+        // Reduce Operations
+        Tensor sum(std::optional<size_t> axis = std::nullopt, bool keepdim = false) const;
+        Tensor mean(std::optional<size_t> axis = std::nullopt, bool keepdim = false) const;
 
         // Memory operations
         Tensor clone() const;
