@@ -1,14 +1,8 @@
 #pragma once
 
-#include <vector>
-#include <functional>
-#include <memory>
-#include <string>
+#include "../autograd/node.hpp"
 
 namespace helix {
-
-// Forward declaration of the internal node structure
-struct ValueNode;
 
 // Value class acts as a handle (smart pointer wrapper) to the underlying ValueNode.
 // This allows value-semantics in C++ (e.g., Value a = 2.0) while sharing the same
@@ -47,24 +41,6 @@ private:
     explicit Value(std::shared_ptr<ValueNode> node);
 
     std::shared_ptr<ValueNode> ptr_;
-};
-
-// The actual node in the computational graph
-struct ValueNode {
-    float data;
-    float grad{0.0f};
-
-    // Using shared_ptr to manage memory automatically and avoid dangling pointers.
-    // In a computational graph without loops, shared_ptr is safe.
-    std::vector<std::shared_ptr<ValueNode>> parents;
-    
-    // The backward function to compute gradients for parents
-    std::function<void()> backward_fn{[](){}};
-    
-    // For debugging and visualization
-    std::string operation;
-
-    explicit ValueNode(const float d) : data(d) {}
 };
 
 } // namespace helix
