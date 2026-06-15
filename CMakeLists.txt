@@ -10,7 +10,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 include_directories(include)
 
 # Define the HELIX core library
-add_library(helix src/value.cpp src/ops.cpp src/backward.cpp)
+add_library(helix 
+    src/core/value.cpp 
+    src/core/ops.cpp 
+    src/autograd/backward.cpp
+)
 target_include_directories(helix PUBLIC include)
 
 # Fetch GoogleTest

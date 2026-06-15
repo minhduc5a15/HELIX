@@ -1,7 +1,7 @@
 #include <ranges>
 #include <unordered_set>
 
-#include "value.hpp"
+#include "core/value.hpp"
 
 namespace helix {
 
