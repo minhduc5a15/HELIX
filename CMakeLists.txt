@@ -11,8 +11,6 @@ include_directories(include)
 
 # Define the HELIX core library
 add_library(helix 
-    src/core/value.cpp 
-    src/core/ops.cpp 
     src/core/allocator.cpp
     src/core/storage.cpp
     src/core/tensor.cpp
@@ -21,7 +19,10 @@ add_library(helix
     src/backend/kernels/ops.cpp
     src/backend/kernels/reduce.cpp
     src/backend/kernels/matmul.cpp
-    src/autograd/backward.cpp
+    src/autograd/autograd_meta.cpp
+    src/autograd/function.cpp
+    src/autograd/graph_builder.cpp
+    src/autograd/engine.cpp
 )
 target_include_directories(helix PUBLIC include)
 

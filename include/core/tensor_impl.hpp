@@ -7,6 +7,7 @@
 #include "core/shape.hpp"
 #include "core/storage.hpp"
 #include "core/stride.hpp"
+#include "core/autograd_meta.hpp"
 
 namespace helix {
 
@@ -53,6 +54,11 @@ namespace helix {
             return static_cast<const uint8_t*>(storage_->data()) + (storage_offset_ * dtype_size(dtype_));
         }
 
+        AutogradMeta* autograd_meta() const { return autograd_meta_.get(); }
+        void set_autograd_meta(std::unique_ptr<AutogradMeta, AutogradMetaDeleter> meta) {
+            autograd_meta_ = std::move(meta);
+        }
+
     private:
         Shape shape_;
         Stride stride_;
@@ -61,6 +67,8 @@ namespace helix {
 
         std::shared_ptr<Storage> storage_;
         size_t storage_offset_;  // Offset in elements (not bytes)
+
+        std::unique_ptr<AutogradMeta, AutogradMetaDeleter> autograd_meta_;
     };
 
 }  // namespace helix

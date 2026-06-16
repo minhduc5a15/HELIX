@@ -1,12 +1,5 @@
 include(GoogleTest)
 
-add_executable(value_test value_test.cpp)
-target_link_libraries(value_test PRIVATE helix GTest::gtest_main)
-gtest_discover_tests(value_test)
-
-add_executable(gradient_check_test gradient_check_test.cpp)
-target_link_libraries(gradient_check_test PRIVATE helix GTest::gtest_main)
-gtest_discover_tests(gradient_check_test)
 add_executable(broadcast_shape_test broadcast_shape_test.cpp)
 target_link_libraries(broadcast_shape_test PRIVATE helix GTest::gtest_main)
 add_test(NAME BroadcastShapeTest COMMAND broadcast_shape_test)
@@ -37,3 +30,7 @@ gtest_discover_tests(core_test)
 add_executable(tensor_test tensor_test.cpp)
 target_link_libraries(tensor_test PRIVATE helix GTest::gtest_main)
 gtest_discover_tests(tensor_test)
+
+add_executable(autograd_test autograd_test.cpp)
+target_link_libraries(autograd_test PRIVATE helix GTest::gtest_main)
+gtest_discover_tests(autograd_test)

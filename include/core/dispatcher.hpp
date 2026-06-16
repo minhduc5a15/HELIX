@@ -6,8 +6,13 @@
 
 namespace helix {
 
+    class GraphBuilderInterface;
+
     class Dispatcher {
     public:
+        static void register_graph_builder(GraphBuilderInterface* builder);
+        static GraphBuilderInterface* get_graph_builder();
+
         // Ensure the tensor is contiguous. If not, returns a contiguous clone.
         static Tensor ensure_contiguous(const Tensor& t);
 

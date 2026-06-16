@@ -5,8 +5,23 @@
 
 #include "core/broadcast.hpp"
 #include "core/dispatcher.hpp"
+#include "core/autograd_meta.hpp"
 
 namespace helix {
+
+    // Autograd Provider Registry
+    static AutogradProvider* g_autograd_provider = nullptr;
+
+    void register_autograd_provider(AutogradProvider* provider) {
+        g_autograd_provider = provider;
+    }
+
+    AutogradProvider* get_autograd_provider() {
+        if (!g_autograd_provider) {
+            throw std::runtime_error("AutogradProvider has not been registered. Autograd module is not loaded.");
+        }
+        return g_autograd_provider;
+    }
 
     Tensor::Tensor() : impl_(std::make_shared<TensorImpl>(Shape{}, DType::Float32, Device(DeviceType::CPU))) {}
 
@@ -120,6 +135,20 @@ namespace helix {
 
     Tensor Tensor::flatten() const { return reshape(Shape{numel()}); }
 
+    Tensor Tensor::detach() const {
+        // Detach creates a new Tensor that shares storage but has no autograd history.
+        // It has a new TensorImpl with autograd_meta_ initialized to nullptr.
+        auto new_impl = std::make_shared<TensorImpl>(
+            impl_->storage(),
+            impl_->storage_offset(),
+            shape(),
+            stride(),
+            dtype(),
+            device()
+        );
+        return Tensor(new_impl);
+    }
+
     Tensor Tensor::slice(size_t dim, size_t start, size_t end) const {
         if (dim >= rank()) {
             throw std::out_of_range("slice dimension out of range");
@@ -176,6 +205,36 @@ namespace helix {
     Tensor Tensor::sum(std::optional<size_t> axis, bool keepdim) const { return Dispatcher::sum(*this, axis, keepdim); }
     Tensor Tensor::mean(std::optional<size_t> axis, bool keepdim) const {
         return Dispatcher::mean(*this, axis, keepdim);
+    }
+
+    // Autograd API implementations
+    bool Tensor::requires_grad() const {
+        return impl_->autograd_meta() != nullptr;
+    }
+
+    void Tensor::set_requires_grad(bool req) {
+        if (req && !requires_grad()) {
+            // Lazy allocation: only create if it doesn't exist and req is true
+            impl_->set_autograd_meta(std::unique_ptr<AutogradMeta, AutogradMetaDeleter>(get_autograd_provider()->create_meta()));
+        } else if (!req && requires_grad()) {
+            // If setting to false, free the meta
+            impl_->set_autograd_meta(nullptr);
+        }
+    }
+
+    Tensor& Tensor::grad() {
+        if (!requires_grad()) throw std::runtime_error("Tensor does not require grad");
+        return get_autograd_provider()->get_grad(*this);
+    }
+
+    const Tensor& Tensor::grad() const {
+        if (!requires_grad()) throw std::runtime_error("Tensor does not require grad");
+        return get_autograd_provider()->get_grad(*this);
+    }
+
+    void Tensor::backward(const std::vector<Tensor>& grad_outputs) {
+        if (!requires_grad()) throw std::runtime_error("Cannot backward on a tensor that does not require grad");
+        get_autograd_provider()->backward(*this, grad_outputs);
     }
 
 }  // namespace helix
