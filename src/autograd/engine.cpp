@@ -17,7 +17,7 @@ namespace helix {
     public:
         AccumulateGrad(AutogradMeta* meta) : meta_(meta) {}
         std::vector<Tensor> backward(const std::vector<Tensor>& grad_outputs) override {
-            if (meta_->grad().impl()->storage() == nullptr || meta_->grad().numel() == 0) {
+            if (!meta_->has_grad()) {
                 meta_->set_grad(grad_outputs[0]);
             } else {
                 meta_->set_grad(meta_->grad() + grad_outputs[0]);
