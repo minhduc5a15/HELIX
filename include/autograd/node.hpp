@@ -1,28 +1,30 @@
 #pragma once
 
-#include <functional>
 #include <memory>
-#include <string>
 #include <vector>
+#include "core/tensor.hpp"
 
 namespace helix {
 
-    // The actual node in the computational graph
-    struct ValueNode {
-        float data;
-        float grad{0.0f};
+    class Node {
+    public:
+        virtual ~Node() = default;
 
-        // Using shared_ptr to manage memory automatically and avoid dangling pointers.
-        // In a computational graph without loops, shared_ptr is safe.
-        std::vector<std::shared_ptr<ValueNode>> parents;
+        // Execute the backward pass for this node
+        // Receives gradients corresponding to its outputs and returns gradients for its inputs
+        virtual std::vector<Tensor> backward(const std::vector<Tensor>& grad_outputs) = 0;
 
-        // The backward function to compute gradients for parents
-        std::function<void()> backward_fn{[]() {}};
+        void add_next_edge(std::shared_ptr<Node> node) {
+            next_edges_.push_back(std::move(node));
+        }
 
-        // For debugging and visualization
-        std::string operation;
+        const std::vector<std::shared_ptr<Node>>& next_edges() const {
+            return next_edges_;
+        }
 
-        explicit ValueNode(const float d) : data(d) {}
+    protected:
+        // The edges pointing to the nodes that this node depends on (parents in the forward graph)
+        std::vector<std::shared_ptr<Node>> next_edges_;
     };
 
 }  // namespace helix

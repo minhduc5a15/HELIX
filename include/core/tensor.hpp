@@ -65,6 +65,14 @@ namespace helix {
         // Unary
         Tensor operator-() const;
 
+        // Autograd API
+        bool requires_grad() const;
+        void set_requires_grad(bool req);
+        Tensor& grad();
+        const Tensor& grad() const;
+        void backward(const std::vector<Tensor>& grad_outputs = {});
+        Tensor detach() const;
+
         // Reduce Operations
         Tensor sum(std::optional<size_t> axis = std::nullopt, bool keepdim = false) const;
         Tensor mean(std::optional<size_t> axis = std::nullopt, bool keepdim = false) const;

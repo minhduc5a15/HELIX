@@ -4,8 +4,21 @@
 
 #include "backend/cpu_backend.hpp"
 #include "core/broadcast.hpp"
+#include "core/tensor.hpp"
+#include "core/graph_builder.hpp"
 
 namespace helix {
+
+    static GraphBuilderInterface* g_graph_builder = nullptr;
+
+    void Dispatcher::register_graph_builder(GraphBuilderInterface* builder) {
+        g_graph_builder = builder;
+    }
+
+    GraphBuilderInterface* Dispatcher::get_graph_builder() {
+        return g_graph_builder;
+    }
+
 
     Tensor Dispatcher::ensure_contiguous(const Tensor& t) { return t.contiguous(); }
 
@@ -22,7 +35,11 @@ namespace helix {
             CPUBackend::add(lhs.data_ptr(), rhs.data_ptr(), out.data_ptr(), out.numel());
         else
             throw std::runtime_error("Unsupported device");
+        if (g_graph_builder) {
+            g_graph_builder->build(OperationContext{OpCategory::Binary, OpType::Add, out, {a, b}});
+        }
         return out;
+
     }
 
     Tensor Dispatcher::sub(const Tensor& a, const Tensor& b) {
@@ -34,7 +51,11 @@ namespace helix {
             CPUBackend::sub(lhs.data_ptr(), rhs.data_ptr(), out.data_ptr(), out.numel());
         else
             throw std::runtime_error("Unsupported device");
+        if (g_graph_builder) {
+            g_graph_builder->build(OperationContext{OpCategory::Binary, OpType::Sub, out, {a, b}});
+        }
         return out;
+
     }
 
     Tensor Dispatcher::mul(const Tensor& a, const Tensor& b) {
@@ -46,7 +67,11 @@ namespace helix {
             CPUBackend::mul(lhs.data_ptr(), rhs.data_ptr(), out.data_ptr(), out.numel());
         else
             throw std::runtime_error("Unsupported device");
+        if (g_graph_builder) {
+            g_graph_builder->build(OperationContext{OpCategory::Binary, OpType::Mul, out, {a, b}});
+        }
         return out;
+
     }
 
     Tensor Dispatcher::div(const Tensor& a, const Tensor& b) {
@@ -58,7 +83,11 @@ namespace helix {
             CPUBackend::div(lhs.data_ptr(), rhs.data_ptr(), out.data_ptr(), out.numel());
         else
             throw std::runtime_error("Unsupported device");
+        if (g_graph_builder) {
+            g_graph_builder->build(OperationContext{OpCategory::Binary, OpType::Div, out, {a, b}});
+        }
         return out;
+
     }
 
     Tensor Dispatcher::neg(const Tensor& a) {
@@ -68,7 +97,11 @@ namespace helix {
             CPUBackend::neg(lhs.data_ptr(), out.data_ptr(), out.numel());
         else
             throw std::runtime_error("Unsupported device");
+        if (g_graph_builder) {
+            g_graph_builder->build(OperationContext{OpCategory::Unary, OpType::Neg, out, {a}});
+        }
         return out;
+
     }
 
     Tensor Dispatcher::matmul(const Tensor& a, const Tensor& b) {
@@ -96,7 +129,11 @@ namespace helix {
         } else {
             throw std::runtime_error("Unsupported device");
         }
+        if (g_graph_builder) {
+            g_graph_builder->build(OperationContext{OpCategory::Matrix, OpType::MatMul, out, {a, b}});
+        }
         return out;
+
     }
 
     Tensor Dispatcher::sum(const Tensor& a, std::optional<size_t> axis, bool keepdim) {
@@ -110,7 +147,11 @@ namespace helix {
             } else {
                 throw std::runtime_error("Unsupported device");
             }
+            if (g_graph_builder) {
+                g_graph_builder->build(OperationContext{OpCategory::Reduce, OpType::Sum, out, {a}});
+            }
             return out;
+
         }
 
         size_t dim = axis.value();
@@ -152,7 +193,11 @@ namespace helix {
             } else {
                 throw std::runtime_error("Unsupported device");
             }
+            if (g_graph_builder) {
+                g_graph_builder->build(OperationContext{OpCategory::Reduce, OpType::Mean, out, {a}});
+            }
             return out;
+
         }
 
         size_t dim = axis.value();
