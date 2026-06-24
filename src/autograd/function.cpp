@@ -1,6 +1,7 @@
 #include "autograd/function.hpp"
 
 #include "autograd/function_utils.hpp"
+#include "core/dispatcher.hpp"
 
 namespace helix {
 
@@ -91,11 +92,20 @@ namespace helix {
         return {grad_outputs[0] / (out * 2.0f)};
     }
 
+    PowBackward::PowBackward(const Tensor& a, float exponent) : saved_a_(a), exponent_(exponent) {}
+
     std::vector<Tensor> PowBackward::backward(const std::vector<Tensor>& grad_outputs) {
         const Tensor& a = saved_a_.unpack();
         // n * x^(n-1)
         const Tensor a_pow = a.pow(exponent_ - 1.0f);
         return {grad_outputs[0] * exponent_ * a_pow};
+    }
+
+    ReLUBackward::ReLUBackward(const Tensor& a) : saved_a_(a) {}
+
+    std::vector<Tensor> ReLUBackward::backward(const std::vector<Tensor>& grad_outputs) {
+        const Tensor& a = saved_a_.unpack();
+        return {Dispatcher::relu_backward(grad_outputs[0], a)};
     }
 
     std::vector<Tensor> SumBackward::backward(const std::vector<Tensor>& grad_outputs) {
@@ -126,7 +136,8 @@ namespace helix {
         grad = grad.broadcast_to(input_shape_);
 
         // Calculate reduction size
-        const float reduction_size = static_cast<float>(input_shape_.numel()) / static_cast<float>(grad_outputs[0].numel());
+        const float reduction_size =
+            static_cast<float>(input_shape_.numel()) / static_cast<float>(grad_outputs[0].numel());
 
         // Divide straight by N using the new scalar operator
         return {grad / reduction_size};

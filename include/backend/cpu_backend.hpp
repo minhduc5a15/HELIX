@@ -24,6 +24,8 @@ namespace helix {
         static void exp(const float* a, float* out, size_t size);
         static void log(const float* a, float* out, size_t size);
         static void sqrt(const float* a, float* out, size_t size);
+        static void relu(const float* a, float* out, size_t size);
+        static void relu_backward(const float* grad_out, const float* a, float* grad_in, size_t size);
         static void pow(const float* a, float exponent, float* out, size_t size);
 
         // Matrix Multiplication

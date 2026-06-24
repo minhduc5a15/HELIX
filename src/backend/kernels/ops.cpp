@@ -76,6 +76,18 @@ namespace helix {
         }
     }
 
+    void CPUBackend::relu(const float* a, float* out, const size_t size) {
+        for (size_t i = 0; i < size; ++i) {
+            out[i] = std::max(0.0f, a[i]);
+        }
+    }
+
+    void CPUBackend::relu_backward(const float* grad_out, const float* a, float* grad_in, const size_t size) {
+        for (size_t i = 0; i < size; ++i) {
+            grad_in[i] = a[i] > 0.0f ? grad_out[i] : 0.0f;
+        }
+    }
+
     void CPUBackend::pow(const float* a, float exponent, float* out, const size_t size) {
         for (size_t i = 0; i < size; ++i) {
             out[i] = std::pow(a[i], exponent);

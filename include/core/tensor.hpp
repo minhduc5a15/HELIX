@@ -10,6 +10,13 @@ namespace helix {
 
     class Tensor {
     public:
+        // Factory Methods
+        static Tensor empty(const Shape& shape);
+        static Tensor zeros(const Shape& shape);
+        static Tensor ones(const Shape& shape);
+        static Tensor full(const Shape& shape, float value);
+        static Tensor randn(const Shape& shape);
+
         // Empty tensor (e.g. for default initialization before assignment)
         Tensor();
 
@@ -73,6 +80,7 @@ namespace helix {
         Tensor exp() const;
         Tensor log() const;
         Tensor sqrt() const;
+        Tensor relu() const;
         Tensor pow(float exponent) const;
 
         // Autograd API
@@ -89,6 +97,7 @@ namespace helix {
 
         // Memory operations
         Tensor clone() const;
+        void copy_(const Tensor& src);
         Tensor contiguous() const;
         bool is_contiguous() const;
 

@@ -14,6 +14,7 @@ add_library(helix
     src/core/allocator.cpp
     src/core/storage.cpp
     src/core/tensor.cpp
+    src/core/tensor_factory.cpp
     src/core/dispatcher.cpp
     src/core/broadcast.cpp
     src/backend/kernels/ops.cpp
@@ -23,6 +24,11 @@ add_library(helix
     src/autograd/function.cpp
     src/autograd/graph_builder.cpp
     src/autograd/engine.cpp
+    src/nn/module.cpp
+    src/nn/linear.cpp
+    src/nn/relu.cpp
+    src/nn/sequential.cpp
+    src/nn/loss.cpp
 )
 target_include_directories(helix PUBLIC include)
 
