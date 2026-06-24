@@ -22,7 +22,7 @@ namespace helix {
     // Once TensorIterator is implemented,
     // remove these contiguous() calls.
     Tensor Dispatcher::add(const Tensor& a, const Tensor& b) {
-        Shape out_shape = compute_broadcast_shape(a.shape(), b.shape());
+        const Shape out_shape = compute_broadcast_shape(a.shape(), b.shape());
         Tensor lhs = ensure_contiguous(a.broadcast_to(out_shape));
         Tensor rhs = ensure_contiguous(b.broadcast_to(out_shape));
         Tensor out(out_shape, a.dtype(), a.device());
@@ -37,7 +37,7 @@ namespace helix {
     }
 
     Tensor Dispatcher::sub(const Tensor& a, const Tensor& b) {
-        Shape out_shape = compute_broadcast_shape(a.shape(), b.shape());
+        const Shape out_shape = compute_broadcast_shape(a.shape(), b.shape());
         Tensor lhs = ensure_contiguous(a.broadcast_to(out_shape));
         Tensor rhs = ensure_contiguous(b.broadcast_to(out_shape));
         Tensor out(out_shape, a.dtype(), a.device());
@@ -52,7 +52,7 @@ namespace helix {
     }
 
     Tensor Dispatcher::mul(const Tensor& a, const Tensor& b) {
-        Shape out_shape = compute_broadcast_shape(a.shape(), b.shape());
+        const Shape out_shape = compute_broadcast_shape(a.shape(), b.shape());
         Tensor lhs = ensure_contiguous(a.broadcast_to(out_shape));
         Tensor rhs = ensure_contiguous(b.broadcast_to(out_shape));
         Tensor out(out_shape, a.dtype(), a.device());
@@ -67,7 +67,7 @@ namespace helix {
     }
 
     Tensor Dispatcher::div(const Tensor& a, const Tensor& b) {
-        Shape out_shape = compute_broadcast_shape(a.shape(), b.shape());
+        const Shape out_shape = compute_broadcast_shape(a.shape(), b.shape());
         Tensor lhs = ensure_contiguous(a.broadcast_to(out_shape));
         Tensor rhs = ensure_contiguous(b.broadcast_to(out_shape));
         Tensor out(out_shape, a.dtype(), a.device());
@@ -175,6 +175,30 @@ namespace helix {
         return out;
     }
 
+    Tensor Dispatcher::relu(const Tensor& a) {
+        Tensor lhs = ensure_contiguous(a);
+        Tensor out(a.shape(), a.dtype(), a.device());
+        if (a.device().is_cpu())
+            CPUBackend::relu(lhs.data_ptr(), out.data_ptr(), out.numel());
+        else
+            throw std::runtime_error("Unsupported device");
+        if (g_graph_builder) {
+            g_graph_builder->build(OperationContext{OpCategory::Unary, OpType::ReLU, out, {a}});
+        }
+        return out;
+    }
+
+    Tensor Dispatcher::relu_backward(const Tensor& grad_out, const Tensor& a) {
+        Tensor lhs = ensure_contiguous(grad_out);
+        Tensor rhs = ensure_contiguous(a);
+        Tensor out(grad_out.shape(), grad_out.dtype(), grad_out.device());
+        if (grad_out.device().is_cpu())
+            CPUBackend::relu_backward(lhs.data_ptr(), rhs.data_ptr(), out.data_ptr(), out.numel());
+        else
+            throw std::runtime_error("Unsupported device");
+        return out;
+    }
+
     Tensor Dispatcher::pow(const Tensor& a, float exponent) {
         Tensor lhs = ensure_contiguous(a);
         Tensor out(a.shape(), a.dtype(), a.device());
@@ -199,14 +223,14 @@ namespace helix {
         }
 
         Tensor lhs = ensure_contiguous(a);
-        Tensor rhs = ensure_contiguous(b);
+        const Tensor rhs = ensure_contiguous(b);
 
         // Transpose B and ensure it's contiguous to improve cache locality during the dot product loop
         Tensor rhs_t = ensure_contiguous(rhs.transpose(0, 1));
 
-        size_t M = a.shape()[0];
-        size_t K = a.shape()[1];
-        size_t N = b.shape()[1];
+        const size_t M = a.shape()[0];
+        const size_t K = a.shape()[1];
+        const size_t N = b.shape()[1];
 
         Tensor out(Shape{M, N}, a.dtype(), a.device());
 
@@ -225,7 +249,7 @@ namespace helix {
         Tensor lhs = ensure_contiguous(a);
 
         if (!axis.has_value()) {
-            Shape out_shape = keepdim ? Shape(std::vector<size_t>(a.rank(), 1)) : Shape();
+            const Shape out_shape = keepdim ? Shape(std::vector<size_t>(a.rank(), 1)) : Shape();
             Tensor out(out_shape, a.dtype(), a.device());
             if (a.device().is_cpu()) {
                 CPUBackend::sum(lhs.data_ptr(), out.data_ptr(), 1, a.numel(), 1);
@@ -241,7 +265,7 @@ namespace helix {
             return out;
         }
 
-        size_t dim = axis.value();
+        const size_t dim = axis.value();
         if (dim >= a.rank()) throw std::out_of_range("axis out of bounds");
 
         std::vector<size_t> out_dims;
@@ -252,12 +276,12 @@ namespace helix {
                 out_dims.push_back(a.shape()[i]);
             }
         }
-        Shape out_shape(out_dims);
+        const Shape out_shape(out_dims);
         Tensor out(out_shape, a.dtype(), a.device());
 
         size_t outer_size = 1;
         for (size_t i = 0; i < dim; ++i) outer_size *= a.shape()[i];
-        size_t dim_size = a.shape()[dim];
+        const size_t dim_size = a.shape()[dim];
         size_t inner_size = 1;
         for (size_t i = dim + 1; i < a.rank(); ++i) inner_size *= a.shape()[i];
 
@@ -279,7 +303,7 @@ namespace helix {
         Tensor lhs = ensure_contiguous(a);
 
         if (!axis.has_value()) {
-            Shape out_shape = keepdim ? Shape(std::vector<size_t>(a.rank(), 1)) : Shape();
+            const Shape out_shape = keepdim ? Shape(std::vector<size_t>(a.rank(), 1)) : Shape();
             Tensor out(out_shape, a.dtype(), a.device());
             if (a.device().is_cpu()) {
                 CPUBackend::mean(lhs.data_ptr(), out.data_ptr(), 1, a.numel(), 1);
@@ -295,7 +319,7 @@ namespace helix {
             return out;
         }
 
-        size_t dim = axis.value();
+        const size_t dim = axis.value();
         if (dim >= a.rank()) throw std::out_of_range("axis out of bounds");
 
         std::vector<size_t> out_dims;
@@ -306,12 +330,12 @@ namespace helix {
                 out_dims.push_back(a.shape()[i]);
             }
         }
-        Shape out_shape(out_dims);
+        const Shape out_shape(out_dims);
         Tensor out(out_shape, a.dtype(), a.device());
 
         size_t outer_size = 1;
         for (size_t i = 0; i < dim; ++i) outer_size *= a.shape()[i];
-        size_t dim_size = a.shape()[dim];
+        const size_t dim_size = a.shape()[dim];
         size_t inner_size = 1;
         for (size_t i = dim + 1; i < a.rank(); ++i) inner_size *= a.shape()[i];
 

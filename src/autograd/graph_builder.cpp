@@ -2,7 +2,6 @@
 
 #include "autograd/autograd_meta.hpp"
 #include "autograd/function.hpp"
-#include "core/tensor_impl.hpp"
 
 namespace helix {
 
@@ -56,6 +55,9 @@ namespace helix {
                 node = std::make_shared<PowBackward>(
                     ctx.inputs[0].get(), std::any_cast<float>(ctx.attributes.at("exponent"))
                 );
+                break;
+            case OpType::ReLU:
+                node = std::make_shared<ReLUBackward>(ctx.inputs[0].get());
                 break;
             case OpType::Sum: {
                 auto axis = std::any_cast<std::optional<size_t>>(ctx.attributes.at("axis"));

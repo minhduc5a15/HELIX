@@ -30,7 +30,8 @@ namespace helix {
         Exp,
         Log,
         Sqrt,
-        Pow
+        Pow,
+        ReLU
     };
 
     struct OperationContext {

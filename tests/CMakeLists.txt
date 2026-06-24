@@ -38,3 +38,24 @@ gtest_discover_tests(autograd_test)
 add_executable(autograd_ops_test autograd_ops_test.cpp grad_check.cpp)
 target_link_libraries(autograd_ops_test PRIVATE helix GTest::gtest_main)
 gtest_discover_tests(autograd_ops_test)
+
+# Neural Network layer tests
+add_executable(linear_test linear_test.cpp grad_check.cpp)
+target_link_libraries(linear_test PRIVATE helix GTest::gtest_main)
+gtest_discover_tests(linear_test)
+
+add_executable(relu_test relu_test.cpp grad_check.cpp)
+target_link_libraries(relu_test PRIVATE helix GTest::gtest_main)
+gtest_discover_tests(relu_test)
+
+add_executable(loss_test loss_test.cpp grad_check.cpp)
+target_link_libraries(loss_test PRIVATE helix GTest::gtest_main)
+gtest_discover_tests(loss_test)
+
+add_executable(sequential_test sequential_test.cpp)
+target_link_libraries(sequential_test PRIVATE helix GTest::gtest_main)
+gtest_discover_tests(sequential_test)
+
+add_executable(nn_integration_test nn_integration_test.cpp grad_check.cpp)
+target_link_libraries(nn_integration_test PRIVATE helix GTest::gtest_main)
+gtest_discover_tests(nn_integration_test)

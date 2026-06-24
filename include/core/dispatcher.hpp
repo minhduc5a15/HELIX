@@ -33,6 +33,8 @@ namespace helix {
         static Tensor exp(const Tensor& a);
         static Tensor log(const Tensor& a);
         static Tensor sqrt(const Tensor& a);
+        static Tensor relu(const Tensor& a);
+        static Tensor relu_backward(const Tensor& grad_out, const Tensor& a);
         static Tensor pow(const Tensor& a, float exponent);
 
         static Tensor sum(const Tensor& a, std::optional<size_t> axis = std::nullopt, bool keepdim = false);

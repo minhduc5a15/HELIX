@@ -6,6 +6,7 @@
 #include "core/autograd_meta.hpp"
 #include "core/broadcast.hpp"
 #include "core/dispatcher.hpp"
+#include "core/tensor_factory.hpp"
 
 namespace helix {
 
@@ -20,6 +21,13 @@ namespace helix {
         }
         return g_autograd_provider;
     }
+
+    // Factory Methods
+    Tensor Tensor::empty(const Shape& shape) { return TensorFactory::empty(shape); }
+    Tensor Tensor::zeros(const Shape& shape) { return TensorFactory::zeros(shape); }
+    Tensor Tensor::ones(const Shape& shape) { return TensorFactory::ones(shape); }
+    Tensor Tensor::full(const Shape& shape, float value) { return TensorFactory::full(shape, value); }
+    Tensor Tensor::randn(const Shape& shape) { return TensorFactory::randn(shape); }
 
     Tensor::Tensor() : impl_(std::make_shared<TensorImpl>(Shape{}, DType::Float32, Device(DeviceType::CPU))) {}
 
@@ -116,6 +124,30 @@ namespace helix {
         return new_tensor;
     }
 
+    void Tensor::copy_(const Tensor& src) {
+        if (numel() != src.numel()) {
+            throw std::invalid_argument("Tensor sizes do not match for copy_");
+        }
+
+        Tensor src_contig = src.contiguous();
+        if (is_contiguous()) {
+            std::memcpy(data_ptr(), src_contig.data_ptr(), numel() * sizeof(float));
+        } else {
+            std::vector<size_t> indices(rank(), 0);
+            for (size_t i = 0; i < numel(); ++i) {
+                set_item(indices, src_contig.data_ptr()[i]);
+
+                for (int j = static_cast<int>(rank()) - 1; j >= 0; --j) {
+                    indices[j]++;
+                    if (indices[j] < shape()[j]) {
+                        break;
+                    }
+                    indices[j] = 0;
+                }
+            }
+        }
+    }
+
     Tensor Tensor::contiguous() const {
         if (is_contiguous()) return *this;
         return clone();
@@ -201,6 +233,7 @@ namespace helix {
     Tensor Tensor::exp() const { return Dispatcher::exp(*this); }
     Tensor Tensor::log() const { return Dispatcher::log(*this); }
     Tensor Tensor::sqrt() const { return Dispatcher::sqrt(*this); }
+    Tensor Tensor::relu() const { return Dispatcher::relu(*this); }
     Tensor Tensor::pow(float exponent) const { return Dispatcher::pow(*this, exponent); }
     Tensor Tensor::matmul(const Tensor& other) const { return Dispatcher::matmul(*this, other); }
 

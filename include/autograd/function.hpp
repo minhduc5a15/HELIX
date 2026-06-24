@@ -105,12 +105,21 @@ namespace helix {
 
     class PowBackward : public Node {
     public:
-        PowBackward(const Tensor& a, float exponent) : saved_a_(a), exponent_(exponent) {}
+        PowBackward(const Tensor& a, float exponent);
         std::vector<Tensor> backward(const std::vector<Tensor>& grad_outputs) override;
 
     private:
         SavedTensor saved_a_;
         float exponent_;
+    };
+
+    class ReLUBackward : public Node {
+    public:
+        ReLUBackward(const Tensor& a);
+        std::vector<Tensor> backward(const std::vector<Tensor>& grad_outputs) override;
+
+    private:
+        SavedTensor saved_a_;
     };
 
     class SumBackward : public Node {
