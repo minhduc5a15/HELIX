@@ -1,8 +1,9 @@
 #pragma once
 
 #include <memory>
-#include "core/tensor.hpp"
+
 #include "autograd/node.hpp"
+#include "core/tensor.hpp"
 
 namespace helix {
 
@@ -10,8 +11,7 @@ namespace helix {
     // Core holds an opaque pointer to this class.
     class AutogradMeta {
     public:
-        AutogradMeta(bool requires_grad = false) 
-            : requires_grad_(requires_grad), has_grad_(false) {}
+        AutogradMeta(bool requires_grad = false) : requires_grad_(requires_grad), has_grad_(false) {}
 
         bool requires_grad() const { return requires_grad_; }
         void set_requires_grad(bool req) { requires_grad_ = req; }
@@ -20,7 +20,10 @@ namespace helix {
 
         Tensor& grad() { return grad_; }
         const Tensor& grad() const { return grad_; }
-        void set_grad(const Tensor& g) { grad_ = g; has_grad_ = true; }
+        void set_grad(const Tensor& g) {
+            grad_ = g;
+            has_grad_ = true;
+        }
 
         std::shared_ptr<Node> grad_fn() const { return grad_fn_; }
         void set_grad_fn(std::shared_ptr<Node> fn) { grad_fn_ = std::move(fn); }

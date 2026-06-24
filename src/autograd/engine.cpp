@@ -1,14 +1,14 @@
 #include "autograd/engine.hpp"
-#include "autograd/node.hpp"
-#include "autograd/autograd_meta.hpp"
-#include "autograd/graph_builder.hpp"
-#include "core/tensor_impl.hpp"
-#include "core/dispatcher.hpp"
 
 #include <queue>
+#include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
-#include <stdexcept>
+
+#include "autograd/autograd_meta.hpp"
+#include "autograd/graph_builder.hpp"
+#include "autograd/node.hpp"
+#include "core/dispatcher.hpp"
 
 namespace helix {
 
@@ -24,6 +24,7 @@ namespace helix {
             }
             return {};
         }
+
     private:
         AutogradMeta* meta_;
     };
@@ -84,7 +85,7 @@ namespace helix {
 
         // Step 2: Initialize gradients queue
         std::unordered_map<Node*, std::vector<Tensor>> node_gradients;
-        
+
         if (grad_outputs.empty()) {
             if (target.numel() != 1) {
                 throw std::runtime_error("grad can be implicitly created only for scalar outputs");
@@ -113,7 +114,7 @@ namespace helix {
             for (size_t i = 0; i < next_edges.size(); ++i) {
                 if (next_edges[i]) {
                     Node* next = next_edges[i].get();
-                    
+
                     if (node_gradients.find(next) == node_gradients.end()) {
                         node_gradients[next] = {input_grads[i]};
                     } else {

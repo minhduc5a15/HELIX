@@ -7,7 +7,7 @@ namespace helix {
 
     enum class DType { Float32, Float64, Int32, Int64 };
 
-    inline size_t dtype_size(DType dtype) {
+    inline size_t dtype_size(const DType dtype) {
         switch (dtype) {
             case DType::Float32:
                 return 4;
@@ -22,7 +22,7 @@ namespace helix {
         }
     }
 
-    constexpr std::string dtype_name(DType dtype) {
+    constexpr std::string dtype_name(const DType dtype) {
         switch (dtype) {
             case DType::Float32:
                 return "float32";

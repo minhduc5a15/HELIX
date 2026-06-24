@@ -60,10 +60,20 @@ namespace helix {
         Tensor operator-(const Tensor& other) const;
         Tensor operator*(const Tensor& other) const;
         Tensor operator/(const Tensor& other) const;
+
+        // Scalar arithmetic
+        Tensor operator+(float scalar) const;
+        Tensor operator-(float scalar) const;
+        Tensor operator*(float scalar) const;
+        Tensor operator/(float scalar) const;
         Tensor matmul(const Tensor& other) const;
 
         // Unary
         Tensor operator-() const;
+        Tensor exp() const;
+        Tensor log() const;
+        Tensor sqrt() const;
+        Tensor pow(float exponent) const;
 
         // Autograd API
         bool requires_grad() const;

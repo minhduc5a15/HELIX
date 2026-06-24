@@ -10,7 +10,7 @@ namespace helix {
         DeviceType type;
         int index;
 
-        Device(DeviceType type = DeviceType::CPU, int index = 0) : type(type), index(index) {}
+        Device(const DeviceType type = DeviceType::CPU, const int index = 0) : type(type), index(index) {}
 
         bool is_cpu() const { return type == DeviceType::CPU; }
         bool is_cuda() const { return type == DeviceType::CUDA; }
