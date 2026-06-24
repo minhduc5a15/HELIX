@@ -13,8 +13,18 @@ namespace helix {
         static void mul(const float* a, const float* b, float* out, size_t size);
         static void div(const float* a, const float* b, float* out, size_t size);
 
+        // Scalar element-wise operations
+        static void add_scalar(const float* a, float scalar, float* out, size_t size);
+        static void sub_scalar(const float* a, float scalar, float* out, size_t size);
+        static void mul_scalar(const float* a, float scalar, float* out, size_t size);
+        static void div_scalar(const float* a, float scalar, float* out, size_t size);
+
         // Unary operations
         static void neg(const float* a, float* out, size_t size);
+        static void exp(const float* a, float* out, size_t size);
+        static void log(const float* a, float* out, size_t size);
+        static void sqrt(const float* a, float* out, size_t size);
+        static void pow(const float* a, float exponent, float* out, size_t size);
 
         // Matrix Multiplication
         static void matmul(const float* a, const float* b_t, float* out, size_t M, size_t K, size_t N);

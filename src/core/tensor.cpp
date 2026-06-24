@@ -3,18 +3,16 @@
 #include <cstring>  // for memcpy
 #include <stdexcept>
 
+#include "core/autograd_meta.hpp"
 #include "core/broadcast.hpp"
 #include "core/dispatcher.hpp"
-#include "core/autograd_meta.hpp"
 
 namespace helix {
 
     // Autograd Provider Registry
     static AutogradProvider* g_autograd_provider = nullptr;
 
-    void register_autograd_provider(AutogradProvider* provider) {
-        g_autograd_provider = provider;
-    }
+    void register_autograd_provider(AutogradProvider* provider) { g_autograd_provider = provider; }
 
     AutogradProvider* get_autograd_provider() {
         if (!g_autograd_provider) {
@@ -139,12 +137,7 @@ namespace helix {
         // Detach creates a new Tensor that shares storage but has no autograd history.
         // It has a new TensorImpl with autograd_meta_ initialized to nullptr.
         auto new_impl = std::make_shared<TensorImpl>(
-            impl_->storage(),
-            impl_->storage_offset(),
-            shape(),
-            stride(),
-            dtype(),
-            device()
+            impl_->storage(), impl_->storage_offset(), shape(), stride(), dtype(), device()
         );
         return Tensor(new_impl);
     }
@@ -199,7 +192,16 @@ namespace helix {
     Tensor Tensor::operator-(const Tensor& other) const { return Dispatcher::sub(*this, other); }
     Tensor Tensor::operator*(const Tensor& other) const { return Dispatcher::mul(*this, other); }
     Tensor Tensor::operator/(const Tensor& other) const { return Dispatcher::div(*this, other); }
+
+    Tensor Tensor::operator+(float scalar) const { return Dispatcher::add_scalar(*this, scalar); }
+    Tensor Tensor::operator-(float scalar) const { return Dispatcher::sub_scalar(*this, scalar); }
+    Tensor Tensor::operator*(float scalar) const { return Dispatcher::mul_scalar(*this, scalar); }
+    Tensor Tensor::operator/(float scalar) const { return Dispatcher::div_scalar(*this, scalar); }
     Tensor Tensor::operator-() const { return Dispatcher::neg(*this); }
+    Tensor Tensor::exp() const { return Dispatcher::exp(*this); }
+    Tensor Tensor::log() const { return Dispatcher::log(*this); }
+    Tensor Tensor::sqrt() const { return Dispatcher::sqrt(*this); }
+    Tensor Tensor::pow(float exponent) const { return Dispatcher::pow(*this, exponent); }
     Tensor Tensor::matmul(const Tensor& other) const { return Dispatcher::matmul(*this, other); }
 
     Tensor Tensor::sum(std::optional<size_t> axis, bool keepdim) const { return Dispatcher::sum(*this, axis, keepdim); }
@@ -208,14 +210,14 @@ namespace helix {
     }
 
     // Autograd API implementations
-    bool Tensor::requires_grad() const {
-        return impl_->autograd_meta() != nullptr;
-    }
+    bool Tensor::requires_grad() const { return impl_->autograd_meta() != nullptr; }
 
     void Tensor::set_requires_grad(bool req) {
         if (req && !requires_grad()) {
             // Lazy allocation: only create if it doesn't exist and req is true
-            impl_->set_autograd_meta(std::unique_ptr<AutogradMeta, AutogradMetaDeleter>(get_autograd_provider()->create_meta()));
+            impl_->set_autograd_meta(
+                std::unique_ptr<AutogradMeta, AutogradMetaDeleter>(get_autograd_provider()->create_meta())
+            );
         } else if (!req && requires_grad()) {
             // If setting to false, free the meta
             impl_->set_autograd_meta(nullptr);

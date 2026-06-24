@@ -10,7 +10,7 @@ namespace helix {
     class Shape {
     public:
         Shape() = default;
-        Shape(std::initializer_list<size_t> dims) : dims_(dims) {}
+        Shape(const std::initializer_list<size_t> dims) : dims_(dims) {}
         explicit Shape(std::vector<size_t> dims) : dims_(std::move(dims)) {}
 
         size_t rank() const { return dims_.size(); }

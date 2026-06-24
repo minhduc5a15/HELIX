@@ -34,3 +34,7 @@ gtest_discover_tests(tensor_test)
 add_executable(autograd_test autograd_test.cpp)
 target_link_libraries(autograd_test PRIVATE helix GTest::gtest_main)
 gtest_discover_tests(autograd_test)
+
+add_executable(autograd_ops_test autograd_ops_test.cpp grad_check.cpp)
+target_link_libraries(autograd_ops_test PRIVATE helix GTest::gtest_main)
+gtest_discover_tests(autograd_ops_test)

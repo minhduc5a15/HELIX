@@ -1,24 +1,44 @@
 #pragma once
 
+#include <any>
 #include <functional>
+#include <optional>
+#include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace helix {
 
-    class Tensor; // Forward declaration
+    class Tensor;  // Forward declaration
 
     enum class OpCategory { Unary, Binary, Reduce, View, Matrix };
 
-    enum class OpType { Add, Sub, Mul, Div, Sum, Mean, MatMul, Neg, View, Reshape, Transpose, Flatten, Slice };
+    enum class OpType {
+        Add,
+        Sub,
+        Mul,
+        Div,
+        Sum,
+        Mean,
+        MatMul,
+        Neg,
+        View,
+        Reshape,
+        Transpose,
+        Flatten,
+        Slice,
+        Exp,
+        Log,
+        Sqrt,
+        Pow
+    };
 
     struct OperationContext {
         OpCategory category;
         OpType type;
         Tensor& out;
         std::vector<std::reference_wrapper<const Tensor>> inputs;
-        
-        // Cấu trúc có thể mở rộng thêm attributes (ví dụ: std::any, enum attributes...)
-        // Nhưng tạm thời để đơn giản, có thể ép kiểu context nếu cần ở phía GraphBuilder.
+        std::unordered_map<std::string, std::any> attributes;
     };
 
     class GraphBuilderInterface {

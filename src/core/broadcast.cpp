@@ -6,9 +6,9 @@
 namespace helix {
 
     Shape compute_broadcast_shape(const Shape& a, const Shape& b) {
-        size_t rank_a = a.rank();
-        size_t rank_b = b.rank();
-        size_t max_rank = std::max(rank_a, rank_b);
+        const size_t rank_a = a.rank();
+        const size_t rank_b = b.rank();
+        const size_t max_rank = std::max(rank_a, rank_b);
 
         std::vector<size_t> out_dims(max_rank);
 
@@ -34,15 +34,15 @@ namespace helix {
             throw std::invalid_argument("Target shape cannot have smaller rank than original shape");
         }
 
-        size_t rank_orig = original_shape.rank();
-        size_t rank_target = target_shape.rank();
+        const size_t rank_orig = original_shape.rank();
+        const size_t rank_target = target_shape.rank();
 
         std::vector<size_t> out_strides(rank_target, 0);
 
         // Iterate right-to-left
         for (size_t i = 0; i < rank_target; ++i) {
-            size_t dim_orig = (i < rank_orig) ? original_shape[rank_orig - 1 - i] : 1;
-            size_t dim_target = target_shape[rank_target - 1 - i];
+            const size_t dim_orig = (i < rank_orig) ? original_shape[rank_orig - 1 - i] : 1;
+            const size_t dim_target = target_shape[rank_target - 1 - i];
 
             if (dim_orig == dim_target) {
                 if (i < rank_orig) {

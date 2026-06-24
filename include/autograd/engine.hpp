@@ -1,8 +1,9 @@
 #pragma once
 
 #include <vector>
+
+#include "core/autograd_meta.hpp"  // For AutogradProvider
 #include "core/tensor.hpp"
-#include "core/autograd_meta.hpp" // For AutogradProvider
 
 namespace helix {
 

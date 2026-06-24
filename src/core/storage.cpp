@@ -2,7 +2,7 @@
 
 namespace helix {
 
-    Storage::Storage(size_t size_bytes, Allocator* allocator) : size_bytes_(size_bytes), allocator_(allocator) {
+    Storage::Storage(const size_t size_bytes, Allocator* allocator) : size_bytes_(size_bytes), allocator_(allocator) {
         if (!allocator_) {
             allocator_ = &MemoryPool::global();
         }

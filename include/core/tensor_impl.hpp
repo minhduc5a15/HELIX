@@ -2,18 +2,18 @@
 
 #include <memory>
 
+#include "core/autograd_meta.hpp"
 #include "core/device.hpp"
 #include "core/dtype.hpp"
 #include "core/shape.hpp"
 #include "core/storage.hpp"
 #include "core/stride.hpp"
-#include "core/autograd_meta.hpp"
 
 namespace helix {
 
     class TensorImpl {
     public:
-        TensorImpl(Shape shape, DType dtype = DType::Float32, Device device = Device(DeviceType::CPU))
+        TensorImpl(Shape shape, const DType dtype = DType::Float32, const Device device = Device(DeviceType::CPU))
             : shape_(std::move(shape)),
               stride_(Stride::compute_contiguous(shape_)),
               dtype_(dtype),
@@ -25,7 +25,12 @@ namespace helix {
 
         // Constructor for views
         TensorImpl(
-            std::shared_ptr<Storage> storage, size_t offset, Shape shape, Stride stride, DType dtype, Device device
+            std::shared_ptr<Storage> storage,
+            const size_t offset,
+            Shape shape,
+            Stride stride,
+            DType dtype,
+            Device device
         )
             : shape_(std::move(shape)),
               stride_(std::move(stride)),

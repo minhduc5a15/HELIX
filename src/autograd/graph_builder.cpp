@@ -1,6 +1,7 @@
 #include "autograd/graph_builder.hpp"
-#include "autograd/function.hpp"
+
 #include "autograd/autograd_meta.hpp"
+#include "autograd/function.hpp"
 #include "core/tensor_impl.hpp"
 
 namespace helix {
@@ -25,10 +26,10 @@ namespace helix {
 
         switch (ctx.type) {
             case OpType::Add:
-                node = std::make_shared<AddBackward>();
+                node = std::make_shared<AddBackward>(ctx.inputs[0].get().shape(), ctx.inputs[1].get().shape());
                 break;
             case OpType::Sub:
-                node = std::make_shared<SubBackward>();
+                node = std::make_shared<SubBackward>(ctx.inputs[0].get().shape(), ctx.inputs[1].get().shape());
                 break;
             case OpType::Mul:
                 node = std::make_shared<MulBackward>(ctx.inputs[0].get(), ctx.inputs[1].get());
@@ -42,12 +43,32 @@ namespace helix {
             case OpType::Neg:
                 node = std::make_shared<NegBackward>();
                 break;
-            case OpType::Sum:
-                node = std::make_shared<SumBackward>(ctx.inputs[0].get().shape());
+            case OpType::Exp:
+                node = std::make_shared<ExpBackward>(ctx.out);
                 break;
-            case OpType::Mean:
-                node = std::make_shared<MeanBackward>(ctx.inputs[0].get().shape());
+            case OpType::Log:
+                node = std::make_shared<LogBackward>(ctx.inputs[0].get());
                 break;
+            case OpType::Sqrt:
+                node = std::make_shared<SqrtBackward>(ctx.out);
+                break;
+            case OpType::Pow:
+                node = std::make_shared<PowBackward>(
+                    ctx.inputs[0].get(), std::any_cast<float>(ctx.attributes.at("exponent"))
+                );
+                break;
+            case OpType::Sum: {
+                auto axis = std::any_cast<std::optional<size_t>>(ctx.attributes.at("axis"));
+                auto keepdim = std::any_cast<bool>(ctx.attributes.at("keepdim"));
+                node = std::make_shared<SumBackward>(ctx.inputs[0].get().shape(), axis, keepdim);
+                break;
+            }
+            case OpType::Mean: {
+                auto axis = std::any_cast<std::optional<size_t>>(ctx.attributes.at("axis"));
+                auto keepdim = std::any_cast<bool>(ctx.attributes.at("keepdim"));
+                node = std::make_shared<MeanBackward>(ctx.inputs[0].get().shape(), axis, keepdim);
+                break;
+            }
             default:
                 // View operations or unsupported ops will be ignored.
                 // In a complete framework, these would also require backward nodes.
