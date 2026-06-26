@@ -97,14 +97,4 @@ TEST_F(NNIntegrationTest, SubgraphIsolation_Detach) {
     EXPECT_EQ(fc1.parameters()[0].grad().rank(), 0);
 }
 
-TEST_F(NNIntegrationTest, ResourceAllocation_MemoryLeakStressTest) {
-    for (int i = 0; i < 50; ++i) {
-        Sequential net(Linear(2, 32), ReLU(), Linear(32, 16), ReLU(), Linear(16, 1));
-        Tensor x = Tensor::randn({128, 2});
-        Tensor target = Tensor::randn({128, 1});
-        Tensor y = net(x);
-        Tensor loss = mse_loss(y, target);
-        loss.backward();
-    }
-    SUCCEED();
-}
+

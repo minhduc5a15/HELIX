@@ -53,3 +53,24 @@ TEST_F(SequentialTest, EdgeCases_LargeSequentialParametersOrder) {
     EXPECT_EQ(params[4].shape().vec(), (std::vector<size_t>{8, 16}));  // w3
     EXPECT_EQ(params[5].shape().vec(), (std::vector<size_t>{16}));     // b3
 }
+
+TEST_F(SequentialTest, NonContiguousTensorPropagation) {
+    Sequential net(Linear(2, 4), ReLU(), Linear(4, 1));
+    
+    // Create a contiguous tensor [2, 32] and transpose to [32, 2] -> non-contiguous
+    Tensor x = Tensor::randn({2, 32});
+    Tensor x_t = x.transpose(0, 1);
+    EXPECT_FALSE(x_t.is_contiguous());
+    EXPECT_EQ(x_t.shape().vec(), (std::vector<size_t>{32, 2}));
+    
+    x_t.set_requires_grad(true);
+
+    Tensor y = net(x_t);
+    EXPECT_EQ(y.shape().vec(), (std::vector<size_t>{32, 1}));
+    
+    Tensor loss = y.sum();
+    loss.backward();
+
+    EXPECT_EQ(x_t.grad().shape().vec(), (std::vector<size_t>{32, 2}));
+    EXPECT_EQ(net.parameters()[0].grad().shape().vec(), (std::vector<size_t>{2, 4}));
+}
