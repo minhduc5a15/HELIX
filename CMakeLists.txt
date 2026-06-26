@@ -48,3 +48,4 @@ enable_testing()
 # We will add test targets in tests/CMakeLists.txt later, or right here.
 # Let's keep it simple and add them here when needed.
 add_subdirectory(tests)
+add_subdirectory(stress)

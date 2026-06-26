@@ -40,6 +40,10 @@ target_link_libraries(autograd_ops_test PRIVATE helix GTest::gtest_main)
 gtest_discover_tests(autograd_ops_test)
 
 # Neural Network layer tests
+add_executable(module_test module_test.cpp)
+target_link_libraries(module_test PRIVATE helix GTest::gtest_main)
+gtest_discover_tests(module_test)
+
 add_executable(linear_test linear_test.cpp grad_check.cpp)
 target_link_libraries(linear_test PRIVATE helix GTest::gtest_main)
 gtest_discover_tests(linear_test)
