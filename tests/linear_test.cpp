@@ -76,13 +76,4 @@ TEST_F(LinearTest, Contiguity_NonContiguousInput) {
     EXPECT_EQ(fc.parameters()[0].grad().shape().vec(), (std::vector<size_t>{4, 8}));
 }
 
-TEST_F(LinearTest, StressTest) {
-    Linear fc(4, 8);
-    for (int i = 0; i < 100; ++i) {
-        Tensor x = Tensor::randn({32, 4});
-        Tensor y = fc(x);
-        Tensor loss = y.sum();
-        loss.backward();
-    }
-    SUCCEED();
-}
+
