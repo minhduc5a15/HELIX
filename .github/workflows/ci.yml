@@ -21,13 +21,21 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Configure CMake
-      # We don't use the 'HELIX' preset here because it hardcodes Linux clang-18 paths.
-      # Instead, we let CMake automatically pick the best compiler (GCC/MSVC/AppleClang) for the OS.
       run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{matrix.build_type}}
 
     - name: Build
       run: cmake --build ${{github.workspace}}/build --config ${{matrix.build_type}} -j 4
 
-    - name: Test
-      working-directory: ${{github.workspace}}/build
-      run: ctest -C ${{matrix.build_type}} --output-on-failure
+    - name: Evaluate (Test and Benchmark)
+      shell: bash
+      working-directory: ${{github.workspace}}
+      run: |
+        chmod +x ./run_eval.sh
+        ./run_eval.sh ${{github.workspace}}/build
+
+    - name: Upload Evaluation Artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: helix-eval-results-${{matrix.os}}
+        path: output/
