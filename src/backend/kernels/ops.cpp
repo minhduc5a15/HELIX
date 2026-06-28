@@ -95,12 +95,14 @@ namespace helix {
         }
     }
 
-    inline void kernel_sgd(float* param, const float* grad, float lr, size_t size) {
+    inline void kernel_sgd(float* param, const float* grad, const float lr, const size_t size) {
         for (size_t i = 0; i < size; ++i) {
             param[i] -= lr * grad[i];
         }
     }
 
-    void CPUBackend::sgd(float* param, const float* grad, float lr, size_t size) { kernel_sgd(param, grad, lr, size); }
+    void CPUBackend::sgd(float* param, const float* grad, const float lr, const size_t size) {
+        kernel_sgd(param, grad, lr, size);
+    }
 
 }  // namespace helix

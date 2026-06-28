@@ -33,6 +33,19 @@ add_library(helix
 )
 target_include_directories(helix PUBLIC include)
 
+# OpenMP Configuration
+find_package(OpenMP)
+if(OpenMP_FOUND)
+    target_link_libraries(helix PUBLIC OpenMP::OpenMP_CXX)
+endif()
+
+# AVX2 and FMA Compiler Flags
+if(MSVC)
+    target_compile_options(helix PUBLIC /arch:AVX2 /O2)
+else()
+    target_compile_options(helix PUBLIC -mavx2 -mfma -O3)
+endif()
+
 # Fetch GoogleTest
 include(FetchContent)
 FetchContent_Declare(
@@ -46,7 +59,7 @@ FetchContent_MakeAvailable(googletest)
 # Enable testing
 enable_testing()
 
-# We will add test targets in tests/CMakeLists.txt later, or right here.
-# Let's keep it simple and add them here when needed.
 add_subdirectory(tests)
 add_subdirectory(stress)
+add_subdirectory(benchmark)
+add_subdirectory(examples)
