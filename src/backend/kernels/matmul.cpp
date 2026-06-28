@@ -61,7 +61,7 @@ namespace helix {
     void CPUBackend::matmul_tiled(
         const float* a, const float* b_t, float* out, const size_t M, const size_t K, const size_t N
     ) {
-        // Có thể thay đổi Tile size thông qua template argument
+        // Tile size can be modified via template arguments
         kernel_matmul_tiled<64, 64, 64>(a, b_t, out, M, K, N);
     }
 
@@ -114,12 +114,16 @@ namespace helix {
 #endif
     }
 
-    // Helper kiểm tra AVX2 hỗ trợ tại runtime
+    // Helper to check AVX2 support at runtime
     inline bool supports_avx2() {
+#if defined(__x86_64__) || defined(_M_X64)
 #if defined(__GNUC__) || defined(__clang__)
         return __builtin_cpu_supports("avx2") && __builtin_cpu_supports("fma");
 #else
-        return true; // Giả định true hoặc implement cho MSVC __cpuid
+        return true; // Assume true or implement __cpuid for MSVC
+#endif
+#else
+        return false; // ARM64 and others do not support AVX2
 #endif
     }
 

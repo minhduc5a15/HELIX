@@ -39,11 +39,19 @@ if(OpenMP_FOUND)
     target_link_libraries(helix PUBLIC OpenMP::OpenMP_CXX)
 endif()
 
-# AVX2 and FMA Compiler Flags
-if(MSVC)
-    target_compile_options(helix PUBLIC /arch:AVX2 /O2)
+# Compiler Flags (AVX2/FMA only on x86_64)
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "amd64|AMD64|x86_64|X86_64")
+    if(MSVC)
+        target_compile_options(helix PUBLIC /arch:AVX2 /O2)
+    else()
+        target_compile_options(helix PUBLIC -mavx2 -mfma -O3)
+    endif()
 else()
-    target_compile_options(helix PUBLIC -mavx2 -mfma -O3)
+    if(MSVC)
+        target_compile_options(helix PUBLIC /O2)
+    else()
+        target_compile_options(helix PUBLIC -O3)
+    endif()
 endif()
 
 # Fetch GoogleTest
