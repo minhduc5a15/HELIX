@@ -96,5 +96,3 @@ TEST_F(NNIntegrationTest, SubgraphIsolation_Detach) {
     // Since default Tensor() has Shape{} (rank 0, numel 1), an unpopulated grad for a (2,4) weight will have rank 0.
     EXPECT_EQ(fc1.parameters()[0].grad().rank(), 0);
 }
-
-

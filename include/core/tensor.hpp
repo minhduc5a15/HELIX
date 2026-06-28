@@ -85,7 +85,8 @@ namespace helix {
 
         // Autograd API
         bool requires_grad() const;
-        void set_requires_grad(bool req);
+        void set_requires_grad(bool req) const;
+        bool has_grad() const;
         Tensor& grad();
         const Tensor& grad() const;
         void backward(const std::vector<Tensor>& grad_outputs = {});
@@ -98,6 +99,7 @@ namespace helix {
         // Memory operations
         Tensor clone() const;
         void copy_(const Tensor& src);
+        void zero_();
         Tensor contiguous() const;
         bool is_contiguous() const;
 

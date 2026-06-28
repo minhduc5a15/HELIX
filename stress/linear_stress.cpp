@@ -1,7 +1,8 @@
 #include <gtest/gtest.h>
-#include "nn/linear.hpp"
-#include "core/tensor.hpp"
+
 #include "autograd/engine.hpp"
+#include "core/tensor.hpp"
+#include "nn/linear.hpp"
 
 using namespace helix;
 
@@ -30,7 +31,7 @@ TEST_F(LinearStressTest, HighVolumeDataStressTest) {
         Tensor y = fc(x);
         Tensor loss = y.sum();
         loss.backward();
-        
+
         EXPECT_EQ(fc.parameters()[0].grad().shape().vec(), (std::vector<size_t>{512, 1024}));
     }
     SUCCEED();

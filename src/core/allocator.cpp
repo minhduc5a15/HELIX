@@ -31,7 +31,7 @@ namespace helix {
         return ptr;
     }
 
-    void MemoryPool::deallocate(void* ptr, size_t bytes) {
+    void MemoryPool::deallocate(void* ptr, const size_t bytes) {
         if (!ptr) return;
         const size_t alloc_size = (bytes + 31) & ~31;
         free_blocks_[alloc_size].push_back(ptr);

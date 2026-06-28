@@ -1,7 +1,8 @@
 #include <gtest/gtest.h>
-#include "nn/relu.hpp"
-#include "core/tensor.hpp"
+
 #include "autograd/engine.hpp"
+#include "core/tensor.hpp"
+#include "nn/relu.hpp"
 
 using namespace helix;
 
@@ -31,7 +32,7 @@ TEST_F(ReLUStressTest, HighVolumeDataStressTest) {
         Tensor y = relu(x);
         Tensor loss = y.sum();
         loss.backward();
-        
+
         EXPECT_EQ(x.grad().shape().vec(), (std::vector<size_t>{1024, 1024}));
     }
     SUCCEED();
@@ -42,16 +43,16 @@ TEST_F(ReLUStressTest, DeepGraphTeardownStressTest) {
     // std::shared_ptr destruction is recursive, so a deep chain can overflow the stack.
     Tensor x = Tensor::randn({10});
     x.set_requires_grad(true);
-    
+
     Tensor current = x;
     for (int i = 0; i < 1000; ++i) {
         current = relu(current);
     }
-    
+
     Tensor loss = current.sum();
     // This triggers 1000-deep backward recursion, and when it falls out of scope,
     // a 1000-deep shared_ptr destruction recursion.
     loss.backward();
-    
+
     EXPECT_EQ(x.grad().shape().vec(), (std::vector<size_t>{10}));
 }

@@ -63,3 +63,11 @@ gtest_discover_tests(sequential_test)
 add_executable(nn_integration_test nn_integration_test.cpp grad_check.cpp)
 target_link_libraries(nn_integration_test PRIVATE helix GTest::gtest_main)
 gtest_discover_tests(nn_integration_test)
+
+add_executable(sgd_test sgd_test.cpp)
+target_link_libraries(sgd_test PRIVATE helix GTest::gtest_main)
+gtest_discover_tests(sgd_test)
+
+add_executable(training_test training_test.cpp)
+target_link_libraries(training_test PRIVATE helix GTest::gtest_main)
+gtest_discover_tests(training_test)
