@@ -2,9 +2,9 @@ name: HELIX CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "m3w4" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "m3w4" ]
 
 jobs:
   build-and-test:
