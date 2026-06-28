@@ -36,6 +36,9 @@ namespace helix {
         // output is treated as [outer_size, inner_size]
         static void sum(const float* input, float* output, size_t outer_size, size_t dim_size, size_t inner_size);
         static void mean(const float* input, float* output, size_t outer_size, size_t dim_size, size_t inner_size);
+
+        // SGD Optimization Kernel
+        static void sgd(float* param, const float* grad, float lr, size_t size);
     };
 
 }  // namespace helix

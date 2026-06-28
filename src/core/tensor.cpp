@@ -1,6 +1,7 @@
 #include "core/tensor.hpp"
 
-#include <cstring>  // for memcpy
+#include <algorithm>  // for std::fill_n
+#include <cstring>    // for memcpy
 #include <stdexcept>
 
 #include "core/autograd_meta.hpp"
@@ -26,7 +27,7 @@ namespace helix {
     Tensor Tensor::empty(const Shape& shape) { return TensorFactory::empty(shape); }
     Tensor Tensor::zeros(const Shape& shape) { return TensorFactory::zeros(shape); }
     Tensor Tensor::ones(const Shape& shape) { return TensorFactory::ones(shape); }
-    Tensor Tensor::full(const Shape& shape, float value) { return TensorFactory::full(shape, value); }
+    Tensor Tensor::full(const Shape& shape, const float value) { return TensorFactory::full(shape, value); }
     Tensor Tensor::randn(const Shape& shape) { return TensorFactory::randn(shape); }
 
     Tensor::Tensor() : impl_(std::make_shared<TensorImpl>(Shape{}, DType::Float32, Device(DeviceType::CPU))) {}
@@ -72,12 +73,12 @@ namespace helix {
     }
 
     float Tensor::item(const std::vector<size_t>& indices) const {
-        size_t offset = stride().compute_offset(indices);
+        const size_t offset = stride().compute_offset(indices);
         return data_ptr()[offset];
     }
 
-    void Tensor::set_item(const std::vector<size_t>& indices, float value) {
-        size_t offset = stride().compute_offset(indices);
+    void Tensor::set_item(const std::vector<size_t>& indices, const float value) {
+        const size_t offset = stride().compute_offset(indices);
         data_ptr()[offset] = value;
     }
 
@@ -90,7 +91,7 @@ namespace helix {
         if (!is_contiguous()) {
             throw std::runtime_error("view cannot be called on non-contiguous tensor, use reshape instead");
         }
-        auto new_impl = std::make_shared<TensorImpl>(
+        const auto new_impl = std::make_shared<TensorImpl>(
             impl_->storage(),
             impl_->storage_offset(),
             std::move(new_shape),
@@ -148,6 +149,25 @@ namespace helix {
         }
     }
 
+    void Tensor::zero_() {
+        if (is_contiguous()) {
+            std::fill_n(data_ptr(), numel(), 0.0f);
+        } else {
+            std::vector<size_t> indices(rank(), 0);
+            for (size_t i = 0; i < numel(); ++i) {
+                set_item(indices, 0.0f);
+
+                for (int j = static_cast<int>(rank()) - 1; j >= 0; --j) {
+                    indices[j]++;
+                    if (indices[j] < shape()[j]) {
+                        break;
+                    }
+                    indices[j] = 0;
+                }
+            }
+        }
+    }
+
     Tensor Tensor::contiguous() const {
         if (is_contiguous()) return *this;
         return clone();
@@ -168,13 +188,13 @@ namespace helix {
     Tensor Tensor::detach() const {
         // Detach creates a new Tensor that shares storage but has no autograd history.
         // It has a new TensorImpl with autograd_meta_ initialized to nullptr.
-        auto new_impl = std::make_shared<TensorImpl>(
+        const auto new_impl = std::make_shared<TensorImpl>(
             impl_->storage(), impl_->storage_offset(), shape(), stride(), dtype(), device()
         );
         return Tensor(new_impl);
     }
 
-    Tensor Tensor::slice(size_t dim, size_t start, size_t end) const {
+    Tensor Tensor::slice(const size_t dim, const size_t start, const size_t end) const {
         if (dim >= rank()) {
             throw std::out_of_range("slice dimension out of range");
         }
@@ -187,12 +207,12 @@ namespace helix {
 
         size_t new_offset = impl_->storage_offset() + start * stride()[dim];
 
-        auto new_impl =
+        const auto new_impl =
             std::make_shared<TensorImpl>(impl_->storage(), new_offset, Shape(new_dims), stride(), dtype(), device());
         return Tensor(new_impl);
     }
 
-    Tensor Tensor::transpose(size_t dim0, size_t dim1) const {
+    Tensor Tensor::transpose(const size_t dim0, const size_t dim1) const {
         if (dim0 >= rank() || dim1 >= rank()) {
             throw std::out_of_range("transpose dimensions out of range");
         }
@@ -203,7 +223,7 @@ namespace helix {
         std::vector<size_t> new_strides = stride().vec();
         std::swap(new_strides[dim0], new_strides[dim1]);
 
-        auto new_impl = std::make_shared<TensorImpl>(
+        const auto new_impl = std::make_shared<TensorImpl>(
             impl_->storage(), impl_->storage_offset(), Shape(new_dims), Stride(new_strides), dtype(), device()
         );
         return Tensor(new_impl);
@@ -214,7 +234,7 @@ namespace helix {
 
         Stride new_stride = compute_broadcast_strides(shape(), stride(), new_shape);
 
-        auto new_impl = std::make_shared<TensorImpl>(
+        const auto new_impl = std::make_shared<TensorImpl>(
             impl_->storage(), impl_->storage_offset(), std::move(new_shape), std::move(new_stride), dtype(), device()
         );
         return Tensor(new_impl);
@@ -225,27 +245,34 @@ namespace helix {
     Tensor Tensor::operator*(const Tensor& other) const { return Dispatcher::mul(*this, other); }
     Tensor Tensor::operator/(const Tensor& other) const { return Dispatcher::div(*this, other); }
 
-    Tensor Tensor::operator+(float scalar) const { return Dispatcher::add_scalar(*this, scalar); }
-    Tensor Tensor::operator-(float scalar) const { return Dispatcher::sub_scalar(*this, scalar); }
-    Tensor Tensor::operator*(float scalar) const { return Dispatcher::mul_scalar(*this, scalar); }
-    Tensor Tensor::operator/(float scalar) const { return Dispatcher::div_scalar(*this, scalar); }
+    Tensor Tensor::operator+(const float scalar) const { return Dispatcher::add_scalar(*this, scalar); }
+    Tensor Tensor::operator-(const float scalar) const { return Dispatcher::sub_scalar(*this, scalar); }
+    Tensor Tensor::operator*(const float scalar) const { return Dispatcher::mul_scalar(*this, scalar); }
+    Tensor Tensor::operator/(const float scalar) const { return Dispatcher::div_scalar(*this, scalar); }
     Tensor Tensor::operator-() const { return Dispatcher::neg(*this); }
     Tensor Tensor::exp() const { return Dispatcher::exp(*this); }
     Tensor Tensor::log() const { return Dispatcher::log(*this); }
     Tensor Tensor::sqrt() const { return Dispatcher::sqrt(*this); }
     Tensor Tensor::relu() const { return Dispatcher::relu(*this); }
-    Tensor Tensor::pow(float exponent) const { return Dispatcher::pow(*this, exponent); }
+    Tensor Tensor::pow(const float exponent) const { return Dispatcher::pow(*this, exponent); }
     Tensor Tensor::matmul(const Tensor& other) const { return Dispatcher::matmul(*this, other); }
 
-    Tensor Tensor::sum(std::optional<size_t> axis, bool keepdim) const { return Dispatcher::sum(*this, axis, keepdim); }
-    Tensor Tensor::mean(std::optional<size_t> axis, bool keepdim) const {
+    Tensor Tensor::sum(const std::optional<size_t> axis, const bool keepdim) const {
+        return Dispatcher::sum(*this, axis, keepdim);
+    }
+    Tensor Tensor::mean(const std::optional<size_t> axis, const bool keepdim) const {
         return Dispatcher::mean(*this, axis, keepdim);
     }
 
     // Autograd API implementations
     bool Tensor::requires_grad() const { return impl_->autograd_meta() != nullptr; }
 
-    void Tensor::set_requires_grad(bool req) {
+    bool Tensor::has_grad() const {
+        if (!requires_grad()) return false;
+        return get_autograd_provider()->has_grad(*this);
+    }
+
+    void Tensor::set_requires_grad(const bool req) const {
         if (req && !requires_grad()) {
             // Lazy allocation: only create if it doesn't exist and req is true
             impl_->set_autograd_meta(

@@ -353,4 +353,17 @@ namespace helix {
         return out;
     }
 
+    void Dispatcher::sgd(Tensor& param, const Tensor& grad, float lr) {
+        Tensor lhs = ensure_contiguous(param);
+        Tensor rhs = ensure_contiguous(grad);
+        if (param.device().is_cpu()) {
+            CPUBackend::sgd(lhs.data_ptr(), rhs.data_ptr(), lr, lhs.numel());
+            if (!param.is_contiguous()) {
+                param.copy_(lhs);
+            }
+        } else {
+            throw std::runtime_error("Unsupported device");
+        }
+    }
+
 }  // namespace helix

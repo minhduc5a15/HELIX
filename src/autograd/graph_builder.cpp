@@ -98,7 +98,7 @@ namespace helix {
 
         // Step 4: Mark output tensor as requires_grad and set its grad_fn
         ctx.out.set_requires_grad(true);
-        auto out_meta = static_cast<AutogradMeta*>(ctx.out.impl()->autograd_meta());
+        const auto out_meta = ctx.out.impl()->autograd_meta();
         if (out_meta) {
             out_meta->set_grad_fn(node);
         }

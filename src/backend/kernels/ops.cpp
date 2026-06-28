@@ -1,5 +1,5 @@
-#include <cmath>
 #include <algorithm>
+#include <cmath>
 
 #include "backend/cpu_backend.hpp"
 
@@ -94,5 +94,13 @@ namespace helix {
             out[i] = std::pow(a[i], exponent);
         }
     }
+
+    inline void kernel_sgd(float* param, const float* grad, float lr, size_t size) {
+        for (size_t i = 0; i < size; ++i) {
+            param[i] -= lr * grad[i];
+        }
+    }
+
+    void CPUBackend::sgd(float* param, const float* grad, float lr, size_t size) { kernel_sgd(param, grad, lr, size); }
 
 }  // namespace helix

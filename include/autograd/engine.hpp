@@ -18,6 +18,7 @@ namespace helix {
         void backward(Tensor& tensor, const std::vector<Tensor>& grad_outputs) override;
         Tensor& get_grad(const Tensor& tensor) override;
         const Tensor& get_grad(const Tensor& tensor) const override;
+        bool has_grad(const Tensor& tensor) const override;
 
     private:
         BackwardEngine engine_;
