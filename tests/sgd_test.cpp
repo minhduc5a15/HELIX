@@ -80,13 +80,13 @@ TEST_F(SGDTest, ZeroGradCheck) {
     x.backward();
 
     // Gradient should be all ones
-    EXPECT_FLOAT_EQ(param.grad().data_ptr()[0], 1.0f);
+    EXPECT_FLOAT_EQ(param.grad().contiguous().data_ptr()[0], 1.0f);
 
     opt.zero_grad();
 
     // Gradient should be all zeros
-    EXPECT_FLOAT_EQ(param.grad().data_ptr()[0], 0.0f);
-    EXPECT_FLOAT_EQ(param.grad().data_ptr()[1], 0.0f);
+    EXPECT_FLOAT_EQ(param.grad().contiguous().data_ptr()[0], 0.0f);
+    EXPECT_FLOAT_EQ(param.grad().contiguous().data_ptr()[1], 0.0f);
 }
 
 TEST_F(SGDTest, NonContiguousParameterUpdate) {
