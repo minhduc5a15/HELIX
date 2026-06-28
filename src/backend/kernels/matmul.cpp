@@ -31,13 +31,11 @@ namespace helix {
         }
     }
 
-    void CPUBackend::matmul_tiled(
+    template <size_t TileM = 64, size_t TileN = 64, size_t TileK = 64>
+    void kernel_matmul_tiled(
         const float* a, const float* b_t, float* out, const size_t M, const size_t K, const size_t N
     ) {
         std::fill_n(out, M * N, 0.0f);
-        constexpr size_t TileM = 64;
-        constexpr size_t TileN = 64;
-        constexpr size_t TileK = 64;
 
         for (size_t ih = 0; ih < M; ih += TileM) {
             const size_t i_end = std::min(ih + TileM, M);
@@ -58,6 +56,13 @@ namespace helix {
                 }
             }
         }
+    }
+
+    void CPUBackend::matmul_tiled(
+        const float* a, const float* b_t, float* out, const size_t M, const size_t K, const size_t N
+    ) {
+        // Có thể thay đổi Tile size thông qua template argument
+        kernel_matmul_tiled<64, 64, 64>(a, b_t, out, M, K, N);
     }
 
     void CPUBackend::matmul_avx2(
@@ -109,10 +114,20 @@ namespace helix {
 #endif
     }
 
+    // Helper kiểm tra AVX2 hỗ trợ tại runtime
+    inline bool supports_avx2() {
+#if defined(__GNUC__) || defined(__clang__)
+        return __builtin_cpu_supports("avx2") && __builtin_cpu_supports("fma");
+#else
+        return true; // Giả định true hoặc implement cho MSVC __cpuid
+#endif
+    }
+
     void CPUBackend::matmul(
         const float* a, const float* b_t, float* out, const size_t M, const size_t K, const size_t N
     ) {
-#if defined(__AVX2__)
+        bool use_avx2 = supports_avx2();
+
         constexpr size_t threshold = 16384;  // 128 * 128 threshold to trigger multithreading
         if (M * N >= threshold) {
 #if defined(_OPENMP)
@@ -132,25 +147,35 @@ namespace helix {
 
                         for (size_t i = static_cast<size_t>(ih); i < i_end; ++i) {
                             for (size_t j = static_cast<size_t>(jh); j < j_end; ++j) {
-                                __m256 acc = _mm256_setzero_ps();
-                                size_t k = kh;
-                                for (; k + 7 < k_end; k += 8) {
-                                    const __m256 va = _mm256_loadu_ps(&a[i * K + k]);
-                                    const __m256 vb = _mm256_loadu_ps(&b_t[j * K + k]);
+                                float sum = 0.0f;
+                                
+                                if (use_avx2) {
+#if defined(__AVX2__)
+                                    __m256 acc = _mm256_setzero_ps();
+                                    size_t k = kh;
+                                    for (; k + 7 < k_end; k += 8) {
+                                        const __m256 va = _mm256_loadu_ps(&a[i * K + k]);
+                                        const __m256 vb = _mm256_loadu_ps(&b_t[j * K + k]);
 #if defined(HELIX_USE_FMA)
-                                    acc = _mm256_fmadd_ps(va, vb, acc);
+                                        acc = _mm256_fmadd_ps(va, vb, acc);
 #else
-                                    acc = _mm256_add_ps(acc, _mm256_mul_ps(va, vb));
+                                        acc = _mm256_add_ps(acc, _mm256_mul_ps(va, vb));
 #endif
-                                }
+                                    }
 
-                                alignas(32) float temp[8];
-                                _mm256_storeu_ps(temp, acc);
-                                float sum =
-                                    temp[0] + temp[1] + temp[2] + temp[3] + temp[4] + temp[5] + temp[6] + temp[7];
+                                    alignas(32) float temp[8];
+                                    _mm256_storeu_ps(temp, acc);
+                                    sum = temp[0] + temp[1] + temp[2] + temp[3] + temp[4] + temp[5] + temp[6] + temp[7];
 
-                                for (; k < k_end; ++k) {
-                                    sum += a[i * K + k] * b_t[j * K + k];
+                                    for (; k < k_end; ++k) {
+                                        sum += a[i * K + k] * b_t[j * K + k];
+                                    }
+#endif
+                                } else {
+                                    // Fallback to scalar
+                                    for (size_t k = kh; k < k_end; ++k) {
+                                        sum += a[i * K + k] * b_t[j * K + k];
+                                    }
                                 }
                                 out[i * N + j] += sum;
                             }
@@ -159,14 +184,19 @@ namespace helix {
                 }
             }
 #else
-            matmul_avx2(a, b_t, out, M, K, N);
+            if (use_avx2) {
+                matmul_avx2(a, b_t, out, M, K, N);
+            } else {
+                matmul_tiled(a, b_t, out, M, K, N);
+            }
 #endif
         } else {
-            matmul_avx2(a, b_t, out, M, K, N);
+            if (use_avx2) {
+                matmul_avx2(a, b_t, out, M, K, N);
+            } else {
+                matmul_tiled(a, b_t, out, M, K, N);
+            }
         }
-#else
-        matmul_tiled(a, b_t, out, M, K, N);
-#endif
     }
 
 }  // namespace helix
