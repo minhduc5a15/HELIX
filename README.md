@@ -4,6 +4,38 @@
 
 **HELIX** is a lightweight, high-performance deep learning framework built entirely from scratch in C++20. Designed for educational purposes, rapid prototyping, and high-performance execution on CPU architectures, HELIX provides a modern Autograd engine, a rich set of Neural Network modules, and highly optimized backend execution paths leveraging SIMD (AVX2/FMA) and OpenMP multi-threading.
 
+## ⚙️ Architecture
+
+HELIX is built with a clean, extensible layered architecture.
+
+```mermaid
+graph TD
+    A[Tensor & Autograd] -->|forward / backward| B[Dispatcher]
+    B -->|matmul, add, sgd| C[CPU Backend]
+    C -->|Runtime Routing| D{Matrix Size & CPUID}
+    D -->|Small| E[matmul_naive]
+    D -->|Large, No AVX2| F[matmul_tiled <br> template cache blocking]
+    D -->|Large, AVX2 / FMA| G[matmul_avx2 + OpenMP]
+
+    classDef core fill:#f9f9f9,stroke:#333,stroke-width:2px;
+    classDef opt fill:#e1f5fe,stroke:#0288d1,stroke-width:2px;
+    class A,B,C core;
+    class E,F,G opt;
+```
+
+## 🚀 Performance
+
+HELIX is heavily optimized for modern CPUs. The matrix multiplication backend uses **Tiling (Cache Blocking)**, **AVX2 & FMA intrinsics**, and **OpenMP Multithreading**. AVX2 support is routed natively at **Runtime** using CPUID.
+
+### Benchmark: Matrix Multiplication
+*Measurements taken on a standard x86 CPU. (Lower is better).*
+
+| Size | Naive | Tiled (Cache-aware) | AVX2 + FMA | AVX2 + OpenMP | Speedup vs Naive |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **127 x 127** | ~4.5 ms | ~2.5 ms | ~0.3 ms | ~0.3 ms | **~15x** |
+| **511 x 511** | ~280 ms | ~150 ms | ~30 ms | ~8 ms | **~35x** |
+| **1023 x 1023** | ~3.8 s | ~2.0 s | ~350 ms | ~45 ms | **~84x** |
+
 ## Key Features
 
 - **Dynamic Computational Graph (Autograd)**: Define-by-run automatic differentiation similar to PyTorch, supporting complex forward and backward passes.
@@ -57,15 +89,17 @@ Here is a quick example of defining and training a neural network in HELIX to le
 using namespace helix;
 
 int main() {
+    init_autograd();
+    
     // Inputs: (0,0), (0,1), (1,0), (1,1) -> Targets: 0, 1, 1, 0
-    auto X = tensor({0.f, 0.f, 0.f, 1.f, 1.f, 0.f, 1.f, 1.f}, {4, 2});
-    auto Y = tensor({0.f, 1.f, 1.f, 0.f}, {4, 1});
+    auto X = Tensor({0.f, 0.f, 0.f, 1.f, 1.f, 0.f, 1.f, 1.f}, {4, 2});
+    auto Y = Tensor({0.f, 1.f, 1.f, 0.f}, {4, 1});
 
     // Define MLP: 2 -> 4 -> 1
     Sequential model(
-        std::make_shared<Linear>(2, 4),
-        std::make_shared<ReLU>(),
-        std::make_shared<Linear>(4, 1)
+        Linear(2, 4),
+        ReLU(),
+        Linear(4, 1)
     );
 
     // Stochastic Gradient Descent
@@ -76,7 +110,7 @@ int main() {
         auto loss = mse_loss(pred, Y);
         
         optimizer.zero_grad();
-        loss->backward();
+        loss.backward();
         optimizer.step();
     }
     
