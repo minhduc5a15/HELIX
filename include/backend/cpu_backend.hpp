@@ -30,6 +30,9 @@ namespace helix {
 
         // Matrix Multiplication
         static void matmul(const float* a, const float* b_t, float* out, size_t M, size_t K, size_t N);
+        static void matmul_naive(const float* a, const float* b_t, float* out, size_t M, size_t K, size_t N);
+        static void matmul_tiled(const float* a, const float* b_t, float* out, size_t M, size_t K, size_t N);
+        static void matmul_avx2(const float* a, const float* b_t, float* out, size_t M, size_t K, size_t N);
 
         // Reduce Operations (using 3D collapse technique)
         // input is treated as [outer_size, dim_size, inner_size]
