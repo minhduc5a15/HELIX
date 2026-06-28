@@ -30,8 +30,21 @@ jobs:
       shell: bash
       working-directory: ${{github.workspace}}
       run: |
-        chmod +x ./run_eval.sh
-        ./run_eval.sh ${{github.workspace}}/build
+        mkdir -p output
+        TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+        TEST_OUT="output/test_results_${TIMESTAMP}.xml"
+        BENCH_OUT="output/benchmark_results_${TIMESTAMP}.json"
+        
+        echo "Running Unit Tests and saving to XML..."
+        ctest --test-dir build -C ${{matrix.build_type}} --output-on-failure --output-junit "$TEST_OUT"
+        
+        echo "Running Google Benchmark and saving to JSON..."
+        BENCHMARK_BIN=$(find build -type f \( -name "matmul_benchmark" -o -name "matmul_benchmark.exe" \) | head -n 1)
+        if [ -n "$BENCHMARK_BIN" ]; then
+            "$BENCHMARK_BIN" --benchmark_format=json --benchmark_out="$BENCH_OUT"
+        else
+            echo "Benchmark executable not found! Skipping benchmark."
+        fi
 
     - name: Upload Evaluation Artifacts
       uses: actions/upload-artifact@v4
