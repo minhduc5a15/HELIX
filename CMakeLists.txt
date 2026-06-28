@@ -29,6 +29,7 @@ add_library(helix
     src/nn/relu.cpp
     src/nn/sequential.cpp
     src/nn/loss.cpp
+    src/optim/sgd.cpp
 )
 target_include_directories(helix PUBLIC include)
 

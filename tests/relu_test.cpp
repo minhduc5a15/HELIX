@@ -107,16 +107,16 @@ TEST_F(ReLUTest, ShallowCopyDynamics_NoSourceModification) {
 TEST_F(ReLUTest, ReLU) {
     // Explicitly verify ReLU forward activation values
     ReLU relu_layer;
-    
+
     Tensor x({5});
     x.data_ptr()[0] = -10.0f;
     x.data_ptr()[1] = 0.0f;
     x.data_ptr()[2] = 5.0f;
     x.data_ptr()[3] = -0.5f;
     x.data_ptr()[4] = 100.0f;
-    
+
     Tensor y = relu_layer(x);
-    
+
     EXPECT_EQ(y.shape().vec(), (std::vector<size_t>{5}));
     EXPECT_FLOAT_EQ(y.data_ptr()[0], 0.0f);
     EXPECT_FLOAT_EQ(y.data_ptr()[1], 0.0f);
@@ -124,4 +124,3 @@ TEST_F(ReLUTest, ReLU) {
     EXPECT_FLOAT_EQ(y.data_ptr()[3], 0.0f);
     EXPECT_FLOAT_EQ(y.data_ptr()[4], 100.0f);
 }
-

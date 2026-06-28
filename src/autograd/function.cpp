@@ -92,7 +92,7 @@ namespace helix {
         return {grad_outputs[0] / (out * 2.0f)};
     }
 
-    PowBackward::PowBackward(const Tensor& a, float exponent) : saved_a_(a), exponent_(exponent) {}
+    PowBackward::PowBackward(const Tensor& a, const float exponent) : saved_a_(a), exponent_(exponent) {}
 
     std::vector<Tensor> PowBackward::backward(const std::vector<Tensor>& grad_outputs) {
         const Tensor& a = saved_a_.unpack();

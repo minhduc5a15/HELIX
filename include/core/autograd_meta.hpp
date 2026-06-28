@@ -11,7 +11,7 @@ namespace helix {
     // The implementation must be provided by the autograd module to ensure Core
     // has no compile-time dependency on Autograd's internals.
     struct AutogradMetaDeleter {
-        void operator()(AutogradMeta* meta) const;
+        void operator()(const AutogradMeta* meta) const;
     };
 
     class Tensor;
@@ -24,6 +24,7 @@ namespace helix {
         virtual void backward(Tensor& tensor, const std::vector<Tensor>& grad_outputs) = 0;
         virtual Tensor& get_grad(const Tensor& tensor) = 0;
         virtual const Tensor& get_grad(const Tensor& tensor) const = 0;
+        virtual bool has_grad(const Tensor& tensor) const = 0;
     };
 
     void register_autograd_provider(AutogradProvider* provider);

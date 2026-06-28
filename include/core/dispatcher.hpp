@@ -39,6 +39,9 @@ namespace helix {
 
         static Tensor sum(const Tensor& a, std::optional<size_t> axis = std::nullopt, bool keepdim = false);
         static Tensor mean(const Tensor& a, std::optional<size_t> axis = std::nullopt, bool keepdim = false);
+
+        // Optimization kernels routing
+        static void sgd(Tensor& param, const Tensor& grad, float lr);
     };
 
 }  // namespace helix

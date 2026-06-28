@@ -50,12 +50,31 @@ namespace helix {
         return meta->grad();
     }
 
+    bool AutogradEngineProvider::has_grad(const Tensor& tensor) const {
+        auto meta = static_cast<AutogradMeta*>(tensor.impl()->autograd_meta());
+        return meta && meta->has_grad();
+    }
+
+    struct NoGradGuard {
+        NoGradGuard() {
+            prev_builder_ = Dispatcher::get_graph_builder();
+            Dispatcher::register_graph_builder(nullptr);
+        }
+        ~NoGradGuard() {
+            Dispatcher::register_graph_builder(prev_builder_);
+        }
+    private:
+        GraphBuilderInterface* prev_builder_;
+    };
+
     // BackwardEngine Implementation
     void BackwardEngine::run(Tensor& target, const std::vector<Tensor>& grad_outputs) {
         auto meta = static_cast<AutogradMeta*>(target.impl()->autograd_meta());
         if (!meta || !meta->requires_grad() || (!meta->grad_fn() && !meta->grad_accumulator())) {
             throw std::runtime_error("Cannot run backward on this tensor.");
         }
+
+        NoGradGuard guard;
 
         auto root = meta->grad_fn() ? meta->grad_fn() : meta->grad_accumulator();
 

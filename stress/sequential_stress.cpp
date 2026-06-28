@@ -1,9 +1,10 @@
 #include <gtest/gtest.h>
-#include "nn/sequential.hpp"
+
+#include "autograd/engine.hpp"
+#include "core/tensor.hpp"
 #include "nn/linear.hpp"
 #include "nn/relu.hpp"
-#include "core/tensor.hpp"
-#include "autograd/engine.hpp"
+#include "nn/sequential.hpp"
 
 using namespace helix;
 
@@ -14,11 +15,7 @@ protected:
 
 TEST_F(SequentialStressTest, MemoryLeakStressTest) {
     for (int i = 0; i < 5000; ++i) {
-        Sequential model(
-            Linear(4, 8),
-            ReLU(),
-            Linear(8, 2)
-        );
+        Sequential model(Linear(4, 8), ReLU(), Linear(8, 2));
         Tensor x = Tensor::randn({32, 4});
         Tensor y = model(x);
         Tensor loss = y.sum();
@@ -36,13 +33,13 @@ TEST_F(SequentialStressTest, DeepGraphTeardownStressTest) {
         layers.push_back(std::make_shared<Linear>(4, 4));
     }
     layers.push_back(std::make_shared<Linear>(4, 1));
-    
+
     Sequential model(layers);
-    
+
     Tensor x = Tensor::randn({1, 2});
     Tensor y = model(x);
     Tensor loss = y.sum();
     loss.backward();
-    
+
     EXPECT_EQ(model.parameters()[0].grad().shape().vec(), (std::vector<size_t>{2, 4}));
 }

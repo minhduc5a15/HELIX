@@ -4,6 +4,6 @@
 
 namespace helix {
 
-    void AutogradMetaDeleter::operator()(AutogradMeta* meta) const { delete meta; }
+    void AutogradMetaDeleter::operator()(const AutogradMeta* meta) const { delete meta; }
 
 }  // namespace helix

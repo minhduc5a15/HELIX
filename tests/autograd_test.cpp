@@ -65,3 +65,37 @@ TEST_F(AutogradTest, Detach) {
     // dc/da = b = 2.0
     EXPECT_FLOAT_EQ(a.grad().item(), 2.0f);
 }
+
+TEST_F(AutogradTest, ErrorHandling_NonScalarWithoutGradOutputs) {
+    // Calling backward() on a non-scalar output without grad_outputs should throw std::runtime_error
+    Tensor a({1.0f, 2.0f}, Shape{2});
+    a.set_requires_grad(true);
+
+    Tensor scale({2.0f, 2.0f}, Shape{2});
+    Tensor b = a * scale;
+    EXPECT_THROW({ b.backward(); }, std::runtime_error);
+}
+
+TEST_F(AutogradTest, ErrorHandling_NoRequiresGrad) {
+    // Calling backward() on a tensor that does not require grad should throw std::runtime_error
+    Tensor a({1.0f}, Shape{1});
+    // requires_grad is false by default
+    EXPECT_THROW({ a.backward(); }, std::runtime_error);
+}
+
+TEST_F(AutogradTest, NonScalarWithGradOutputs) {
+    // Calling backward(grad_outputs) on a non-scalar tensor should work and use the provided gradients
+    Tensor x({1.0f, 2.0f}, Shape{2});
+    x.set_requires_grad(true);
+
+    Tensor scale({2.0f, 2.0f}, Shape{2});
+    Tensor y = x * scale;
+
+    // grad_outputs matching shape of y
+    Tensor grad_out({1.0f, 3.0f}, Shape{2});
+    y.backward({grad_out});
+
+    // dy/dx = scale = 2.0, so x.grad = grad_out * scale = [2.0, 6.0]
+    EXPECT_FLOAT_EQ(x.grad().data_ptr()[0], 2.0f);
+    EXPECT_FLOAT_EQ(x.grad().data_ptr()[1], 6.0f);
+}

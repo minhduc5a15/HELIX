@@ -15,10 +15,10 @@ namespace helix {
 
     Tensor TensorFactory::ones(const Shape& shape) { return full(shape, 1.0f); }
 
-    Tensor TensorFactory::full(const Shape& shape, float value) {
+    Tensor TensorFactory::full(const Shape& shape, const float value) {
         Tensor t(shape);
         float* data = t.data_ptr();
-        size_t n = t.numel();
+        const size_t n = t.numel();
         for (size_t i = 0; i < n; ++i) {
             data[i] = value;
         }
@@ -28,7 +28,7 @@ namespace helix {
     Tensor TensorFactory::randn(const Shape& shape) {
         Tensor t(shape);
         float* data = t.data_ptr();
-        size_t n = t.numel();
+        const size_t n = t.numel();
 
         // Use a fixed seed for reproducible tests, or random_device for true randomness.
         static std::mt19937 gen(42);
