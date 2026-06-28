@@ -29,25 +29,25 @@ namespace helix {
         }
     }
 
-    void CPUBackend::add_scalar(const float* a, float scalar, float* out, const size_t size) {
+    void CPUBackend::add_scalar(const float* a, const float scalar, float* out, const size_t size) {
         for (size_t i = 0; i < size; ++i) {
             out[i] = a[i] + scalar;
         }
     }
 
-    void CPUBackend::sub_scalar(const float* a, float scalar, float* out, const size_t size) {
+    void CPUBackend::sub_scalar(const float* a, const float scalar, float* out, const size_t size) {
         for (size_t i = 0; i < size; ++i) {
             out[i] = a[i] - scalar;
         }
     }
 
-    void CPUBackend::mul_scalar(const float* a, float scalar, float* out, const size_t size) {
+    void CPUBackend::mul_scalar(const float* a, const float scalar, float* out, const size_t size) {
         for (size_t i = 0; i < size; ++i) {
             out[i] = a[i] * scalar;
         }
     }
 
-    void CPUBackend::div_scalar(const float* a, float scalar, float* out, const size_t size) {
+    void CPUBackend::div_scalar(const float* a, const float scalar, float* out, const size_t size) {
         for (size_t i = 0; i < size; ++i) {
             out[i] = a[i] / scalar;
         }
@@ -89,7 +89,7 @@ namespace helix {
         }
     }
 
-    void CPUBackend::pow(const float* a, float exponent, float* out, const size_t size) {
+    void CPUBackend::pow(const float* a, const float exponent, float* out, const size_t size) {
         for (size_t i = 0; i < size; ++i) {
             out[i] = std::pow(a[i], exponent);
         }

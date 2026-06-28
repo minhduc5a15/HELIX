@@ -75,7 +75,7 @@ namespace helix {
                 if (next_node_ptr) {
                     Node* next = next_node_ptr.get();
                     in_degrees[next]++;
-                    if (visited.find(next) == visited.end()) {
+                    if (!visited.contains(next)) {
                         visited.insert(next);
                         nodes_to_process.push_back(next);
                     }
@@ -115,7 +115,7 @@ namespace helix {
                 if (next_edges[i]) {
                     Node* next = next_edges[i].get();
 
-                    if (node_gradients.find(next) == node_gradients.end()) {
+                    if (!node_gradients.contains(next)) {
                         node_gradients[next] = {input_grads[i]};
                     } else {
                         // Assuming single output per node
