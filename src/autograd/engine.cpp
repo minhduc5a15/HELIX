@@ -60,9 +60,8 @@ namespace helix {
             prev_builder_ = Dispatcher::get_graph_builder();
             Dispatcher::register_graph_builder(nullptr);
         }
-        ~NoGradGuard() {
-            Dispatcher::register_graph_builder(prev_builder_);
-        }
+        ~NoGradGuard() { Dispatcher::register_graph_builder(prev_builder_); }
+
     private:
         GraphBuilderInterface* prev_builder_;
     };
