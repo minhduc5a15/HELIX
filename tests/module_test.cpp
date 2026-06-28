@@ -143,4 +143,23 @@ TEST_F(ModuleTest, RequiresGradMutation) {
     EXPECT_FALSE(updated_params[0].requires_grad());
 }
 
+TEST_F(ModuleTest, ModuleParameters) {
+    // Explicitly verify Module::parameters() behaves correctly
+    DummyModule module;
+    auto params = module.parameters();
+    EXPECT_EQ(params.size(), 2);
+    EXPECT_EQ(params[0].shape().vec(), (std::vector<size_t>{2, 2}));
+    EXPECT_EQ(params[1].shape().vec(), (std::vector<size_t>{2}));
+}
+
+TEST_F(ModuleTest, RequiresGrad) {
+    // Explicitly verify requires_grad setup and query
+    DummyModule module;
+    auto params = module.parameters();
+    for (const auto& param : params) {
+        EXPECT_TRUE(param.requires_grad());
+    }
+}
+
+
 

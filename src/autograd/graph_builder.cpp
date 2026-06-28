@@ -81,7 +81,7 @@ namespace helix {
         for (const auto& input_ref : ctx.inputs) {
             const Tensor& t = input_ref.get();
             if (t.requires_grad()) {
-                auto meta = static_cast<AutogradMeta*>(t.impl()->autograd_meta());
+                const auto meta = t.impl()->autograd_meta();
                 if (meta) {
                     if (meta->grad_fn()) {
                         node->add_next_edge(meta->grad_fn());
