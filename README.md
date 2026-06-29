@@ -9,18 +9,22 @@
 HELIX is built with a clean, extensible layered architecture.
 
 ```mermaid
+%%{init: {'themeVariables': {'edgeLabelBackground': 'transparent'}}}%%
 graph TD
-    A[Tensor & Autograd] -->|forward / backward| B[Dispatcher]
-    B -->|matmul, add, sgd| C[CPU Backend]
-    C -->|Runtime Routing| D{Matrix Size & CPUID}
-    D -->|Small| E[matmul_naive]
-    D -->|Large, No AVX2| F[matmul_tiled <br> template cache blocking]
-    D -->|Large, AVX2 / FMA| G[matmul_avx2 + OpenMP]
+    A[Tensor & Autograd] -->|<span style="background-color:#1a202c; color:white; padding:4px 10px; border-radius:8px;">forward / backward</span>| B[Dispatcher]
+    B -->|<span style="background-color:#1a202c; color:white; padding:4px 10px; border-radius:8px;">matmul, add, sgd</span>| C[CPU Backend]
+    C -->|<span style="background-color:#1a202c; color:white; padding:4px 10px; border-radius:8px;">Runtime Routing</span>| D{Matrix Size & CPUID}
+    D -->|<span style="background-color:#1a202c; color:white; padding:4px 10px; border-radius:8px;">Small</span>| E[matmul_naive]
+    D -->|<span style="background-color:#1a202c; color:white; padding:4px 10px; border-radius:8px;">Large, No AVX2</span>| F[matmul_tiled <br> template cache blocking]
+    D -->|<span style="background-color:#1a202c; color:white; padding:4px 10px; border-radius:8px;">Large, AVX2 / FMA</span>| G[matmul_avx2 + OpenMP]
 
-    classDef core fill:#f9f9f9,stroke:#333,stroke-width:2px;
-    classDef opt fill:#e1f5fe,stroke:#0288d1,stroke-width:2px;
+    classDef core fill:#2d3748,stroke:#4fd1c5,stroke-width:2px,color:#ffffff,rx:5px,ry:5px;
+    classDef opt fill:#2b6cb0,stroke:#63b3ed,stroke-width:2px,color:#ffffff,rx:5px,ry:5px;
+    classDef decision fill:#702459,stroke:#d53f8c,stroke-width:2px,color:#ffffff;
     class A,B,C core;
     class E,F,G opt;
+    class D decision;
+    linkStyle default stroke:#a0aec0,stroke-width:2px,color:white;
 ```
 
 ## 🚀 Performance
