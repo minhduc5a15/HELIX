@@ -1,7 +1,8 @@
 #pragma once
 
-#include "benchmark_result.hpp"
 #include <vector>
+
+#include "benchmark_result.hpp"
 
 namespace helix {
     namespace benchmark {

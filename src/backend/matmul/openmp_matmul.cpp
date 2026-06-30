@@ -1,6 +1,7 @@
-#include "matmul_kernel.hpp"
-#include "matmul_config.hpp"
 #include <algorithm>
+
+#include "matmul_config.hpp"
+#include "matmul_kernel.hpp"
 
 #if defined(__AVX2__)
 #include <immintrin.h>
@@ -16,10 +17,10 @@ namespace helix {
 #if defined(__GNUC__) || defined(__clang__)
         return __builtin_cpu_supports("avx2") && __builtin_cpu_supports("fma");
 #else
-        return true;  
+        return true;
 #endif
 #else
-        return false; 
+        return false;
 #endif
     }
 
@@ -83,4 +84,4 @@ namespace helix {
         }
 #endif
     }
-}
+}  // namespace helix
