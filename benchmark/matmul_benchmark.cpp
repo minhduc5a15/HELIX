@@ -1,3 +1,4 @@
+#include <iostream>
 #include <random>
 #include <string>
 #include <vector>
@@ -17,7 +18,7 @@ static void fill_random(std::vector<float>& vec) {
     }
 }
 
-void run_matmul_benchmark(size_t size) {
+static std::vector<BenchmarkResult> run_matmul_benchmark(size_t size) {
     size_t M = size;
     size_t K = size;
     size_t N = size;
@@ -31,49 +32,40 @@ void run_matmul_benchmark(size_t size) {
 
     double ops = 2.0 * M * K * N;
 
-    // We only benchmark Naive for Week 1 baseline
-    auto fn_naive = [&]() { CPUBackend::matmul_naive(A.data(), B_T.data(), C.data(), M, K, N); };
-
-    /*
-    auto fn_tiled = [&]() {
-        CPUBackend::matmul_tiled(A.data(), B_T.data(), C.data(), M, K, N);
+    // Strategies to benchmark
+    std::vector<std::pair<MatMulStrategy, std::string>> strategies = {
+        {MatMulStrategy::Naive, "Naive"}, {MatMulStrategy::Blocked, "Blocked"}
     };
 
-    auto fn_avx2 = [&]() {
-        CPUBackend::matmul_avx2(A.data(), B_T.data(), C.data(), M, K, N);
-    };
+    std::vector<BenchmarkResult> results;
 
-    auto fn_openmp = [&]() {
-        CPUBackend::matmul(A.data(), B_T.data(), C.data(), M, K, N);
-    };
-    */
+    for (const auto& [strategy, name_suffix] : strategies) {
+        auto fn = [&]() { CPUBackend::matmul(A.data(), B_T.data(), C.data(), M, K, N, strategy); };
+        std::string name = name_suffix + " " + std::to_string(size) + "x" + std::to_string(size);
+        BenchmarkResult res = BenchmarkRunner::run(name, fn, 10, 3, ops);
+        BenchmarkReporter::print_result(res);
+        results.push_back(res);
+    }
 
-    std::string name = "Naive " + std::to_string(size) + "x" + std::to_string(size);
-    BenchmarkResult res_naive = BenchmarkRunner::run(name, fn_naive, 10, 3, ops);
-    BenchmarkReporter::print_result(res_naive);
+    // Print comparison
+    if (results.size() >= 2) {
+        BenchmarkReporter::print_comparison(results[0], results[1]);
+    }
 
-    /*
-    std::string name_tiled = "Blocked " + std::to_string(size) + "x" + std::to_string(size);
-    BenchmarkResult res_tiled = BenchmarkRunner::run(name_tiled, fn_tiled, 10, 3, ops);
-    BenchmarkReporter::print_result(res_tiled);
-
-    std::string name_avx2 = "AVX2 " + std::to_string(size) + "x" + std::to_string(size);
-    BenchmarkResult res_avx2 = BenchmarkRunner::run(name_avx2, fn_avx2, 10, 3, ops);
-    BenchmarkReporter::print_result(res_avx2);
-
-    std::string name_omp = "OpenMP " + std::to_string(size) + "x" + std::to_string(size);
-    BenchmarkResult res_omp = BenchmarkRunner::run(name_omp, fn_openmp, 10, 3, ops);
-    BenchmarkReporter::print_result(res_omp);
-    */
+    return results;
 }
 
 int main() {
     BenchmarkReporter::print_header("Matrix Multiplication Benchmark");
 
-    std::vector<size_t> sizes = {64, 128, 256, 512, 1024};
+    std::vector<size_t> sizes = {64, 128, 256, 512, 1024, 2048};
+    std::vector<BenchmarkResult> all_results;
     for (size_t size : sizes) {
-        run_matmul_benchmark(size);
+        auto res = run_matmul_benchmark(size);
+        all_results.insert(all_results.end(), res.begin(), res.end());
     }
+
+    BenchmarkReporter::export_csv(all_results, "output/matmul_benchmark.csv");
 
     BenchmarkReporter::print_footer();
     return 0;

@@ -65,22 +65,22 @@ TEST_P(MatMulOptTest, DirectKernelEdgeCases) {
     
     // Naive Kernel
     std::fill(C_data.begin(), C_data.end(), 0.0f);
-    CPUBackend::matmul_naive(A_data.data(), B_T_data.data(), C_data.data(), size, size, size);
+    CPUBackend::matmul(A_data.data(), B_T_data.data(), C_data.data(), size, size, size, MatMulStrategy::Naive);
     EXPECT_FLOAT_EQ(C_data[0], 2.0f * size);
     
-    // Tiled Kernel
+    // Blocked Kernel
     std::fill(C_data.begin(), C_data.end(), 0.0f);
-    CPUBackend::matmul_tiled(A_data.data(), B_T_data.data(), C_data.data(), size, size, size);
+    CPUBackend::matmul(A_data.data(), B_T_data.data(), C_data.data(), size, size, size, MatMulStrategy::Blocked);
     EXPECT_FLOAT_EQ(C_data[0], 2.0f * size);
     
     // AVX2 Kernel
     std::fill(C_data.begin(), C_data.end(), 0.0f);
-    CPUBackend::matmul_avx2(A_data.data(), B_T_data.data(), C_data.data(), size, size, size);
+    CPUBackend::matmul(A_data.data(), B_T_data.data(), C_data.data(), size, size, size, MatMulStrategy::AVX2);
     EXPECT_FLOAT_EQ(C_data[0], 2.0f * size);
     
     // OpenMP Kernel
     std::fill(C_data.begin(), C_data.end(), 0.0f);
-    CPUBackend::matmul(A_data.data(), B_T_data.data(), C_data.data(), size, size, size);
+    CPUBackend::matmul(A_data.data(), B_T_data.data(), C_data.data(), size, size, size, MatMulStrategy::OpenMP);
     EXPECT_FLOAT_EQ(C_data[0], 2.0f * size);
 }
 
