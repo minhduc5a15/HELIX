@@ -120,10 +120,10 @@ namespace helix {
 #if defined(__GNUC__) || defined(__clang__)
         return __builtin_cpu_supports("avx2") && __builtin_cpu_supports("fma");
 #else
-        return true; // Assume true or implement __cpuid for MSVC
+        return true;  // Assume true or implement __cpuid for MSVC
 #endif
 #else
-        return false; // ARM64 and others do not support AVX2
+        return false;  // ARM64 and others do not support AVX2
 #endif
     }
 
@@ -152,7 +152,7 @@ namespace helix {
                         for (size_t i = static_cast<size_t>(ih); i < i_end; ++i) {
                             for (size_t j = static_cast<size_t>(jh); j < j_end; ++j) {
                                 float sum = 0.0f;
-                                
+
                                 if (use_avx2) {
 #if defined(__AVX2__)
                                     __m256 acc = _mm256_setzero_ps();
