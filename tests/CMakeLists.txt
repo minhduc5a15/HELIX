@@ -75,3 +75,7 @@ gtest_discover_tests(training_test)
 add_executable(matmul_opt_test matmul_opt_test.cpp)
 target_link_libraries(matmul_opt_test PRIVATE helix GTest::gtest_main)
 gtest_discover_tests(matmul_opt_test)
+
+add_executable(benchmark_test benchmark_test.cpp)
+target_link_libraries(benchmark_test PRIVATE helix GTest::gtest_main)
+gtest_discover_tests(benchmark_test)
