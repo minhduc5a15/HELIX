@@ -4,13 +4,7 @@
 
 namespace helix {
 
-    enum class MatMulStrategy {
-        Auto,
-        Naive,
-        Blocked,
-        AVX2,
-        OpenMP
-    };
+    enum class MatMulStrategy { Auto, Naive, Blocked, AVX2, OpenMP };
 
     class CPUBackend {
     public:
@@ -37,7 +31,15 @@ namespace helix {
         static void pow(const float* a, float exponent, float* out, size_t size);
 
         // Matrix Multiplication
-        static void matmul(const float* a, const float* b_t, float* out, size_t M, size_t K, size_t N, MatMulStrategy strategy = MatMulStrategy::Auto);
+        static void matmul(
+            const float* a,
+            const float* b_t,
+            float* out,
+            size_t M,
+            size_t K,
+            size_t N,
+            MatMulStrategy strategy = MatMulStrategy::Auto
+        );
 
         // Reduce Operations (using 3D collapse technique)
         // input is treated as [outer_size, dim_size, inner_size]

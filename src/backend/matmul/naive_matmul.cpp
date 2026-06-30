@@ -12,4 +12,4 @@ namespace helix {
             }
         }
     }
-}
+}  // namespace helix

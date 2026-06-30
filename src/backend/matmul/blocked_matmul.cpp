@@ -1,6 +1,7 @@
-#include "matmul_kernel.hpp"
-#include "matmul_config.hpp"
 #include <algorithm>
+
+#include "matmul_config.hpp"
+#include "matmul_kernel.hpp"
 
 namespace helix {
     void blocked_matmul(const float* a, const float* b_t, float* out, size_t M, size_t K, size_t N) {
@@ -28,4 +29,4 @@ namespace helix {
             }
         }
     }
-}
+}  // namespace helix

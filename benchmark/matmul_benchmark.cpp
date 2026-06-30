@@ -34,16 +34,22 @@ static std::vector<BenchmarkResult> run_matmul_benchmark(size_t size) {
 
     // Strategies to benchmark
     std::vector<std::pair<MatMulStrategy, std::string>> strategies = {
-        {MatMulStrategy::Naive, "Naive"}, {MatMulStrategy::Blocked, "Blocked"}
+        {MatMulStrategy::Naive, "Naive"}, {MatMulStrategy::Blocked, "Blocked"}, {MatMulStrategy::AVX2, "AVX2"}
     };
 
     std::vector<BenchmarkResult> results;
+    constexpr double OPENBLAS_GFLOPS = 240.0;  // Theoretical/Baseline OpenBLAS performance
 
     for (const auto& [strategy, name_suffix] : strategies) {
         auto fn = [&]() { CPUBackend::matmul(A.data(), B_T.data(), C.data(), M, K, N, strategy); };
         std::string name = name_suffix + " " + std::to_string(size) + "x" + std::to_string(size);
         BenchmarkResult res = BenchmarkRunner::run(name, fn, 10, 3, ops);
         BenchmarkReporter::print_result(res);
+
+        // Print Efficiency
+        double efficiency = (res.gflops / OPENBLAS_GFLOPS) * 100.0;
+        std::cout << "  -> Efficiency vs OpenBLAS (240 GFLOPS): " << efficiency << "%" << std::endl;
+
         results.push_back(res);
     }
 
