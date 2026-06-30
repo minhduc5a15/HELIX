@@ -4,6 +4,14 @@
 
 namespace helix {
 
+    enum class MatMulStrategy {
+        Auto,
+        Naive,
+        Blocked,
+        AVX2,
+        OpenMP
+    };
+
     class CPUBackend {
     public:
         // Core element-wise operations
@@ -29,10 +37,7 @@ namespace helix {
         static void pow(const float* a, float exponent, float* out, size_t size);
 
         // Matrix Multiplication
-        static void matmul(const float* a, const float* b_t, float* out, size_t M, size_t K, size_t N);
-        static void matmul_naive(const float* a, const float* b_t, float* out, size_t M, size_t K, size_t N);
-        static void matmul_tiled(const float* a, const float* b_t, float* out, size_t M, size_t K, size_t N);
-        static void matmul_avx2(const float* a, const float* b_t, float* out, size_t M, size_t K, size_t N);
+        static void matmul(const float* a, const float* b_t, float* out, size_t M, size_t K, size_t N, MatMulStrategy strategy = MatMulStrategy::Auto);
 
         // Reduce Operations (using 3D collapse technique)
         // input is treated as [outer_size, dim_size, inner_size]
