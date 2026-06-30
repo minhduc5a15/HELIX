@@ -1,9 +1,9 @@
 #include "benchmark/benchmark_reporter.hpp"
 
+#include <filesystem>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
-#include <fstream>
-#include <filesystem>
 #include <vector>
 
 namespace helix {
@@ -37,7 +37,7 @@ namespace helix {
             std::cout << std::fixed << std::setprecision(2);
             std::cout << "  " << base.name << ": " << base.average_ms << " ms\n";
             std::cout << "  " << target.name << ": " << target.average_ms << " ms\n";
-            
+
             if (target.average_ms > 0) {
                 double speedup = base.average_ms / target.average_ms;
                 double improvement = (speedup - 1.0) * 100.0;
@@ -58,16 +58,11 @@ namespace helix {
             }
             std::ofstream out(filepath);
             if (!out.is_open()) return;
-            
+
             out << "Name,Iterations,Average_ms,Minimum_ms,Maximum_ms,Median_ms,StdDev_ms,GFLOPS\n";
             for (const auto& res : results) {
-                out << res.name << "," 
-                    << res.iterations << "," 
-                    << res.average_ms << "," 
-                    << res.minimum_ms << "," 
-                    << res.maximum_ms << "," 
-                    << res.median_ms << "," 
-                    << res.stddev_ms << ",";
+                out << res.name << "," << res.iterations << "," << res.average_ms << "," << res.minimum_ms << ","
+                    << res.maximum_ms << "," << res.median_ms << "," << res.stddev_ms << ",";
                 if (res.gflops > 0) out << res.gflops;
                 out << "\n";
             }

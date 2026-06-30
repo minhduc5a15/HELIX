@@ -1,11 +1,11 @@
 #include <gtest/gtest.h>
 
-#include <vector>
-#include <stdexcept>
 #include <algorithm>
+#include <stdexcept>
+#include <vector>
 
-#include "helix.hpp"
 #include "backend/cpu_backend.hpp"
+#include "helix.hpp"
 
 using namespace helix;
 
@@ -36,19 +36,15 @@ Tensor create_identity_matrix(size_t size) {
 class MatMulOptTest : public ::testing::TestWithParam<size_t> {};
 
 // Provide the specific sizes requested for unit tests: {63, 127, 255, 1023}
-INSTANTIATE_TEST_SUITE_P(
-    Sizes,
-    MatMulOptTest,
-    ::testing::Values(63, 127, 255, 1023)
-);
+INSTANTIATE_TEST_SUITE_P(Sizes, MatMulOptTest, ::testing::Values(1, 7, 8, 9, 15, 16, 17, 63, 127, 255, 1023));
 
 TEST_P(MatMulOptTest, DispatcherHappyPath) {
     size_t size = GetParam();
     auto A = create_sequential_matrix(size, size);
     auto I = create_identity_matrix(size);
-    
+
     auto C = A.matmul(I);
-    
+
     const float* a_ptr = A.data_ptr();
     const float* c_ptr = C.data_ptr();
     for (size_t i = 0; i < size * size; ++i) {
@@ -58,26 +54,26 @@ TEST_P(MatMulOptTest, DispatcherHappyPath) {
 
 TEST_P(MatMulOptTest, DirectKernelEdgeCases) {
     size_t size = GetParam();
-    
+
     std::vector<float> A_data(size * size, 1.0f);
     std::vector<float> B_T_data(size * size, 2.0f);
     std::vector<float> C_data(size * size, 0.0f);
-    
+
     // Naive Kernel
     std::fill(C_data.begin(), C_data.end(), 0.0f);
     CPUBackend::matmul(A_data.data(), B_T_data.data(), C_data.data(), size, size, size, MatMulStrategy::Naive);
     EXPECT_FLOAT_EQ(C_data[0], 2.0f * size);
-    
+
     // Blocked Kernel
     std::fill(C_data.begin(), C_data.end(), 0.0f);
     CPUBackend::matmul(A_data.data(), B_T_data.data(), C_data.data(), size, size, size, MatMulStrategy::Blocked);
     EXPECT_FLOAT_EQ(C_data[0], 2.0f * size);
-    
+
     // AVX2 Kernel
     std::fill(C_data.begin(), C_data.end(), 0.0f);
     CPUBackend::matmul(A_data.data(), B_T_data.data(), C_data.data(), size, size, size, MatMulStrategy::AVX2);
     EXPECT_FLOAT_EQ(C_data[0], 2.0f * size);
-    
+
     // OpenMP Kernel
     std::fill(C_data.begin(), C_data.end(), 0.0f);
     CPUBackend::matmul(A_data.data(), B_T_data.data(), C_data.data(), size, size, size, MatMulStrategy::OpenMP);
@@ -90,15 +86,15 @@ TEST_P(MatMulOptTest, DirectKernelEdgeCases) {
 
 TEST(MatMulErrorTest, IncompatibleShapes) {
     auto A = create_sequential_matrix(10, 20);
-    auto B = create_sequential_matrix(30, 40); // Inner dims 20 and 30 do not match
-    
+    auto B = create_sequential_matrix(30, 40);  // Inner dims 20 and 30 do not match
+
     EXPECT_THROW(A.matmul(B), std::invalid_argument);
 }
 
 TEST(MatMulErrorTest, Non2DShapes) {
-    Tensor A(std::vector<float>(10), {10}); // 1D
-    Tensor B = create_sequential_matrix(10, 20); // 2D
-    
+    Tensor A(std::vector<float>(10), {10});       // 1D
+    Tensor B = create_sequential_matrix(10, 20);  // 2D
+
     // matmul strictly expects 2D tensors in current HELIX implementation
     EXPECT_THROW(A.matmul(B), std::invalid_argument);
 }
@@ -144,6 +140,31 @@ TEST(MatMulStressTest, RectangularOddShapes_Calculation) {
             for (size_t l = 0; l < k; ++l) {
                 // Because HELIX backend internally transposes B, we access B sequentially if it was B_T.
                 // But in tests we access B directly as row-major.
+                sum += a_ptr[i * k + l] * b_ptr[l * n + j];
+            }
+            EXPECT_NEAR(c_ptr[i * n + j], sum, 1e-4);
+        }
+    }
+}
+
+TEST(MatMulStressTest, RectangularOddShapes_KTail) {
+    size_t m = 31;
+    size_t k = 17;
+    size_t n = 29;
+
+    auto A = create_sequential_matrix(m, k);
+    auto B = create_sequential_matrix(k, n);
+
+    auto C = A.matmul(B);
+
+    const float* a_ptr = A.data_ptr();
+    const float* b_ptr = B.data_ptr();
+    const float* c_ptr = C.data_ptr();
+
+    for (size_t i = 0; i < m; ++i) {
+        for (size_t j = 0; j < n; ++j) {
+            float sum = 0.0f;
+            for (size_t l = 0; l < k; ++l) {
                 sum += a_ptr[i * k + l] * b_ptr[l * n + j];
             }
             EXPECT_NEAR(c_ptr[i * n + j], sum, 1e-4);

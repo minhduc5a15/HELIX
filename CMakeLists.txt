@@ -21,7 +21,8 @@ add_library(helix
     src/backend/kernels/reduce.cpp
     src/backend/matmul/naive_matmul.cpp
     src/backend/matmul/blocked_matmul.cpp
-    src/backend/matmul/avx2_matmul.cpp
+    src/backend/matmul/avx2_dot_matmul.cpp
+    src/backend/matmul/avx2_micro_matmul.cpp
     src/backend/matmul/openmp_matmul.cpp
     src/backend/matmul/matmul_backend.cpp
     src/autograd/autograd_meta.cpp

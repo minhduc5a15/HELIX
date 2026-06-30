@@ -1,6 +1,7 @@
-#include "matmul_kernel.hpp"
-#include "matmul_config.hpp"
 #include <algorithm>
+
+#include "matmul_config.hpp"
+#include "matmul_kernel.hpp"
 
 #if defined(__AVX2__)
 #include <immintrin.h>
@@ -10,7 +11,7 @@
 #endif
 
 namespace helix {
-    void avx2_matmul(const float* a, const float* b_t, float* out, size_t M, size_t K, size_t N) {
+    void avx2_dot_matmul(const float* a, const float* b_t, float* out, size_t M, size_t K, size_t N) {
         std::fill_n(out, M * N, 0.0f);
 
 #if defined(__AVX2__)
@@ -54,4 +55,4 @@ namespace helix {
         blocked_matmul(a, b_t, out, M, K, N);
 #endif
     }
-}
+}  // namespace helix

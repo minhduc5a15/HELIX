@@ -8,14 +8,16 @@ namespace helix {
 #if defined(__GNUC__) || defined(__clang__)
         return __builtin_cpu_supports("avx2") && __builtin_cpu_supports("fma");
 #else
-        return true;  
+        return true;
 #endif
 #else
-        return false;  
+        return false;
 #endif
     }
 
-    void CPUBackend::matmul(const float* a, const float* b_t, float* out, size_t M, size_t K, size_t N, MatMulStrategy strategy) {
+    void CPUBackend::matmul(
+        const float* a, const float* b_t, float* out, size_t M, size_t K, size_t N, MatMulStrategy strategy
+    ) {
         if (strategy == MatMulStrategy::Auto) {
             constexpr size_t threshold = 16384;  // 128 * 128
             if (M * N >= threshold) {
@@ -37,7 +39,7 @@ namespace helix {
                 blocked_matmul(a, b_t, out, M, K, N);
                 break;
             case MatMulStrategy::AVX2:
-                avx2_matmul(a, b_t, out, M, K, N);
+                avx2_micro_matmul(a, b_t, out, M, K, N);
                 break;
             case MatMulStrategy::OpenMP:
                 openmp_matmul(a, b_t, out, M, K, N);
@@ -47,4 +49,4 @@ namespace helix {
                 break;
         }
     }
-}
+}  // namespace helix
