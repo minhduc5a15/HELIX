@@ -9,6 +9,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Add include directory
 include_directories(include)
 
+# Build options
+option(HELIX_NATIVE_BUILD "Enable -march=native and LTO for local performance builds" OFF)
+
 # Define the HELIX core library
 add_library(helix 
     src/core/allocator.cpp
@@ -25,6 +28,7 @@ add_library(helix
     src/backend/matmul/avx2_micro_matmul.cpp
     src/backend/matmul/openmp_matmul.cpp
     src/backend/matmul/matmul_backend.cpp
+    src/backend/simd/simd_backend.cpp
     src/autograd/autograd_meta.cpp
     src/autograd/function.cpp
     src/autograd/graph_builder.cpp
@@ -51,7 +55,11 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "amd64|AMD64|x86_64|X86_64")
     if(MSVC)
         target_compile_options(helix PUBLIC /arch:AVX2 /O2)
     else()
-        target_compile_options(helix PUBLIC -mavx2 -mfma -O3)
+        if(HELIX_NATIVE_BUILD)
+            target_compile_options(helix PUBLIC -march=native -O3 -flto)
+        else()
+            target_compile_options(helix PUBLIC -mavx2 -mfma -O3)
+        endif()
     endif()
 else()
     if(MSVC)

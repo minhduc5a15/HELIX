@@ -18,6 +18,7 @@ namespace helix {
 
         // Mathematical Operations
         static Tensor add(const Tensor& a, const Tensor& b);
+        static void add_(Tensor& a, const Tensor& b);
         static Tensor sub(const Tensor& a, const Tensor& b);
         static Tensor mul(const Tensor& a, const Tensor& b);
         static Tensor div(const Tensor& a, const Tensor& b);
