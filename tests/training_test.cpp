@@ -78,10 +78,7 @@ TEST_F(TrainingTest, LinearRegression_Convergence) {
 }
 
 TEST_F(TrainingTest, XOR_Convergence) {
-    Tensor x({0.0f, 0.0f, 
-              0.0f, 1.0f, 
-              1.0f, 0.0f, 
-              1.0f, 1.0f}, Shape{4, 2});
+    Tensor x({0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 1.0f}, Shape{4, 2});
     Tensor target({0.0f, 1.0f, 1.0f, 0.0f}, Shape{4, 1});
 
     Sequential model(Linear(2, 4), ReLU(), Linear(4, 1));
@@ -108,4 +105,3 @@ TEST_F(TrainingTest, XOR_Convergence) {
         EXPECT_NEAR(pred_data[i], target_data[i], 0.3f);
     }
 }
-

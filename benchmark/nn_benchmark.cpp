@@ -10,7 +10,7 @@ using namespace helix::benchmark;
 
 void run_nn_benchmark(size_t batch_size, size_t input_dim, size_t hidden_dim, size_t output_dim) {
     std::string prefix = "Batch " + std::to_string(batch_size) + " ";
-    
+
     // Create dummy data
     Tensor X = Tensor::randn({batch_size, input_dim});
     Tensor Y = Tensor::randn({batch_size, output_dim});
@@ -26,19 +26,19 @@ void run_nn_benchmark(size_t batch_size, size_t input_dim, size_t hidden_dim, si
     Tensor pred_detached = Tensor::randn({batch_size, output_dim});
     pred_detached.set_requires_grad(true);
     Tensor Y_detached = Tensor::randn({batch_size, output_dim});
-    
-    auto fn_loss = [&]() { 
-        Tensor l = mse_loss(pred_detached, Y_detached); 
-        l.backward(); // Include backward of the loss function itself
+
+    auto fn_loss = [&]() {
+        Tensor l = mse_loss(pred_detached, Y_detached);
+        l.backward();  // Include backward of the loss function itself
     };
     BenchmarkReporter::print_result(BenchmarkRunner::run(prefix + "MSELoss (FW+BW)", fn_loss, 30, 5));
 
     // 3. Forward + Loss + Backward Benchmark
-    auto fn_fw_bw = [&]() { 
+    auto fn_fw_bw = [&]() {
         optimizer.zero_grad();
         Tensor p = model(X);
         Tensor l = mse_loss(p, Y);
-        l.backward(); 
+        l.backward();
     };
     BenchmarkReporter::print_result(BenchmarkRunner::run(prefix + "FW + Loss + BW", fn_fw_bw, 30, 5));
 

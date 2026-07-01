@@ -1,138 +1,138 @@
-# HELIX: A Modern C++ Autograd & Neural Network Framework
+# HELIX: Deep Learning Framework in Modern C++
 
-![HELIX Logo](https://img.shields.io/badge/C%2B%2B-20-blue.svg) ![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg) ![License](https://img.shields.io/badge/license-MIT-blue.svg)
+HELIX is a Deep Learning Framework built entirely from scratch in C++20. The project's goal is to research and master the core technologies underneath massive frameworks like PyTorch or TensorFlow, including: Tensor Runtime, Reverse-mode Automatic Differentiation (Autograd), and computational optimization (SIMD/OpenMP).
 
-**HELIX** is a lightweight, high-performance deep learning framework built entirely from scratch in C++20. Designed for educational purposes, rapid prototyping, and high-performance execution on CPU architectures, HELIX provides a modern Autograd engine, a rich set of Neural Network modules, and highly optimized backend execution paths leveraging SIMD (AVX2/FMA) and OpenMP multi-threading.
+## 🌟 Key Features
 
-## ⚙️ Architecture
+- **Tensor Runtime**: Supports n-dimensional arrays, Zero-memory Broadcasting (based on Strides), and View Operations (`reshape`, `transpose`) with $O(1)$ latency.
+- **Dynamic Autograd**: Dynamic Computational Graph (Define-by-Run). Automatically analyzes Topology and computes gradients with In-place Accumulation to optimize RAM.
+- **Neural Network Core**: Clean and extensible API. Supports `Module`, `Linear`, `Sequential`, Activation functions (`ReLU`, `Sigmoid`), Optimizers (`SGD`), and Loss functions (`MSE`).
+- **High-Performance Backends**:
+  - `Naive`: Absolute baseline for correctness.
+  - `Blocked`: Memory Access Pattern optimization (Cache Tiling).
+  - `SIMD AVX2`: Hardware instruction-level optimization (Register level).
+  - `OpenMP`: Multi-threading level optimization.
 
-HELIX is built with a clean, extensible layered architecture.
+---
+
+## 🏛 Overall Architecture
+
+HELIX's architecture is divided into 4 independent layers to ensure Scalability and Maintainability.
 
 ```mermaid
-%%{init: {'themeVariables': {'edgeLabelBackground': 'transparent'}}}%%
 graph TD
-    A[Tensor & Autograd] -->|<span style="background-color:#1a202c; color:white; padding:4px 10px; border-radius:8px;">forward / backward</span>| B[Dispatcher]
-    B -->|<span style="background-color:#1a202c; color:white; padding:4px 10px; border-radius:8px;">matmul, add, sgd</span>| C[CPU Backend]
-    C -->|<span style="background-color:#1a202c; color:white; padding:4px 10px; border-radius:8px;">Runtime Routing</span>| D{Matrix Size & CPUID}
-    D -->|<span style="background-color:#1a202c; color:white; padding:4px 10px; border-radius:8px;">Small</span>| E[matmul_naive]
-    D -->|<span style="background-color:#1a202c; color:white; padding:4px 10px; border-radius:8px;">Large, No AVX2</span>| F[matmul_tiled <br> template cache blocking]
-    D -->|<span style="background-color:#1a202c; color:white; padding:4px 10px; border-radius:8px;">Large, AVX2 / FMA</span>| G[matmul_avx2 + OpenMP]
-
-    classDef core fill:#2d3748,stroke:#4fd1c5,stroke-width:2px,color:#ffffff,rx:5px,ry:5px;
-    classDef opt fill:#2b6cb0,stroke:#63b3ed,stroke-width:2px,color:#ffffff,rx:5px,ry:5px;
-    classDef decision fill:#702459,stroke:#d53f8c,stroke-width:2px,color:#ffffff;
-    class A,B,C core;
-    class E,F,G opt;
-    class D decision;
-    linkStyle default stroke:#a0aec0,stroke-width:2px,color:white;
+    A[Neural Network Layer] -->|Forward / Backward| B(Autograd Engine)
+    B -->|Tensor Operations| C(Tensor Runtime)
+    C -->|Op Dispatching| D{Dispatcher}
+    
+    D -->|Fallback| E[Naive/Blocked Backend]
+    D -->|SIMD Intrinsics| G[AVX2 Backend]
+    D -->|Multi-threading| H[OpenMP Backend]
 ```
 
-## 🚀 Performance
+To better understand **Why** we decided on this design (Why use a Dispatcher? Why use Dynamic Graphs instead of Static?), read the [Design Decisions](docs/design_decisions.md) and [Architecture](docs/architecture.md) documents.
 
-HELIX is heavily optimized for modern CPUs. The matrix multiplication backend uses **Tiling (Cache Blocking)**, **AVX2 & FMA intrinsics**, and **OpenMP Multithreading**. AVX2 support is routed natively at **Runtime** using CPUID.
+---
 
-### Benchmark: Matrix Multiplication
-*Measurements taken on a standard x86 CPU. (Lower is better).*
+## 🚀 Quick Start
 
-| Size | Naive | Tiled (Cache-aware) | AVX2 + FMA | AVX2 + OpenMP | Speedup vs Naive |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **127 x 127** | ~4.5 ms | ~2.5 ms | ~0.3 ms | ~0.3 ms | **~15x** |
-| **511 x 511** | ~280 ms | ~150 ms | ~30 ms | ~8 ms | **~35x** |
-| **1023 x 1023** | ~3.8 s | ~2.0 s | ~350 ms | ~45 ms | **~84x** |
+### System Requirements
+- C++20 Compiler (GCC 10+, Clang 11+).
+- CMake 3.20 or newer.
+- (Optional) AVX2 supported CPU to utilize the SIMD Backend.
 
-## Key Features
-
-- **Dynamic Computational Graph (Autograd)**: Define-by-run automatic differentiation similar to PyTorch, supporting complex forward and backward passes.
-- **High-Performance CPU Backend**:
-  - Cache-oblivious and Tiled matrix multiplication algorithms for maximum L1/L2 cache utilization.
-  - Runtime detection and dispatch for **AVX2 & FMA** SIMD instructions, processing 8 floating-point operations per cycle.
-  - Multi-threading support powered by **OpenMP** for parallel execution on multi-core CPUs.
-- **Extensible Neural Network API**: Built-in support for `Linear`, `ReLU`, `Sequential`, and MSE Loss, designed with an intuitive API inspired by PyTorch (`helix::nn`).
-- **Comprehensive Tensor Operations**: Multidimensional `Tensor` class supporting automatic broadcasting, manipulation (reshape, view, transpose), and reduction operations.
-- **Memory Safety & Modern C++**: Built using strictly modern C++20 standard practices (smart pointers, templates, `std::variant`, auto) ensuring a robust, leak-free memory architecture.
-
-## Getting Started
-
-### Prerequisites
-
-- CMake 3.25+
-- A C++20 compatible compiler (GCC 11+, Clang 14+, or MSVC 19.30+)
-- OpenMP support (optional, but recommended for maximum performance)
-
-### Building the Project
+### Build
+The project comes with an automation script to simplify the build process:
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-org/HELIX.git
+# Clone repository
+git clone https://github.com/minhduc5a15/HELIX.git
 cd HELIX
 
-# Build using the provided build script
-./build.sh
-```
+# Build with Release mode and architecture optimization (Native)
+./build.sh --release
 
-### Running Tests and Benchmarks
-
-HELIX features an extensive test suite and benchmark programs.
-
-```bash
-# Run all tests
+# Run all Unit Tests
 ./run_tests.sh
-
-# Run Matrix Multiplication Benchmark
-./out/build/HELIX/benchmark/matmul_benchmark
 ```
 
-## Quick Start Example
+---
 
-Here is a quick example of defining and training a neural network in HELIX to learn the XOR function:
+## 💡 Minimal Working Example
+
+To build and train a Neural Network model, HELIX's API is designed to closely resemble PyTorch to provide maximum familiarity.
 
 ```cpp
-#include <helix/helix.hpp>
-#include <iostream>
-
+#include "helix.hpp"
 using namespace helix;
 
 int main() {
-    init_autograd();
-    
-    // Inputs: (0,0), (0,1), (1,0), (1,1) -> Targets: 0, 1, 1, 0
-    auto X = Tensor({0.f, 0.f, 0.f, 1.f, 1.f, 0.f, 1.f, 1.f}, {4, 2});
-    auto Y = Tensor({0.f, 1.f, 1.f, 0.f}, {4, 1});
+    // 1. Initialize Neural Network model
+    auto model = nn::Sequential({
+        std::make_shared<nn::Linear>(2, 16),
+        std::make_shared<nn::ReLU>(),
+        std::make_shared<nn::Linear>(16, 1)
+    });
 
-    // Define MLP: 2 -> 4 -> 1
-    Sequential model(
-        Linear(2, 4),
-        ReLU(),
-        Linear(4, 1)
-    );
+    // 2. Define Optimizer and Loss Function
+    optim::SGD optimizer(model->parameters(), 0.01);
+    nn::MSELoss criterion;
 
-    // Stochastic Gradient Descent
-    SGD optimizer(model.parameters(), 0.1);
+    // 3. Prepare Data (Inputs) and Labels (Targets)
+    auto inputs = Tensor({{0, 0}, {0, 1}, {1, 0}, {1, 1}}, Shape{4, 2});
+    auto targets = Tensor({{0}, {1}, {1}, {0}}, Shape{4, 1});
 
+    // 4. Training Loop
     for (int epoch = 0; epoch < 1000; ++epoch) {
-        auto pred = model.forward(X);
-        auto loss = mse_loss(pred, Y);
-        
-        optimizer.zero_grad();
-        loss.backward();
-        optimizer.step();
+        optimizer.zero_grad();               // Clear previous gradients
+
+        auto outputs = model->forward(inputs); // Forward Pass
+        auto loss = criterion(outputs, targets); // Compute Loss
+
+        loss.backward();                     // Backpropagation (Backward Pass)
+        optimizer.step();                    // Update weights
     }
-    
-    std::cout << "Training complete!" << std::endl;
+
     return 0;
 }
 ```
 
-Check out the `examples/` directory for more demos, including Linear Regression and XOR MLP training!
+---
 
-## Architecture Details
+## 📊 Performance (Benchmark)
 
-HELIX is composed of the following key layers:
-1. **Core**: Multidimensional Tensors, Dispatcher, Allocators, and Shape Broadcast semantics.
-2. **Backend**: Optimized compute kernels (`matmul_naive`, `matmul_tiled`, `matmul_avx2`, `reduce`, `ops`).
-3. **Autograd**: DAG construction, `BackwardEngine`, gradient accumulation.
-4. **NN Modules**: High-level layer abstractions, parameter management, Optimizers (SGD), and Loss functions.
+HELIX comes with a Benchmark system to measure the limits of Tensor algorithms. For the **Matrix Multiplication (1024x1024)** operation, the SIMD (AVX2) and OpenMP Backends show incredible superiority over traditional algorithms:
 
-## License
+![Benchmark Chart](docs/benchmark_chart.png)
 
-This project is licensed under the MIT License.
+```text
+Naive (2.15 GFLOPS)
+██
+
+Blocked (2.39 GFLOPS)
+██▎
+
+OpenMP (37.37 GFLOPS)
+████████████████████████████████
+
+AVX2 (35.44 GFLOPS)
+██████████████████████████████
+```
+
+👉 See the full bottleneck analysis report at [Benchmark Report](docs/benchmark_report.md).
+
+---
+
+## 📚 Additional Documentation
+
+Please browse the `docs/` directory to read in-depth documents for developers:
+
+- [Architecture Guide](docs/architecture.md): System diagram.
+- [Design Decisions](docs/design_decisions.md): Core design decisions.
+- [Developer Guide](docs/developer_guide.md): Guide to extending HELIX (Adding NN Layers, Activation Functions, Backends).
+- [API Reference](docs/api_output/html/index.html): API documentation generated by Doxygen (Requires Doxygen configuration).
+- [Coding Convention](docs/coding_convention.md): Source code standards for submitting Pull Requests.
+
+---
+
+> _"What I cannot create, I do not understand." - Richard Feynman_

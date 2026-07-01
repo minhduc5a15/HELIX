@@ -1,8 +1,8 @@
+#include <chrono>
+#include <iomanip>
 #include <iostream>
 #include <random>
 #include <string>
-#include <chrono>
-#include <iomanip>
 
 #include "benchmark/benchmark_reporter.hpp"
 #include "helix.hpp"
@@ -41,7 +41,7 @@ void run_linear_regression_benchmark() {
     for (int epoch = 0; epoch < max_epochs; ++epoch) {
         auto pred = model(X);
         auto loss = mse_loss(pred, Y);
-        
+
         optimizer.zero_grad();
         loss.backward();
         optimizer.step();
@@ -61,7 +61,8 @@ void run_linear_regression_benchmark() {
         std::cout << "Reached max epochs (" << max_epochs << ") without full convergence." << std::endl;
     }
     std::cout << "Total Training Time: " << duration.count() << " ms" << std::endl;
-    std::cout << "Average Time per Epoch: " << duration.count() / (converged_epoch == -1 ? max_epochs : converged_epoch + 1) << " ms" << std::endl;
+    std::cout << "Average Time per Epoch: "
+              << duration.count() / (converged_epoch == -1 ? max_epochs : converged_epoch + 1) << " ms" << std::endl;
     std::cout << std::endl;
 }
 
@@ -82,7 +83,7 @@ void run_xor_benchmark() {
     for (int epoch = 0; epoch < max_epochs; ++epoch) {
         auto pred = model(X);
         auto loss = mse_loss(pred, Y);
-        
+
         optimizer.zero_grad();
         loss.backward();
         optimizer.step();
@@ -102,7 +103,8 @@ void run_xor_benchmark() {
         std::cout << "Reached max epochs (" << max_epochs << ") without full convergence." << std::endl;
     }
     std::cout << "Total Training Time: " << duration.count() << " ms" << std::endl;
-    std::cout << "Average Time per Epoch: " << duration.count() / (converged_epoch == -1 ? max_epochs : converged_epoch + 1) << " ms" << std::endl;
+    std::cout << "Average Time per Epoch: "
+              << duration.count() / (converged_epoch == -1 ? max_epochs : converged_epoch + 1) << " ms" << std::endl;
     std::cout << std::endl;
 }
 

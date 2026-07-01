@@ -156,13 +156,13 @@ namespace helix {
                 for (; j + 8 <= dim_size; j += 8) {
                     vsum = _mm256_add_ps(vsum, _mm256_loadu_ps(ptr + j));
                 }
-                __m128 vlow  = _mm256_castps256_ps128(vsum);
+                __m128 vlow = _mm256_castps256_ps128(vsum);
                 __m128 vhigh = _mm256_extractf128_ps(vsum, 1);
-                vlow  = _mm_add_ps(vlow, vhigh);
+                vlow = _mm_add_ps(vlow, vhigh);
                 __m128 shuf = _mm_movehl_ps(vlow, vlow);
-                vlow  = _mm_add_ps(vlow, shuf);
-                shuf  = _mm_shuffle_ps(vlow, vlow, _MM_SHUFFLE(1, 1, 1, 1));
-                vlow  = _mm_add_ss(vlow, shuf);
+                vlow = _mm_add_ps(vlow, shuf);
+                shuf = _mm_shuffle_ps(vlow, vlow, _MM_SHUFFLE(1, 1, 1, 1));
+                vlow = _mm_add_ss(vlow, shuf);
                 sum_val += _mm_cvtss_f32(vlow);
 #endif
                 for (; j < dim_size; ++j) {
@@ -196,13 +196,13 @@ namespace helix {
                 for (; j + 8 <= dim_size; j += 8) {
                     vsum = _mm256_add_ps(vsum, _mm256_loadu_ps(ptr + j));
                 }
-                __m128 vlow  = _mm256_castps256_ps128(vsum);
+                __m128 vlow = _mm256_castps256_ps128(vsum);
                 __m128 vhigh = _mm256_extractf128_ps(vsum, 1);
-                vlow  = _mm_add_ps(vlow, vhigh);
+                vlow = _mm_add_ps(vlow, vhigh);
                 __m128 shuf = _mm_movehl_ps(vlow, vlow);
-                vlow  = _mm_add_ps(vlow, shuf);
-                shuf  = _mm_shuffle_ps(vlow, vlow, _MM_SHUFFLE(1, 1, 1, 1));
-                vlow  = _mm_add_ss(vlow, shuf);
+                vlow = _mm_add_ps(vlow, shuf);
+                shuf = _mm_shuffle_ps(vlow, vlow, _MM_SHUFFLE(1, 1, 1, 1));
+                vlow = _mm_add_ss(vlow, shuf);
                 sum_val += _mm_cvtss_f32(vlow);
 #endif
                 for (; j < dim_size; ++j) {
