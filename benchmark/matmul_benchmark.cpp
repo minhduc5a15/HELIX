@@ -35,6 +35,7 @@ static std::vector<BenchmarkResult> run_matmul_benchmark(size_t size) {
     double ops = 2.0 * M * K * N;
 
     // Strategies to benchmark
+    // Strategies to benchmark
     std::vector<std::pair<MatMulStrategy, std::string>> strategies = {
         {MatMulStrategy::Naive, "Naive"}, 
         {MatMulStrategy::Blocked, "Blocked"}, 

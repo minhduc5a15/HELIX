@@ -2,6 +2,6 @@
 #include <cstddef>
 namespace helix {
     struct MatMulConfig {
-        static constexpr size_t block_size = 64;
+        static constexpr size_t block_size = 256;
     };
 }  // namespace helix

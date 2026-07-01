@@ -67,6 +67,7 @@ namespace helix {
         Tensor operator-(const Tensor& other) const;
         Tensor operator*(const Tensor& other) const;
         Tensor operator/(const Tensor& other) const;
+        Tensor& add_(const Tensor& other);
 
         // Scalar arithmetic
         Tensor operator+(float scalar) const;
@@ -102,6 +103,7 @@ namespace helix {
         void zero_();
         Tensor contiguous() const;
         bool is_contiguous() const;
+        bool is_shared() const;
 
     private:
         // Internal constructor used for views and other internals
