@@ -2,6 +2,7 @@
 #include <random>
 #include <string>
 #include <vector>
+#include <iomanip>
 
 #include "backend/cpu_backend.hpp"
 #include "benchmark/benchmark_reporter.hpp"
@@ -30,33 +31,52 @@ static std::vector<BenchmarkResult> run_matmul_benchmark(size_t size) {
     fill_random(A);
     fill_random(B_T);
 
+    // Công thức tính số phép toán dấu phẩy động thống nhất: 2 * M * K * N
     double ops = 2.0 * M * K * N;
 
     // Strategies to benchmark
     std::vector<std::pair<MatMulStrategy, std::string>> strategies = {
-        {MatMulStrategy::Naive, "Naive"}, {MatMulStrategy::Blocked, "Blocked"}, {MatMulStrategy::AVX2, "AVX2"}
+        {MatMulStrategy::Naive, "Naive"}, 
+        {MatMulStrategy::Blocked, "Blocked"}, 
+        {MatMulStrategy::AVX2, "AVX2"},
+        {MatMulStrategy::OpenMP, "OpenMP"}
     };
 
     std::vector<BenchmarkResult> results;
     constexpr double OPENBLAS_GFLOPS = 240.0;  // Theoretical/Baseline OpenBLAS performance
 
-    for (const auto& [strategy, name_suffix] : strategies) {
+    for (size_t i = 0; i < strategies.size(); ++i) {
+        auto strategy = strategies[i].first;
+        auto name_suffix = strategies[i].second;
+
         auto fn = [&]() { CPUBackend::matmul(A.data(), B_T.data(), C.data(), M, K, N, strategy); };
         std::string name = name_suffix + " " + std::to_string(size) + "x" + std::to_string(size);
-        BenchmarkResult res = BenchmarkRunner::run(name, fn, 10, 3, ops);
+        
+        // 5 warmups, 30 iterations for stability
+        BenchmarkResult res = BenchmarkRunner::run(name, fn, 30, 5, ops);
         BenchmarkReporter::print_result(res);
 
-        // Print Efficiency
+        // Print Efficiency vs OpenBLAS
         double efficiency = (res.gflops / OPENBLAS_GFLOPS) * 100.0;
-        std::cout << "  -> Efficiency vs OpenBLAS (240 GFLOPS): " << efficiency << "%" << std::endl;
+        std::cout << "  -> Efficiency vs OpenBLAS (240 GFLOPS): " << std::fixed << std::setprecision(2) << efficiency << "%" << std::endl;
 
+        // Calculate and Print Speedup
+        if (i > 0) {
+            double speedup = results[i-1].median_ms / res.median_ms;
+            std::cout << "  -> Speedup vs " << strategies[i-1].second << ": " << std::fixed << std::setprecision(2) << speedup << "x" << std::endl;
+        }
+        
+        if (i == strategies.size() - 1) {
+            // Compare OpenMP vs Naive
+            double speedup_total = results[0].median_ms / res.median_ms;
+            std::cout << "  -> Total Speedup (OpenMP vs Naive): " << std::fixed << std::setprecision(2) << speedup_total << "x" << std::endl;
+        }
+
+        std::cout << std::endl;
         results.push_back(res);
     }
 
-    // Print comparison
-    if (results.size() >= 2) {
-        BenchmarkReporter::print_comparison(results[0], results[1]);
-    }
+    std::cout << "--------------------------------------------------------" << std::endl;
 
     return results;
 }

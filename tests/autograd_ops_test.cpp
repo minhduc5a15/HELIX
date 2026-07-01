@@ -77,3 +77,26 @@ TEST_F(AutogradOpsTest, MeanAxisKeepdimGradientCheck) {
     };
     EXPECT_TRUE(gradient_check(func, {a}));
 }
+
+// 4. Additional Operations
+TEST_F(AutogradOpsTest, SubBroadcastGradientCheck) {
+    Tensor a({1.0f, 2.0f, 3.0f, 4.0f}, Shape{2, 2});
+    Tensor b({5.0f, 6.0f}, Shape{1, 2});
+    auto func = [](const std::vector<Tensor>& inputs) { return (inputs[0] - inputs[1]).sum(); };
+    EXPECT_TRUE(gradient_check(func, {a, b}, 1e-4f, 5e-3f));
+}
+
+TEST_F(AutogradOpsTest, DivBroadcastGradientCheck) {
+    Tensor a({1.0f, 2.0f, 3.0f, 4.0f}, Shape{2, 2});
+    Tensor b({2.0f, 4.0f}, Shape{1, 2});
+    auto func = [](const std::vector<Tensor>& inputs) { return (inputs[0] / inputs[1]).sum(); };
+    EXPECT_TRUE(gradient_check(func, {a, b}, 1e-4f, 5e-3f));
+}
+
+TEST_F(AutogradOpsTest, MatMulGradientCheck) {
+    Tensor a = Tensor::randn({3, 4});
+    Tensor b = Tensor::randn({4, 2});
+    auto func = [](const std::vector<Tensor>& inputs) { return inputs[0].matmul(inputs[1]).sum(); };
+    EXPECT_TRUE(gradient_check(func, {a, b}, 1e-4f, 5e-3f));
+}
+
