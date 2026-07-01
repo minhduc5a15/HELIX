@@ -27,6 +27,13 @@ namespace helix {
         return Shape(out_dims);
     }
 
+    // WHY USE STRIDES FOR BROADCASTING?
+    // When a Tensor of shape (1, 3) is added to a Tensor of shape (4, 3), the first Tensor
+    // needs to be "duplicated" to (4, 3). Allocating new memory and copying data 4 times
+    // would incur an O(N) memory cost.
+    // By setting the Stride of the broadcasted dimension to 0 (out_strides = 0),
+    // the memory pointer remains stationary when iterating along that dimension.
+    // This allows us to reuse the exact same elements infinitely with O(1) memory cost.
     Stride compute_broadcast_strides(
         const Shape& original_shape, const Stride& original_stride, const Shape& target_shape
     ) {

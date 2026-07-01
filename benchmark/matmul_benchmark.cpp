@@ -1,8 +1,8 @@
+#include <iomanip>
 #include <iostream>
 #include <random>
 #include <string>
 #include <vector>
-#include <iomanip>
 
 #include "backend/cpu_backend.hpp"
 #include "benchmark/benchmark_reporter.hpp"
@@ -37,8 +37,8 @@ static std::vector<BenchmarkResult> run_matmul_benchmark(size_t size) {
     // Strategies to benchmark
     // Strategies to benchmark
     std::vector<std::pair<MatMulStrategy, std::string>> strategies = {
-        {MatMulStrategy::Naive, "Naive"}, 
-        {MatMulStrategy::Blocked, "Blocked"}, 
+        {MatMulStrategy::Naive, "Naive"},
+        {MatMulStrategy::Blocked, "Blocked"},
         {MatMulStrategy::AVX2, "AVX2"},
         {MatMulStrategy::OpenMP, "OpenMP"}
     };
@@ -52,25 +52,28 @@ static std::vector<BenchmarkResult> run_matmul_benchmark(size_t size) {
 
         auto fn = [&]() { CPUBackend::matmul(A.data(), B_T.data(), C.data(), M, K, N, strategy); };
         std::string name = name_suffix + " " + std::to_string(size) + "x" + std::to_string(size);
-        
+
         // 5 warmups, 30 iterations for stability
         BenchmarkResult res = BenchmarkRunner::run(name, fn, 30, 5, ops);
         BenchmarkReporter::print_result(res);
 
         // Print Efficiency vs OpenBLAS
         double efficiency = (res.gflops / OPENBLAS_GFLOPS) * 100.0;
-        std::cout << "  -> Efficiency vs OpenBLAS (240 GFLOPS): " << std::fixed << std::setprecision(2) << efficiency << "%" << std::endl;
+        std::cout << "  -> Efficiency vs OpenBLAS (240 GFLOPS): " << std::fixed << std::setprecision(2) << efficiency
+                  << "%" << std::endl;
 
         // Calculate and Print Speedup
         if (i > 0) {
-            double speedup = results[i-1].median_ms / res.median_ms;
-            std::cout << "  -> Speedup vs " << strategies[i-1].second << ": " << std::fixed << std::setprecision(2) << speedup << "x" << std::endl;
+            double speedup = results[i - 1].median_ms / res.median_ms;
+            std::cout << "  -> Speedup vs " << strategies[i - 1].second << ": " << std::fixed << std::setprecision(2)
+                      << speedup << "x" << std::endl;
         }
-        
+
         if (i == strategies.size() - 1) {
             // Compare OpenMP vs Naive
             double speedup_total = results[0].median_ms / res.median_ms;
-            std::cout << "  -> Total Speedup (OpenMP vs Naive): " << std::fixed << std::setprecision(2) << speedup_total << "x" << std::endl;
+            std::cout << "  -> Total Speedup (OpenMP vs Naive): " << std::fixed << std::setprecision(2) << speedup_total
+                      << "x" << std::endl;
         }
 
         std::cout << std::endl;

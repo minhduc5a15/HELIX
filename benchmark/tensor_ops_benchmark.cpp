@@ -56,7 +56,7 @@ void run_tensor_ops_benchmark(size_t size) {
     BenchmarkReporter::print_result(BenchmarkRunner::run("Flatten (Contig) " + size_str, fn_flatten, 30, 5));
 
     // Non-contiguous views (will trigger copy in reshape/flatten)
-    Tensor t_nc = t1.transpose(0, 1); 
+    Tensor t_nc = t1.transpose(0, 1);
 
     auto fn_reshape_nc = [&]() { Tensor res = t_nc.reshape({size * size}); };
     BenchmarkReporter::print_result(BenchmarkRunner::run("Reshape (Non-Contig) " + size_str, fn_reshape_nc, 30, 5));

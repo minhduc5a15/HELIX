@@ -17,7 +17,7 @@ namespace helix {
 
     Tensor Dispatcher::ensure_contiguous(const Tensor& t) { return t.contiguous(); }
 
-    // TODO:
+    // NOTE:
     // Current CPU backend only supports contiguous tensors.
     // Once TensorIterator is implemented,
     // remove these contiguous() calls.
@@ -46,7 +46,7 @@ namespace helix {
             CPUBackend::add(lhs.data_ptr(), rhs.data_ptr(), lhs.data_ptr(), lhs.numel());
         else
             throw std::runtime_error("Unsupported device");
-        
+
         if (!a.is_contiguous()) {
             a.copy_(lhs);
         }

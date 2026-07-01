@@ -81,6 +81,13 @@ namespace helix {
 
         auto root = meta->grad_fn() ? meta->grad_fn() : meta->grad_accumulator();
 
+        // WHY TOPOLOGICAL SORT?
+        // In real-world Neural Networks (especially ResNets with Residual Connections),
+        // a Tensor can act as an input for multiple Operations.
+        // During backpropagation, the gradient of this Tensor must be the sum of gradients
+        // from ALL its branches. If we don't use Topo Sort and instead call recursively (DFS),
+        // this Tensor might compute its gradient before receiving data from all branches,
+        // leading to incorrect results.
         // Step 1: Topological Sort (compute in-degrees for reverse traversal)
         std::unordered_map<Node*, int> in_degrees;
         std::queue<Node*> queue;
@@ -141,7 +148,8 @@ namespace helix {
                         node_gradients[next] = {input_grads[i]};
                     } else {
                         // Inplace gradient accumulation if safe
-                        if (!node_gradients[next][0].is_shared() && node_gradients[next][0].shape() == input_grads[i].shape()) {
+                        if (!node_gradients[next][0].is_shared() &&
+                            node_gradients[next][0].shape() == input_grads[i].shape()) {
                             node_gradients[next][0].add_(input_grads[i]);
                         } else {
                             node_gradients[next][0] = node_gradients[next][0] + input_grads[i];

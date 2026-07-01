@@ -84,9 +84,7 @@ namespace helix {
 
     bool Tensor::is_contiguous() const { return impl_->is_contiguous(); }
 
-    bool Tensor::is_shared() const {
-        return impl_.use_count() > 1 || impl_->storage().use_count() > 1;
-    }
+    bool Tensor::is_shared() const { return impl_.use_count() > 1 || impl_->storage().use_count() > 1; }
 
     Tensor Tensor::view(Shape new_shape) const {
         if (new_shape.numel() != numel()) {

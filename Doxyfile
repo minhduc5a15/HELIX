@@ -1,0 +1,54 @@
+# Doxyfile 1.9.8
+
+# Project related configuration options
+PROJECT_NAME           = "HELIX"
+PROJECT_BRIEF          = "A Deep Learning Framework built in C++20 for researching Tensor Runtime and Automatic Differentiation"
+OUTPUT_DIRECTORY       = docs/api_output
+
+# Input files
+INPUT                  = include/core include/autograd include/nn include/optim include/backend
+FILE_PATTERNS          = *.hpp
+RECURSIVE              = YES
+
+# Extraction options
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+
+# Documentation formatting
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+GENERATE_XML           = NO
+
+HTML_OUTPUT            = html
+HTML_FILE_EXTENSION    = .html
+
+GENERATE_TREEVIEW      = YES
+DISABLE_INDEX          = NO
+FULL_SIDEBAR           = NO
+TREEVIEW_WIDTH         = 250
+
+SEARCHENGINE           = YES
+SERVER_BASED_SEARCH    = NO
+EXTENSION_MAPPING      = hpp=C++
+
+HTML_EXTRA_STYLESHEET  = ./docs/doxygen-awesome.css
+
+HTML_DYNAMIC_MENUBAR   = YES
+
+SAMPLED_LINE_LINKS     = YES
+# ---------------------------------------------------------------------------
+
+# Source browsing
+SOURCE_BROWSER         = YES
+INLINE_SOURCES         = NO
+STRIP_CODE_COMMENTS    = YES
+
+# Warning and Progress messages
+QUIET                  = YES
+WARNINGS               = YES
+
+# Preprocessor
+ENABLE_PREPROCESSING   = YES
+MACRO_EXPANSION        = YES
+EXPAND_ONLY_PREDEF     = YES
