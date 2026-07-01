@@ -99,4 +99,3 @@ TEST_F(AutogradOpsTest, MatMulGradientCheck) {
     auto func = [](const std::vector<Tensor>& inputs) { return inputs[0].matmul(inputs[1]).sum(); };
     EXPECT_TRUE(gradient_check(func, {a, b}, 1e-4f, 5e-3f));
 }
-

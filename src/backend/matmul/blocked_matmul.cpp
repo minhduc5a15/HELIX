@@ -9,6 +9,12 @@ namespace helix {
 
         constexpr size_t BLOCK = MatMulConfig::block_size;
 
+        // WHY USE CACHE BLOCKING (TILING):
+        // Keeps a small block of the matrix in L1/L2 Cache to reuse it multiple times
+        // rather than reloading from RAM, reducing Cache Misses for very large matrices.
+        // However, since HELIX's architecture pre-transposes B into b_t, the innermost loop
+        // already accesses memory linearly (contiguous access). Thus, tiling here has
+        // diminished returns and introduces loop overhead.
         for (size_t ih = 0; ih < M; ih += BLOCK) {
             const size_t i_end = std::min(ih + BLOCK, M);
             for (size_t jh = 0; jh < N; jh += BLOCK) {

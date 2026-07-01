@@ -7,7 +7,13 @@
 namespace helix {
 
 #if defined(__AVX2__)
-    // 8x1 Micro-kernel
+    // WHY AN 8x1 MICRO-KERNEL?
+    // This micro-kernel computes an 8-element column of matrix C (from i to i+7).
+    // By keeping 8 YMM registers (c0 to c7) to accumulate intermediate results,
+    // we only need to load 1 vector from B_T (vb) and 8 vectors from A to perform 8 FMAs.
+    // Arithmetic Intensity = 8 FMAs / 9 Loads = ~0.88.
+    // This is the simplest design to utilize AVX2 but not yet fully optimal.
+    // To achieve higher GFLOPS, Register Blocking (e.g. 4x3 or 3x4) is required (~1.7 FMA/Load).
     static inline void micro_kernel_8x1(
         const float* a, const float* b_t, float* out, size_t i, size_t j, size_t kh, size_t k_end, size_t K, size_t N
     ) {

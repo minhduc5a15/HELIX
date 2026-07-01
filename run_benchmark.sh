@@ -61,4 +61,11 @@ for BENCHMARK in "${BENCHMARKS[@]}"; do
     fi
 done
 
+echo -e "\n${GREEN}=== Generating Benchmark Chart ===${NC}"
+if command -v python3 &> /dev/null; then
+    python3 "$WORKSPACE_DIR/docs/plot_benchmark.py" || echo -e "${YELLOW}Warning: Failed to generate chart. Is matplotlib installed?${NC}"
+else
+    echo -e "${YELLOW}Warning: python3 not found. Skipping chart generation.${NC}"
+fi
+
 echo -e "\n${GREEN}=== Benchmarks Completed ===${NC}"

@@ -111,6 +111,13 @@ namespace helix {
     std::vector<Tensor> SumBackward::backward(const std::vector<Tensor>& grad_outputs) {
         Tensor grad = grad_outputs[0];
 
+        // WHY REDUCTION BACKWARD USES BROADCASTING?
+        // The Forward pass of a Reduction (e.g., summing a 4x4 matrix into 1x4)
+        // collapsed n elements into a single element.
+        // During Backward, the gradient from that 1x4 output must be distributed evenly
+        // back to all n original elements (i.e., copying the grad from 1x4 to 4x4).
+        // Instead of allocating a 4x4 matrix and performing a physical copy, we use the
+        // broadcast_to operation (which sets Stride = 0) to save all this memory overhead.
         // If reduced along an axis and keepdim is false, we must unsqueeze it back
         // to its broadcastable shape before calling broadcast_to
         if (axis_.has_value() && !keepdim_) {
