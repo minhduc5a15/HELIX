@@ -36,6 +36,22 @@ namespace helix {
         return out;
     }
 
+    void Dispatcher::add_(Tensor& a, const Tensor& b) {
+        if (a.shape() != b.shape()) {
+            throw std::invalid_argument("Inplace addition requires matching shapes without broadcasting.");
+        }
+        Tensor lhs = ensure_contiguous(a);
+        Tensor rhs = ensure_contiguous(b);
+        if (a.device().is_cpu())
+            CPUBackend::add(lhs.data_ptr(), rhs.data_ptr(), lhs.data_ptr(), lhs.numel());
+        else
+            throw std::runtime_error("Unsupported device");
+        
+        if (!a.is_contiguous()) {
+            a.copy_(lhs);
+        }
+    }
+
     Tensor Dispatcher::sub(const Tensor& a, const Tensor& b) {
         const Shape out_shape = compute_broadcast_shape(a.shape(), b.shape());
         Tensor lhs = ensure_contiguous(a.broadcast_to(out_shape));

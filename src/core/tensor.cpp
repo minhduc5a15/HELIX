@@ -84,6 +84,10 @@ namespace helix {
 
     bool Tensor::is_contiguous() const { return impl_->is_contiguous(); }
 
+    bool Tensor::is_shared() const {
+        return impl_.use_count() > 1 || impl_->storage().use_count() > 1;
+    }
+
     Tensor Tensor::view(Shape new_shape) const {
         if (new_shape.numel() != numel()) {
             throw std::invalid_argument("view shape must have the same number of elements");
@@ -241,6 +245,10 @@ namespace helix {
     }
 
     Tensor Tensor::operator+(const Tensor& other) const { return Dispatcher::add(*this, other); }
+    Tensor& Tensor::add_(const Tensor& other) {
+        Dispatcher::add_(*this, other);
+        return *this;
+    }
     Tensor Tensor::operator-(const Tensor& other) const { return Dispatcher::sub(*this, other); }
     Tensor Tensor::operator*(const Tensor& other) const { return Dispatcher::mul(*this, other); }
     Tensor Tensor::operator/(const Tensor& other) const { return Dispatcher::div(*this, other); }
