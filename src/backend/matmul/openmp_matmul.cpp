@@ -78,7 +78,7 @@ namespace helix {
         }
 #else
         if (use_avx2) {
-            avx2_matmul(a, b_t, out, M, K, N);
+            avx2_micro_matmul(a, b_t, out, M, K, N);
         } else {
             blocked_matmul(a, b_t, out, M, K, N);
         }
