@@ -2,7 +2,6 @@
 
 #include <any>
 #include <functional>
-#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -39,7 +38,7 @@ namespace helix {
         OpType type;
         Tensor& out;
         std::vector<std::reference_wrapper<const Tensor>> inputs;
-        std::unordered_map<std::string, std::any> attributes;
+        std::unordered_map<std::string, std::any> attributes{};
     };
 
     class GraphBuilderInterface {
