@@ -38,7 +38,7 @@ namespace helix {
     }
 
     void MemoryPool::reset() {
-        for (auto& list : free_blocks_ | std::views::values) {
+        for (const auto& list : free_blocks_ | std::views::values) {
             for (void* ptr : list) {
 #if defined(_WIN32)
                 _aligned_free(ptr);

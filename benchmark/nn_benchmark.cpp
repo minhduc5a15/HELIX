@@ -1,5 +1,4 @@
 #include <string>
-#include <vector>
 
 #include "benchmark/benchmark_reporter.hpp"
 #include "benchmark/benchmark_runner.hpp"
