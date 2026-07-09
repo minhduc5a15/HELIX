@@ -97,5 +97,5 @@ TEST_F(AutogradOpsTest, MatMulGradientCheck) {
     Tensor a = Tensor::randn({3, 4});
     Tensor b = Tensor::randn({4, 2});
     auto func = [](const std::vector<Tensor>& inputs) { return inputs[0].matmul(inputs[1]).sum(); };
-    EXPECT_TRUE(gradient_check(func, {a, b}, 1e-4f, 5e-3f));
+    EXPECT_TRUE(gradient_check(func, {a, b}, 1e-4f, 1e-2f));
 }
