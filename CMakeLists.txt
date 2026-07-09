@@ -5,6 +5,7 @@ project(helix VERSION 0.1.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Add include directory
 include_directories(include)
@@ -43,6 +44,13 @@ add_library(helix
     src/benchmark/benchmark_reporter.cpp
 )
 target_include_directories(helix PUBLIC include)
+
+# Compiler Warnings
+if(MSVC)
+    target_compile_options(helix PRIVATE /W4)
+else()
+    target_compile_options(helix PRIVATE -Wall -Wextra -Wpedantic)
+endif()
 
 # OpenMP Configuration
 find_package(OpenMP)

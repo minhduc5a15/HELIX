@@ -25,7 +25,7 @@ namespace helix {
          * @brief Constructs a Sequential container with a vector of layers.
          * @param layers A vector of shared pointers to Module.
          */
-        Sequential(std::vector<std::shared_ptr<Module>> layers);
+        explicit Sequential(std::vector<std::shared_ptr<Module>> layers);
 
         /**
          * @brief Variadic template constructor to initialize with multiple modules.

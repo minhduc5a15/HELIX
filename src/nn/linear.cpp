@@ -4,12 +4,9 @@
 
 namespace helix {
 
-    Linear::Linear(size_t in_features, size_t out_features) {
-        // scaled random initialization for weight (LeCun Initialization)
-        weight_ = Tensor::randn({in_features, out_features}) / std::sqrt(static_cast<float>(in_features));
-        // initialize bias to zero
-        bias_ = Tensor::zeros({out_features});
-
+    Linear::Linear(size_t in_features, size_t out_features)
+        : weight_(Tensor::randn({in_features, out_features}) / std::sqrt(static_cast<float>(in_features))),
+          bias_(Tensor::zeros({out_features})) {
         weight_.set_requires_grad(true);
         bias_.set_requires_grad(true);
     }
