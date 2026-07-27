@@ -15,7 +15,7 @@ int main() {
     omp_set_num_threads(NUM_THREADS);
 
     // We will spam the MemoryPool from multiple threads simultaneously.
-    // MemoryPool::global().allocate() accesses the unordered_map `free_blocks_`
+    // MemoryPool::get_instance().allocate() accesses the unordered_map `free_blocks_`
     // without any std::mutex. This will cause a data race.
 
 #pragma omp parallel for
@@ -24,13 +24,13 @@ int main() {
         // and also same sizes to trigger simultaneous push_back/pop_back on std::vector.
         size_t size = ((i % 1024) + 1) * 32;
 
-        void* ptr = MemoryPool::global().allocate(size);
+        void* ptr = MemoryPool::get_instance().allocate(size);
 
         // Small delay to increase thread overlap
         for (volatile int j = 0; j < 50; ++j) {
         }
 
-        MemoryPool::global().deallocate(ptr, size);
+        MemoryPool::get_instance().deallocate(ptr, size);
     }
 
     std::cout << "If you see this, we got lucky and it didn't crash." << std::endl;
