@@ -38,7 +38,7 @@ TEST(CoreTest, ShapeScalar) {
 }
 
 TEST(CoreTest, MemoryPool) {
-    auto& pool = MemoryPool::global();
+    auto& pool = MemoryPool::get_instance();
 
     void* ptr1 = pool.allocate(100);
     EXPECT_NE(ptr1, nullptr);
