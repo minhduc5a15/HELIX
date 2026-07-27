@@ -1,7 +1,10 @@
 #pragma once
 
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
+#include <mutex>
+#include <memory>
 
 namespace helix {
 
@@ -13,11 +16,21 @@ namespace helix {
         virtual void deallocate(void* ptr, size_t bytes) = 0;
     };
 
-    // A caching Memory Pool that caches freed blocks by size to avoid frequent malloc calls.
-    // Provides O(1) allocation/deallocation for reused sizes.
+    struct GlobalBin {
+        std::mutex mutex;
+        std::vector<void*> blocks;
+    };
+
+    struct ThreadCache {
+        std::unordered_map<size_t, std::vector<void*>> blocks;
+    };
+
+    // A caching Memory Pool that uses a TCMalloc-style architecture:
+    // Thread-Local Cache for fast lock-free allocation, and a Global Pool
+    // for garbage collection and cross-thread deallocation handling.
     class MemoryPool : public Allocator {
     public:
-        MemoryPool() = default;
+        MemoryPool();
         ~MemoryPool() override;
 
         void* allocate(size_t bytes) override;
@@ -27,10 +40,22 @@ namespace helix {
         void reset();
 
         // Global singleton accessor
-        static MemoryPool& global();
+        static MemoryPool& get_instance();
 
     private:
-        std::unordered_map<size_t, std::vector<void*>> free_blocks_;
+        friend struct ThreadCacheWrapper;
+
+        std::unordered_map<size_t, std::unique_ptr<GlobalBin>> global_bins_;
+        std::mutex global_map_mutex_;
+
+        std::unordered_set<ThreadCache*> all_caches_;
+        std::mutex caches_mutex_;
+
+        static constexpr size_t MAX_LOCAL_CACHE_SIZE = 64;
+        static constexpr size_t TRANSFER_BATCH_SIZE = 32;
+
+        GlobalBin* get_global_bin(size_t alloc_size);
+        ThreadCache* get_thread_cache();
     };
 
 }  // namespace helix
