@@ -39,11 +39,13 @@ To better understand **Why** we decided on this design (Why use a Dispatcher? Wh
 ## 🚀 Quick Start
 
 ### System Requirements
+
 - C++20 Compiler (GCC 10+, Clang 11+).
 - CMake 3.20 or newer.
 - (Optional) AVX2 supported CPU to utilize the SIMD Backend.
 
 ### Build
+
 The project comes with an automation script to simplify the build process:
 
 ```bash
