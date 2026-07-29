@@ -10,8 +10,9 @@ HELIX is a Deep Learning Framework built entirely from scratch in C++20. The pro
 - **High-Performance Backends**:
   - `Naive`: Absolute baseline for correctness.
   - `Blocked`: Memory Access Pattern optimization (Cache Tiling).
-  - `SIMD AVX2`: Hardware instruction-level optimization (Register level).
+  - `SIMD AVX2`: Hardware instruction-level optimization (`4x16` Outer Product via 256-bit YMM).
   - `OpenMP`: Multi-threading level optimization.
+  - `AutoTuner`: JIT Hardware Profiler (Lazy Eval & Explicit Init) to auto-detect the optimal OpenMP Threading threshold.
 
 ---
 
@@ -23,7 +24,8 @@ HELIX's architecture is divided into 4 independent layers to ensure Scalability 
 graph TD
     A[Neural Network Layer] -->|Forward / Backward| B(Autograd Engine)
     B -->|Tensor Operations| C(Tensor Runtime)
-    C -->|Op Dispatching| D{Dispatcher}
+    C -->|Op Dispatching| J{AutoTuner Profiler}
+    J -->|Cache Threshold| D{Dispatcher}
     
     D -->|Fallback| E[Naive/Blocked Backend]
     D -->|SIMD Intrinsics| G[AVX2 Backend]
@@ -101,22 +103,23 @@ int main() {
 
 ## 📊 Performance (Benchmark)
 
-HELIX comes with a Benchmark system to measure the limits of Tensor algorithms. For the **Matrix Multiplication (1024x1024)** operation, the SIMD (AVX2) and OpenMP Backends show incredible superiority over traditional algorithms:
+HELIX comes with a Benchmark system to measure the limits of Tensor algorithms.
+For the **Matrix Multiplication (1024x1024)** operation, the SIMD (AVX2) and OpenMP Backends show incredible superiority over traditional algorithms:
 
 ![Benchmark Chart](docs/benchmark_chart.png)
 
 ```text
-Naive (2.15 GFLOPS)
+Naive (1.47 GFLOPS)
 ██
 
-Blocked (2.39 GFLOPS)
+Blocked (14.43 GFLOPS)
 ██▎
 
-OpenMP (37.37 GFLOPS)
-████████████████████████████████
-
-AVX2 (35.44 GFLOPS)
+AVX2 (41.08 GFLOPS)
 ██████████████████████████████
+
+OpenMP (128.09 GFLOPS)
+██████████████████████████████████████████████████████████████████████████████
 ```
 
 👉 See the full bottleneck analysis report at [Benchmark Report](docs/benchmark_report.md).
