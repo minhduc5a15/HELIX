@@ -24,53 +24,33 @@ namespace helix {
 #endif
     }
 
-    void openmp_matmul(const float* a, const float* b_t, float* out, size_t M, size_t K, size_t N) {
+    void openmp_matmul(const float* a, const float* b, float* out, size_t M, size_t K, size_t N) {
         bool use_avx2 = supports_avx2_internal();
 #if defined(_OPENMP)
         std::fill_n(out, M * N, 0.0f);
         constexpr size_t BLOCK = MatMulConfig::block_size;
 
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for collapse(2) schedule(dynamic)
         for (int ih = 0; ih < static_cast<int>(M); ih += static_cast<int>(BLOCK)) {
             for (int jh = 0; jh < static_cast<int>(N); jh += static_cast<int>(BLOCK)) {
                 const size_t i_end = std::min(static_cast<size_t>(ih) + BLOCK, M);
                 const size_t j_end = std::min(static_cast<size_t>(jh) + BLOCK, N);
 
-                for (size_t kh = 0; kh < K; kh += BLOCK) {
-                    const size_t k_end = std::min(kh + BLOCK, K);
+                if (use_avx2) {
+                    // For AVX2, we delegate to the specialized micro-kernel block
+                    avx2_matmul_block(a, b, out, i_end - ih, K, j_end - jh, ih, jh, N, K);
+                } else {
+                    for (size_t kh = 0; kh < K; kh += BLOCK) {
+                        const size_t k_end = std::min(kh + BLOCK, K);
 
-                    for (size_t i = static_cast<size_t>(ih); i < i_end; ++i) {
-                        for (size_t j = static_cast<size_t>(jh); j < j_end; ++j) {
-                            float sum = 0.0f;
-
-                            if (use_avx2) {
-#if defined(__AVX2__)
-                                __m256 acc = _mm256_setzero_ps();
-                                size_t k = kh;
-                                for (; k + 7 < k_end; k += 8) {
-                                    const __m256 va = _mm256_loadu_ps(&a[i * K + k]);
-                                    const __m256 vb = _mm256_loadu_ps(&b_t[j * K + k]);
-#if defined(HELIX_USE_FMA)
-                                    acc = _mm256_fmadd_ps(va, vb, acc);
-#else
-                                    acc = _mm256_add_ps(acc, _mm256_mul_ps(va, vb));
-#endif
-                                }
-
-                                alignas(32) float temp[8];
-                                _mm256_storeu_ps(temp, acc);
-                                sum = temp[0] + temp[1] + temp[2] + temp[3] + temp[4] + temp[5] + temp[6] + temp[7];
-
-                                for (; k < k_end; ++k) {
-                                    sum += a[i * K + k] * b_t[j * K + k];
-                                }
-#endif
-                            } else {
+                        for (size_t i = static_cast<size_t>(ih); i < i_end; ++i) {
+                            for (size_t j = static_cast<size_t>(jh); j < j_end; ++j) {
+                                float sum = 0.0f;
                                 for (size_t k = kh; k < k_end; ++k) {
-                                    sum += a[i * K + k] * b_t[j * K + k];
+                                    sum += a[i * K + k] * b[k * N + j];
                                 }
+                                out[i * N + j] += sum;
                             }
-                            out[i * N + j] += sum;
                         }
                     }
                 }
@@ -78,9 +58,9 @@ namespace helix {
         }
 #else
         if (use_avx2) {
-            avx2_micro_matmul(a, b_t, out, M, K, N);
+            avx2_micro_matmul(a, b, out, M, K, N);
         } else {
-            blocked_matmul(a, b_t, out, M, K, N);
+            blocked_matmul(a, b, out, M, K, N);
         }
 #endif
     }

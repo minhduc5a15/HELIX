@@ -1,4 +1,5 @@
 #include "backend/cpu_backend.hpp"
+#include "core/autotuner.hpp"
 #include "matmul_kernel.hpp"
 
 namespace helix {
@@ -16,36 +17,37 @@ namespace helix {
     }
 
     void CPUBackend::matmul(
-        const float* a, const float* b_t, float* out, size_t M, size_t K, size_t N, MatMulStrategy strategy
+        const float* a, const float* b, float* out, size_t M, size_t K, size_t N, MatMulStrategy strategy
     ) {
         if (strategy == MatMulStrategy::Auto) {
-            constexpr size_t threshold = 16384;  // 128 * 128
-            if (M * N >= threshold) {
 #if defined(_OPENMP)
+            size_t volume = (size_t)M * (size_t)N * (size_t)K;
+            size_t threshold = AutoTuner::get_instance().get_omp_threshold();
+            if (volume >= threshold) {
                 strategy = MatMulStrategy::OpenMP;
-#else
-                strategy = supports_avx2_backend() ? MatMulStrategy::AVX2 : MatMulStrategy::Blocked;
-#endif
             } else {
                 strategy = supports_avx2_backend() ? MatMulStrategy::AVX2 : MatMulStrategy::Blocked;
             }
+#else
+            strategy = supports_avx2_backend() ? MatMulStrategy::AVX2 : MatMulStrategy::Blocked;
+#endif
         }
 
         switch (strategy) {
             case MatMulStrategy::Naive:
-                naive_matmul(a, b_t, out, M, K, N);
+                naive_matmul(a, b, out, M, K, N);
                 break;
             case MatMulStrategy::Blocked:
-                blocked_matmul(a, b_t, out, M, K, N);
+                blocked_matmul(a, b, out, M, K, N);
                 break;
             case MatMulStrategy::AVX2:
-                avx2_micro_matmul(a, b_t, out, M, K, N);
+                avx2_micro_matmul(a, b, out, M, K, N);
                 break;
             case MatMulStrategy::OpenMP:
-                openmp_matmul(a, b_t, out, M, K, N);
+                openmp_matmul(a, b, out, M, K, N);
                 break;
             default:
-                blocked_matmul(a, b_t, out, M, K, N);
+                blocked_matmul(a, b, out, M, K, N);
                 break;
         }
     }
