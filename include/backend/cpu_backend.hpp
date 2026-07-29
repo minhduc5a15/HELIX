@@ -33,7 +33,7 @@ namespace helix {
         // Matrix Multiplication
         static void matmul(
             const float* a,
-            const float* b_t,
+            const float* b,
             float* out,
             size_t M,
             size_t K,

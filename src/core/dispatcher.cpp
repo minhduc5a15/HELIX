@@ -241,9 +241,6 @@ namespace helix {
         Tensor lhs = ensure_contiguous(a);
         const Tensor rhs = ensure_contiguous(b);
 
-        // Transpose B and ensure it's contiguous to improve cache locality during the dot product loop
-        Tensor rhs_t = ensure_contiguous(rhs.transpose(0, 1));
-
         const size_t M = a.shape()[0];
         const size_t K = a.shape()[1];
         const size_t N = b.shape()[1];
@@ -251,7 +248,7 @@ namespace helix {
         Tensor out(Shape{M, N}, a.dtype(), a.device());
 
         if (a.device().is_cpu()) {
-            CPUBackend::matmul(lhs.data_ptr(), rhs_t.data_ptr(), out.data_ptr(), M, K, N);
+            CPUBackend::matmul(lhs.data_ptr(), rhs.data_ptr(), out.data_ptr(), M, K, N);
         } else {
             throw std::runtime_error("Unsupported device");
         }
