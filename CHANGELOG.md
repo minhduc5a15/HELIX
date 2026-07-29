@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.0] - 2026-07-10
 
 ### Added
+
 - **Tensor Runtime**:
   - N-dimensional tensor support with customizable shapes, strides, and memory storage.
   - Zero-memory broadcasting across multiple dimensions.
@@ -37,5 +38,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Doxygen integration.
 
 ### Changed
+
 - Extensive code quality and static analysis refactoring to enforce strict compilation warnings and performance safety.
 - Refactored `Tensor` class for zero-overhead move semantics.
