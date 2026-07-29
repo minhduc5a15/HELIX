@@ -1,8 +1,6 @@
 #include <gtest/gtest.h>
 
 #include "core/allocator.hpp"
-#include "core/device.hpp"
-#include "core/dtype.hpp"
 #include "core/shape.hpp"
 #include "core/storage.hpp"
 #include "core/stride.hpp"
