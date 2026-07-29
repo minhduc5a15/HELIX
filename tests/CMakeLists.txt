@@ -79,3 +79,7 @@ gtest_discover_tests(matmul_opt_test)
 add_executable(benchmark_test benchmark_test.cpp)
 target_link_libraries(benchmark_test PRIVATE helix GTest::gtest_main)
 gtest_discover_tests(benchmark_test)
+
+add_executable(autotuner_test autotuner_test.cpp)
+target_link_libraries(autotuner_test PRIVATE helix GTest::gtest_main)
+gtest_discover_tests(autotuner_test)
