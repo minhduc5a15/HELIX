@@ -1,10 +1,10 @@
 #pragma once
 
+#include <memory>
+#include <mutex>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-#include <mutex>
-#include <memory>
 
 namespace helix {
 

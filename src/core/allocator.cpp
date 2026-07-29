@@ -1,16 +1,14 @@
 #include "core/allocator.hpp"
 
+#include <algorithm>
 #include <cstdlib>
 #include <new>
-#include <algorithm>
 
 namespace helix {
 
     MemoryPool::MemoryPool() = default;
-    
-    MemoryPool::~MemoryPool() { 
-        reset(); 
-    }
+
+    MemoryPool::~MemoryPool() { reset(); }
 
     GlobalBin* MemoryPool::get_global_bin(size_t alloc_size) {
         std::lock_guard<std::mutex> lock(global_map_mutex_);
@@ -37,7 +35,7 @@ namespace helix {
                 std::lock_guard<std::mutex> lock(pool->caches_mutex_);
                 pool->all_caches_.erase(cache);
             }
-            
+
             // Push remaining blocks to global bins
             for (auto& [size, blocks] : cache->blocks) {
                 if (blocks.empty()) continue;
@@ -78,15 +76,15 @@ namespace helix {
                 // Transfer a batch of blocks from global to local
                 size_t transfer_count = std::min(TRANSFER_BATCH_SIZE, bin->blocks.size());
                 auto transfer_start = bin->blocks.end() - transfer_count;
-                
+
                 // Keep the last one to return directly, put the rest in local cache
                 void* ptr = *(bin->blocks.end() - 1);
-                
+
                 if (transfer_count > 1) {
                     local_list.insert(local_list.end(), transfer_start, bin->blocks.end() - 1);
                 }
                 bin->blocks.erase(transfer_start, bin->blocks.end());
-                
+
                 return ptr;
             }
         }
@@ -115,7 +113,7 @@ namespace helix {
         if (local_list.size() >= MAX_LOCAL_CACHE_SIZE) {
             size_t transfer_count = MAX_LOCAL_CACHE_SIZE / 2;
             GlobalBin* bin = get_global_bin(alloc_size);
-            
+
             std::lock_guard<std::mutex> lock(bin->mutex);
             auto transfer_start = local_list.end() - transfer_count;
             bin->blocks.insert(bin->blocks.end(), transfer_start, local_list.end());
