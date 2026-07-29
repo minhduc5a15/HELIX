@@ -67,10 +67,10 @@ TEST_F(TrainingTest, LinearRegression_Convergence) {
         optimizer.step();
     }
 
-    // Tiêu chí: Loss giảm xuống dưới một ngưỡng xác định
+    // Criteria: Loss decreases below a specified threshold
     EXPECT_LT(last_loss, 1e-1f);
 
-    // Tiêu chí: Tham số học được xấp xỉ nghiệm kỳ vọng
+    // Criteria: Learned parameters approximate the expected solution
     auto params = model.parameters();
     // params[0] is Weight, params[1] is Bias
     EXPECT_NEAR(params[0].item(), 2.0f, 0.2f);
@@ -94,10 +94,10 @@ TEST_F(TrainingTest, XOR_Convergence) {
         optimizer.step();
     }
 
-    // Tiêu chí: Loss hội tụ về mức rất nhỏ
+    // Criteria: Loss decreases below a specified threshold
     EXPECT_LT(last_loss, 0.1f);
 
-    // Tiêu chí: Prediction error < tolerance
+    // Criteria: Prediction error < tolerance
     Tensor pred = model(x);
     const float* pred_data = pred.data_ptr();
     const float* target_data = target.data_ptr();

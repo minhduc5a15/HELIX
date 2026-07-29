@@ -31,7 +31,7 @@ static std::vector<BenchmarkResult> run_matmul_benchmark(size_t size) {
     fill_random(A);
     fill_random(B_T);
 
-    // Công thức tính số phép toán dấu phẩy động thống nhất: 2 * M * K * N
+    // Unified floating-point operations formula: 2 * M * K * N
     double ops = 2.0 * M * K * N;
 
     // Strategies to benchmark
@@ -88,7 +88,7 @@ static std::vector<BenchmarkResult> run_matmul_benchmark(size_t size) {
 int main() {
     BenchmarkReporter::print_header("Matrix Multiplication Benchmark");
 
-    std::vector<size_t> sizes = {64, 128, 256, 512, 1024, 2048};
+    std::vector<size_t> sizes = {64, 128, 256, 512, 1024};
     std::vector<BenchmarkResult> all_results;
     for (size_t size : sizes) {
         auto res = run_matmul_benchmark(size);
