@@ -20,6 +20,7 @@ add_library(helix
     src/core/tensor.cpp
     src/core/tensor_factory.cpp
     src/core/dispatcher.cpp
+    src/core/autotuner.cpp
     src/core/broadcast.cpp
     src/backend/kernels/ops.cpp
     src/backend/kernels/reduce.cpp
