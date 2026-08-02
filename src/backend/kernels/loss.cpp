@@ -1,6 +1,6 @@
 #include <algorithm>
 #include <cmath>
-#include <cstddef> // for std::ptrdiff_t
+#include <cstddef>  // for std::ptrdiff_t
 
 #include "backend/cpu_backend.hpp"
 

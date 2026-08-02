@@ -47,8 +47,9 @@ plantests/
 
 # others
 output/
+out/
+data/
 .agents/
 plan/
-*.sh
 /docs/api_output
 .CHECKPOINT.md
