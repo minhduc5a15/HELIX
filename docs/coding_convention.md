@@ -39,10 +39,12 @@ A standard `.cpp` or `.hpp` file should be organized with Includes in the follow
 - Pass large objects (e.g., `std::vector`, `std::string`) by Const Reference `const T&`. For `std::shared_ptr<Tensor>`, if ownership is not transferred, pass-by-value is acceptable as the pointer copy cost is extremely cheap.
 
 ## 4. Pointers and Memory Management
+
 - **ABSOLUTELY NO** raw pointers (`new` or `delete`) for resources living outside the function scope.
 - All Tensor and Autograd Node objects are managed using `std::shared_ptr`.
 - When needing to prevent Circular Dependency in the Autograd Graph, use `std::weak_ptr` or non-owning raw pointers if the lifecycle is guaranteed.
 
 ## 5. Comments and Code Documentation
+
 - **Public APIs**: Must have standard Doxygen comments describing `@brief`, `@param`, `@return`.
 - **In-code Comments**: Only comment to explain **WHY** you wrote this code, rather than describing **WHAT** it does. (e.g., Don't write `// Iterate through matrix`, write `// Iterate column-wise to utilize Hardware Prefetcher and avoid Cache Misses`).

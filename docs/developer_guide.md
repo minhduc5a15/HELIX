@@ -35,10 +35,26 @@ public:
 
 ## 2. Adding a New Loss Function
 
-Loss functions also inherit from `Module`. They typically take two Tensors: `predictions` and `targets`, and return a Scalar Tensor.
+By design, Loss functions **DO NOT** inherit from `Module`. This is because `Module::forward()` is strictly designed for single-input operations, whereas Loss functions inherently require two inputs (`predictions` and `targets`).
+Instead, Loss functions are implemented as **Free Functions**.
 
-1. **Define Forward**: Write the Loss computation logic in `forward()`. Ensure the returned result is a Tensor with `requires_grad = true` if `predictions` requires a gradient.
-2. The derivative computation will be completely handled by Autograd; you don't need to write the derivative yourself unless you want to optimize the mathematical formula!
+1. **Declare the Function**: Add the declaration in `include/nn/loss.hpp`. Example: `Tensor mse_loss(const Tensor& pred, const Tensor& target);`
+2. **Define the Computation**: In `src/nn/loss.cpp`, define the computation graph.
+3. **Autograd Hooking**: Create a class inheriting from `autograd::Node` for the backward pass of the loss (e.g., `MSELossBackward`), and link it to the resulting scalar `Tensor` via `set_grad_fn()`.
+
+**Example (MSE Loss):**
+
+```cpp
+Tensor mse_loss(const Tensor& pred, const Tensor& target) {
+    auto diff = Tensor::sub(pred, target);
+    auto sq = Tensor::pow(diff, 2.0f);
+    auto sum = Tensor::sum(sq);
+    auto mean = Tensor::div_scalar(sum, static_cast<float>(pred.size()));
+    
+    // Attach custom backward node to `mean` Tensor here...
+    return mean;
+}
+```
 
 ---
 
