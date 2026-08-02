@@ -1,9 +1,7 @@
 #!/bin/bash
 
-# Thư mục đích
 TARGET_DIR="data/mnist"
 
-# Tạo thư mục nếu chưa tồn tại
 mkdir -p "$TARGET_DIR"
 
 # URLs
