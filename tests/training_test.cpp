@@ -105,3 +105,32 @@ TEST_F(TrainingTest, XOR_Convergence) {
         EXPECT_NEAR(pred_data[i], target_data[i], 0.3f);
     }
 }
+
+TEST_F(TrainingTest, Classification_Convergence) {
+    // 4 samples, 3 classes
+    Tensor x({0.1f, 0.2f, 0.8f, 0.9f, 0.5f, 0.1f, 0.9f, 0.8f}, Shape{4, 2});
+
+    // Targets: class 0, class 1, class 2, class 1 (one-hot)
+    Tensor target({1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f}, Shape{4, 3});
+
+    Sequential model(Linear(2, 8), ReLU(), Linear(8, 3));
+    SGD optimizer(model.parameters(), 0.1f);
+
+    float initial_loss = 0.0f;
+    float last_loss = 0.0f;
+    for (int epoch = 0; epoch < 500; ++epoch) {
+        optimizer.zero_grad();
+        Tensor y = model(x);
+        Tensor loss = cross_entropy_loss(y, target);
+        if (epoch == 0) {
+            initial_loss = loss.item();
+        }
+        last_loss = loss.item();
+        loss.backward();
+        optimizer.step();
+    }
+
+    // Loss must decrease significantly
+    EXPECT_LT(last_loss, initial_loss);
+    EXPECT_LT(last_loss, 0.1f);  // Should converge well
+}

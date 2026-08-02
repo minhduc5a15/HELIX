@@ -150,4 +150,14 @@ namespace helix {
         return {grad / reduction_size};
     }
 
+    std::vector<Tensor> CrossEntropyLossBackward::backward(const std::vector<Tensor>& grad_outputs) {
+        const Tensor& log_softmax = saved_log_softmax_out_.unpack();
+        const Tensor& target = saved_target_.unpack();
+        const float N = static_cast<float>(log_softmax.shape()[0]);
+
+        // grad = (exp(log_softmax) - target) * (grad_outputs[0] / N)
+        Tensor grad = (log_softmax.exp() - target) * (grad_outputs[0] / N);
+        return {grad, Tensor()};  // Only returning grad w.r.t pred, target doesn't need grad
+    }
+
 }  // namespace helix

@@ -366,6 +366,40 @@ namespace helix {
         return out;
     }
 
+    Tensor Dispatcher::cross_entropy(const Tensor& pred, const Tensor& target) {
+        if (pred.rank() != 2 || target.rank() != 2) {
+            throw std::invalid_argument("cross_entropy currently only supports 2D tensors");
+        }
+        if (pred.shape() != target.shape()) {
+            throw std::invalid_argument("cross_entropy shapes incompatible");
+        }
+
+        Tensor p_contig = ensure_contiguous(pred);
+        Tensor t_contig = ensure_contiguous(target);
+
+        const size_t N = pred.shape()[0];
+        const size_t C = pred.shape()[1];
+
+        Tensor out(Shape{}, pred.dtype(), pred.device());                   // scalar loss
+        Tensor log_softmax_out(pred.shape(), pred.dtype(), pred.device());  // [N, C]
+
+        if (pred.device().is_cpu()) {
+            CPUBackend::cross_entropy(
+                p_contig.data_ptr(), t_contig.data_ptr(), out.data_ptr(), log_softmax_out.data_ptr(), N, C
+            );
+        } else {
+            throw std::runtime_error("Unsupported device");
+        }
+
+        if (g_graph_builder) {
+            OperationContext ctx{OpCategory::Loss, OpType::CrossEntropy, out, {pred, target}};
+            ctx.attributes["log_softmax"] = log_softmax_out;
+            g_graph_builder->build(ctx);
+        }
+
+        return out;
+    }
+
     void Dispatcher::sgd(Tensor& param, const Tensor& grad, float lr) {
         Tensor lhs = ensure_contiguous(param);
         Tensor rhs = ensure_contiguous(grad);
