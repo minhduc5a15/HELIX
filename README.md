@@ -78,9 +78,8 @@ int main() {
         std::make_shared<nn::Linear>(16, 1)
     });
 
-    // 2. Define Optimizer and Loss Function
+    // 2. Define Optimizer
     optim::SGD optimizer(model->parameters(), 0.01);
-    nn::MSELoss criterion;
 
     // 3. Prepare Data (Inputs) and Labels (Targets)
     auto inputs = Tensor({{0, 0}, {0, 1}, {1, 0}, {1, 1}}, Shape{4, 2});
@@ -88,10 +87,10 @@ int main() {
 
     // 4. Training Loop
     for (int epoch = 0; epoch < 1000; ++epoch) {
-        optimizer.zero_grad();               // Clear previous gradients
+        optimizer.zero_grad();                 // Clear previous gradients
 
         auto outputs = model->forward(inputs); // Forward Pass
-        auto loss = criterion(outputs, targets); // Compute Loss
+        auto loss = mse_loss(outputs, targets); // Compute Loss
 
         loss.backward();                     // Backpropagation (Backward Pass)
         optimizer.step();                    // Update weights
@@ -99,6 +98,21 @@ int main() {
 
     return 0;
 }
+```
+
+### End-to-End Image Classification (MNIST)
+
+HELIX is capable of training realistic datasets like MNIST using its high-performance CPU backend and CrossEntropyLoss. You can run the provided example to see it in action (reaches ~97% accuracy in < 30 seconds):
+
+```bash
+# 1. Download and extract the MNIST dataset (requires wget and gzip)
+bash scripts/download_mnist.sh
+
+# 2. Build the MNIST example
+./build.sh
+
+# 3. Run the training loop
+./out/build/HELIX/examples/mnist
 ```
 
 ---
