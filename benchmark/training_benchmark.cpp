@@ -1,5 +1,4 @@
 #include <chrono>
-#include <iomanip>
 #include <iostream>
 #include <random>
 #include <string>
@@ -114,6 +113,45 @@ int main() {
 
     run_linear_regression_benchmark();
     run_xor_benchmark();
+
+    // --- Classification Training Benchmark ---
+    std::cout << "--- Classification Training Benchmark ---" << std::endl;
+    int num_samples = 1000;
+    int input_dim = 10;
+    int num_classes = 5;
+
+    Tensor X_cls = Tensor::randn({static_cast<size_t>(num_samples), static_cast<size_t>(input_dim)});
+    // One-hot targets
+    std::vector<float> y_cls_data(num_samples * num_classes, 0.0f);
+    std::mt19937 gen(42);
+    std::uniform_int_distribution<> dist_cls(0, num_classes - 1);
+    for (int i = 0; i < num_samples; ++i) {
+        y_cls_data[i * num_classes + dist_cls(gen)] = 1.0f;
+    }
+    Tensor Y_cls(y_cls_data, {static_cast<size_t>(num_samples), static_cast<size_t>(num_classes)});
+
+    Sequential cls_model(Linear(input_dim, 32), ReLU(), Linear(32, num_classes));
+    SGD cls_optimizer(cls_model.parameters(), 0.05);
+
+    int max_cls_epochs = 100;
+    auto start_time_cls = std::chrono::high_resolution_clock::now();
+
+    for (int epoch = 0; epoch < max_cls_epochs; ++epoch) {
+        auto pred = cls_model(X_cls);
+        auto loss = cross_entropy_loss(pred, Y_cls);
+
+        cls_optimizer.zero_grad();
+        loss.backward();
+        cls_optimizer.step();
+    }
+
+    auto end_time_cls = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double, std::milli> duration_cls = end_time_cls - start_time_cls;
+
+    std::cout << "Ran " << max_cls_epochs << " epochs on Classification task." << std::endl;
+    std::cout << "Total Training Time: " << duration_cls.count() << " ms" << std::endl;
+    std::cout << "Average Time per Epoch: " << duration_cls.count() / max_cls_epochs << " ms" << std::endl;
+    std::cout << std::endl;
 
     BenchmarkReporter::print_footer();
     return 0;

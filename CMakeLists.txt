@@ -24,6 +24,7 @@ add_library(helix
     src/core/broadcast.cpp
     src/backend/kernels/ops.cpp
     src/backend/kernels/reduce.cpp
+    src/backend/kernels/loss.cpp
     src/backend/matmul/naive_matmul.cpp
     src/backend/matmul/blocked_matmul.cpp
     src/backend/matmul/avx2_dot_matmul.cpp

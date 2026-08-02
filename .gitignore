@@ -51,3 +51,4 @@ output/
 plan/
 *.sh
 /docs/api_output
+.CHECKPOINT.md

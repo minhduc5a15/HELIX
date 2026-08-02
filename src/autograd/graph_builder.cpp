@@ -71,6 +71,11 @@ namespace helix {
                 node = std::make_shared<MeanBackward>(ctx.inputs[0].get().shape(), axis, keepdim);
                 break;
             }
+            case OpType::CrossEntropy: {
+                auto log_softmax = std::any_cast<Tensor>(ctx.attributes.at("log_softmax"));
+                node = std::make_shared<CrossEntropyLossBackward>(log_softmax, ctx.inputs[1].get());
+                break;
+            }
             default:
                 // View operations or unsupported ops will be ignored.
                 // In a complete framework, these would also require backward nodes.

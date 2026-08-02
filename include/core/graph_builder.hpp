@@ -10,7 +10,7 @@ namespace helix {
 
     class Tensor;  // Forward declaration
 
-    enum class OpCategory { Unary, Binary, Reduce, View, Matrix };
+    enum class OpCategory { Unary, Binary, Reduce, View, Matrix, Loss };
 
     enum class OpType {
         Add,
@@ -30,7 +30,8 @@ namespace helix {
         Log,
         Sqrt,
         Pow,
-        ReLU
+        ReLU,
+        CrossEntropy
     };
 
     struct OperationContext {
