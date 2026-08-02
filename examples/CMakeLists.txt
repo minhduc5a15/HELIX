@@ -3,3 +3,6 @@ target_link_libraries(xor_mlp PRIVATE helix)
 
 add_executable(linear_regression linear_regression.cpp)
 target_link_libraries(linear_regression PRIVATE helix)
+
+add_executable(mnist mnist.cpp)
+target_link_libraries(mnist PRIVATE helix)
