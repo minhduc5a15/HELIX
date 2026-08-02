@@ -14,4 +14,14 @@ namespace helix {
      */
     Tensor mse_loss(const Tensor& pred, const Tensor& target);
 
+    /**
+     * @brief Computes the Cross Entropy Loss between predictions and targets.
+     * Combines LogSoftmax and NLLLoss in a single stable operation.
+     *
+     * @param pred The predicted unnormalized logits. Shape: [N, C]
+     * @param target The ground truth probabilities or one-hot vectors. Shape: [N, C]
+     * @return A scalar Tensor representing the average loss over the batch.
+     */
+    Tensor cross_entropy_loss(const Tensor& pred, const Tensor& target);
+
 }  // namespace helix

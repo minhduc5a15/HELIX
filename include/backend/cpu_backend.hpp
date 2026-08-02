@@ -47,6 +47,13 @@ namespace helix {
         static void sum(const float* input, float* output, size_t outer_size, size_t dim_size, size_t inner_size);
         static void mean(const float* input, float* output, size_t outer_size, size_t dim_size, size_t inner_size);
 
+        // Loss Operations
+        // Computes CrossEntropy Loss with Log-Sum-Exp Trick.
+        // pred and target are [N, C], loss_out is scalar, log_softmax_out is [N, C]
+        static void cross_entropy(
+            const float* pred, const float* target, float* loss_out, float* log_softmax_out, size_t N, size_t C
+        );
+
         // SGD Optimization Kernel
         static void sgd(float* param, const float* grad, float lr, size_t size);
     };

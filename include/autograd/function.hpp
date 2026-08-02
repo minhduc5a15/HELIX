@@ -146,4 +146,15 @@ namespace helix {
         bool keepdim_;
     };
 
+    class CrossEntropyLossBackward : public Node {
+    public:
+        CrossEntropyLossBackward(const Tensor& log_softmax_out, const Tensor& target)
+            : saved_log_softmax_out_(log_softmax_out), saved_target_(target) {}
+        std::vector<Tensor> backward(const std::vector<Tensor>& grad_outputs) override;
+
+    private:
+        SavedTensor saved_log_softmax_out_;
+        SavedTensor saved_target_;
+    };
+
 }  // namespace helix
