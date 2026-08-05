@@ -19,37 +19,43 @@ namespace helix {
         return it->second.get();
     }
 
+    thread_local ThreadCache* tls_cache_ptr = nullptr;
+
     struct ThreadCacheWrapper {
-        ThreadCache* cache;
-        MemoryPool* pool;
-
-        ThreadCacheWrapper(MemoryPool* p) : pool(p) {
-            cache = new ThreadCache();
-            std::lock_guard<std::mutex> lock(pool->caches_mutex_);
-            pool->all_caches_.insert(cache);
-        }
-
+        void touch() {}
         ~ThreadCacheWrapper() {
-            // First remove from global list to avoid reset() accessing it while destructing
-            {
-                std::lock_guard<std::mutex> lock(pool->caches_mutex_);
-                pool->all_caches_.erase(cache);
-            }
+            if (tls_cache_ptr) {
+                MemoryPool& pool = MemoryPool::get_instance();
+                
+                // First remove from global list to avoid reset() accessing it while destructing
+                {
+                    std::lock_guard<std::mutex> lock(pool.caches_mutex_);
+                    pool.all_caches_.erase(tls_cache_ptr);
+                }
 
-            // Push remaining blocks to global bins
-            for (auto& [size, blocks] : cache->blocks) {
-                if (blocks.empty()) continue;
-                GlobalBin* bin = pool->get_global_bin(size);
-                std::lock_guard<std::mutex> bin_lock(bin->mutex);
-                bin->blocks.insert(bin->blocks.end(), blocks.begin(), blocks.end());
+                // Push remaining blocks to global bins
+                for (auto& [size, blocks] : tls_cache_ptr->blocks) {
+                    if (blocks.empty()) continue;
+                    GlobalBin* bin = pool.get_global_bin(size);
+                    std::lock_guard<std::mutex> bin_lock(bin->mutex);
+                    bin->blocks.insert(bin->blocks.end(), blocks.begin(), blocks.end());
+                }
+                delete tls_cache_ptr;
+                tls_cache_ptr = nullptr; // Critical to prevent use-after-free
             }
-            delete cache;
         }
     };
 
+    thread_local ThreadCacheWrapper tls_wrapper;
+
     ThreadCache* MemoryPool::get_thread_cache() {
-        thread_local ThreadCacheWrapper wrapper(this);
-        return wrapper.cache;
+        if (!tls_cache_ptr) {
+            tls_cache_ptr = new ThreadCache();
+            std::lock_guard<std::mutex> lock(caches_mutex_);
+            all_caches_.insert(tls_cache_ptr);
+        }
+        tls_wrapper.touch();
+        return tls_cache_ptr;
     }
 
     void* MemoryPool::allocate(const size_t bytes) {
@@ -104,7 +110,15 @@ namespace helix {
         if (!ptr) return;
         const size_t alloc_size = (bytes + 31) & ~31;
 
-        ThreadCache* local_cache = get_thread_cache();
+        if (!tls_cache_ptr) {
+            // Bypass thread cache if the thread is exiting or hasn't allocated any memory.
+            GlobalBin* bin = get_global_bin(alloc_size);
+            std::lock_guard<std::mutex> lock(bin->mutex);
+            bin->blocks.push_back(ptr);
+            return;
+        }
+
+        ThreadCache* local_cache = tls_cache_ptr;
         auto& local_list = local_cache->blocks[alloc_size];
 
         local_list.push_back(ptr);
@@ -157,8 +171,8 @@ namespace helix {
     }
 
     MemoryPool& MemoryPool::get_instance() {
-        static MemoryPool instance;
-        return instance;
+        static MemoryPool* instance = new MemoryPool();
+        return *instance;
     }
 
 }  // namespace helix
