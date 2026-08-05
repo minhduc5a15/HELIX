@@ -54,3 +54,4 @@ plan/
 /docs/api_output
 .CHECKPOINT.md
 scratch
+build_asan
