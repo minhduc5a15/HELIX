@@ -112,15 +112,21 @@ namespace helix {
         } else {
             // N-dimensional iterator for non-contiguous copy
             std::vector<size_t> indices(rank(), 0);
+            size_t current_offset = 0;
+            const float* src_data = data_ptr();
+            float* dst_data = new_tensor.data_ptr();
+
             for (size_t i = 0; i < numel(); ++i) {
-                new_tensor.data_ptr()[i] = item(indices);
+                dst_data[i] = src_data[current_offset];
 
                 for (int j = static_cast<int>(rank()) - 1; j >= 0; --j) {
                     indices[j]++;
+                    current_offset += stride()[j];
                     if (indices[j] < shape()[j]) {
                         break;
                     }
                     indices[j] = 0;
+                    current_offset -= stride()[j] * shape()[j];
                 }
             }
         }
@@ -137,15 +143,21 @@ namespace helix {
             std::memcpy(data_ptr(), src_contig.data_ptr(), numel() * sizeof(float));
         } else {
             std::vector<size_t> indices(rank(), 0);
+            size_t current_offset = 0;
+            const float* src_data = src_contig.data_ptr();
+            float* dst_data = data_ptr();
+
             for (size_t i = 0; i < numel(); ++i) {
-                set_item(indices, src_contig.data_ptr()[i]);
+                dst_data[current_offset] = src_data[i];
 
                 for (int j = static_cast<int>(rank()) - 1; j >= 0; --j) {
                     indices[j]++;
+                    current_offset += stride()[j];
                     if (indices[j] < shape()[j]) {
                         break;
                     }
                     indices[j] = 0;
+                    current_offset -= stride()[j] * shape()[j];
                 }
             }
         }
@@ -156,15 +168,20 @@ namespace helix {
             std::fill_n(data_ptr(), numel(), 0.0f);
         } else {
             std::vector<size_t> indices(rank(), 0);
+            size_t current_offset = 0;
+            float* dst_data = data_ptr();
+
             for (size_t i = 0; i < numel(); ++i) {
-                set_item(indices, 0.0f);
+                dst_data[current_offset] = 0.0f;
 
                 for (int j = static_cast<int>(rank()) - 1; j >= 0; --j) {
                     indices[j]++;
+                    current_offset += stride()[j];
                     if (indices[j] < shape()[j]) {
                         break;
                     }
                     indices[j] = 0;
+                    current_offset -= stride()[j] * shape()[j];
                 }
             }
         }
