@@ -26,7 +26,7 @@ namespace helix {
         ~ThreadCacheWrapper() {
             if (tls_cache_ptr) {
                 MemoryPool& pool = MemoryPool::get_instance();
-                
+
                 // First remove from global list to avoid reset() accessing it while destructing
                 {
                     std::lock_guard<std::mutex> lock(pool.caches_mutex_);
@@ -41,7 +41,7 @@ namespace helix {
                     bin->blocks.insert(bin->blocks.end(), blocks.begin(), blocks.end());
                 }
                 delete tls_cache_ptr;
-                tls_cache_ptr = nullptr; // Critical to prevent use-after-free
+                tls_cache_ptr = nullptr;  // Critical to prevent use-after-free
             }
         }
     };
