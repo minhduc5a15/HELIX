@@ -35,7 +35,11 @@ namespace helix {
         void zero_grad() {
             for (auto& param : params_) {
                 if (param.requires_grad() && param.has_grad()) {
-                    param.grad().zero_();
+                    if (param.grad().has_internal_overlap()) {
+                        param.grad() = Tensor::zeros(param.shape());
+                    } else {
+                        param.grad().zero_();
+                    }
                 }
             }
         }
