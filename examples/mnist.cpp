@@ -40,12 +40,14 @@ Tensor read_mnist_images(const std::string& path) {
     std::vector<unsigned char> raw_data(num_images * image_size);
     file.read(reinterpret_cast<char*>(raw_data.data()), num_images * image_size);
 
-    std::vector<float> data(num_images * image_size);
+    Tensor images = Tensor::empty({static_cast<size_t>(num_images), image_size});
+    float* tensor_data = images.data_ptr();
+
     for (size_t i = 0; i < raw_data.size(); ++i) {
-        data[i] = static_cast<float>(raw_data[i]) / 255.0f;
+        tensor_data[i] = static_cast<float>(raw_data[i]) / 255.0f;
     }
 
-    return Tensor(data, {static_cast<size_t>(num_images), image_size});
+    return images;
 }
 
 // Read MNIST Labels
@@ -69,12 +71,14 @@ std::pair<Tensor, std::vector<uint8_t>> read_mnist_labels(const std::string& pat
     std::vector<uint8_t> raw_labels(num_labels);
     file.read(reinterpret_cast<char*>(raw_labels.data()), num_labels);
 
-    std::vector<float> data(num_labels * num_classes, 0.0f);
+    Tensor labels = Tensor::zeros({static_cast<size_t>(num_labels), num_classes});
+    float* tensor_data = labels.data_ptr();
+
     for (size_t i = 0; i < num_labels; ++i) {
-        data[i * num_classes + raw_labels[i]] = 1.0f;
+        tensor_data[i * num_classes + raw_labels[i]] = 1.0f;
     }
 
-    return {Tensor(data, {static_cast<size_t>(num_labels), num_classes}), raw_labels};
+    return {labels, raw_labels};
 }
 
 int main() {
