@@ -1,12 +1,16 @@
 #include "core/tensor.hpp"
 
+#include <omp.h>
+
 #include <algorithm>  // for std::fill_n
-#include <cstring>    // for memcpy
+#include <algorithm>
+#include <cstring>  // for memcpy
 #include <stdexcept>
 
 #include "core/autograd_meta.hpp"
 #include "core/broadcast.hpp"
 #include "core/dispatcher.hpp"
+#include "core/nd_iterator.hpp"
 #include "core/tensor_factory.hpp"
 
 namespace helix {
@@ -108,25 +112,47 @@ namespace helix {
         Tensor new_tensor(shape(), dtype(), device());
 
         if (is_contiguous()) {
-            std::memcpy(new_tensor.data_ptr(), data_ptr(), numel() * sizeof(float));
+            if (numel() > 0) {
+                std::memcpy(new_tensor.data_ptr(), data_ptr(), numel() * sizeof(float));
+            }
         } else {
-            // N-dimensional iterator for non-contiguous copy
-            std::vector<size_t> indices(rank(), 0);
-            size_t current_offset = 0;
-            const float* src_data = data_ptr();
-            float* dst_data = new_tensor.data_ptr();
-
-            for (size_t i = 0; i < numel(); ++i) {
-                dst_data[i] = src_data[current_offset];
-
-                for (int j = static_cast<int>(rank()) - 1; j >= 0; --j) {
-                    indices[j]++;
-                    current_offset += stride()[j];
-                    if (indices[j] < shape()[j]) {
+            size_t chunk_dim = static_cast<size_t>(-1);
+            for (int i = static_cast<int>(rank()) - 1; i >= 0; --i) {
+                if (stride()[i] == 1 && new_tensor.stride()[i] == 1) {
+                    chunk_dim = static_cast<size_t>(i);
+                    if (shape()[i] > 1) {
                         break;
                     }
-                    indices[j] = 0;
-                    current_offset -= stride()[j] * shape()[j];
+                }
+            }
+
+            size_t chunk_size = 1;
+            Shape outer_shape = shape();
+            Stride outer_stride_src = stride();
+            Stride outer_stride_dst = new_tensor.stride();
+
+            if (chunk_dim != static_cast<size_t>(-1)) {
+                chunk_size = shape()[chunk_dim];
+                outer_shape = remove_dimension(shape(), chunk_dim);
+                outer_stride_src = remove_dimension(stride(), chunk_dim);
+                outer_stride_dst = remove_dimension(new_tensor.stride(), chunk_dim);
+            }
+
+            const size_t num_chunks = outer_shape.numel();
+            float* dst_data = new_tensor.data_ptr();
+            const float* src_data = data_ptr();
+
+#pragma omp parallel for
+            for (size_t c = 0; c < num_chunks; ++c) {
+                size_t offset_src = BinaryNDIterator::compute_offset_from_flat(c, outer_shape, outer_stride_src);
+                size_t offset_dst = BinaryNDIterator::compute_offset_from_flat(c, outer_shape, outer_stride_dst);
+
+                float* dst_chunk = dst_data + offset_dst;
+                const float* src_chunk = src_data + offset_src;
+
+#pragma omp simd
+                for (size_t i = 0; i < chunk_size; ++i) {
+                    dst_chunk[i] = src_chunk[i];
                 }
             }
         }
@@ -138,50 +164,116 @@ namespace helix {
             throw std::invalid_argument("Tensor sizes do not match for copy_");
         }
 
-        Tensor src_contig = src.contiguous();
-        if (is_contiguous()) {
-            std::memcpy(data_ptr(), src_contig.data_ptr(), numel() * sizeof(float));
+        if (data_ptr() == src.data_ptr() && stride() == src.stride() && shape() == src.shape()) {
+            return;
+        }
+
+        if (has_internal_overlap()) {
+            throw std::runtime_error(
+                "copy_: in-place operation on a tensor with overlapping memory (stride 0) is not supported."
+            );
+        }
+
+        bool is_aliased = (impl_->storage() == src.impl_->storage()) &&
+                          (data_ptr() != src.data_ptr() || stride() != src.stride() || shape() != src.shape());
+        Tensor safe_src = is_aliased ? src.clone() : src;
+
+        if (is_contiguous() && safe_src.is_contiguous()) {
+            if (numel() > 0) {
+                std::memcpy(data_ptr(), safe_src.data_ptr(), numel() * sizeof(float));
+            }
         } else {
-            std::vector<size_t> indices(rank(), 0);
-            size_t current_offset = 0;
-            const float* src_data = src_contig.data_ptr();
-            float* dst_data = data_ptr();
-
-            for (size_t i = 0; i < numel(); ++i) {
-                dst_data[current_offset] = src_data[i];
-
-                for (int j = static_cast<int>(rank()) - 1; j >= 0; --j) {
-                    indices[j]++;
-                    current_offset += stride()[j];
-                    if (indices[j] < shape()[j]) {
-                        break;
+            // Find contiguous dimension ONLY if shapes match
+            size_t chunk_dim = static_cast<size_t>(-1);
+            if (shape() == safe_src.shape()) {
+                for (int i = static_cast<int>(rank()) - 1; i >= 0; --i) {
+                    if (stride()[i] == 1 && safe_src.stride()[i] == 1) {
+                        chunk_dim = static_cast<size_t>(i);
+                        if (shape()[i] > 1) {
+                            break;
+                        }
                     }
-                    indices[j] = 0;
-                    current_offset -= stride()[j] * shape()[j];
+                }
+            }
+
+            size_t chunk_size = 1;
+            Shape outer_shape_dst = shape();
+            Shape outer_shape_src = safe_src.shape();
+            Stride outer_stride_dst = stride();
+            Stride outer_stride_src = safe_src.stride();
+
+            if (chunk_dim != static_cast<size_t>(-1)) {
+                chunk_size = shape()[chunk_dim];
+                outer_shape_dst = remove_dimension(shape(), chunk_dim);
+                outer_shape_src = remove_dimension(safe_src.shape(), chunk_dim);
+                outer_stride_dst = remove_dimension(stride(), chunk_dim);
+                outer_stride_src = remove_dimension(safe_src.stride(), chunk_dim);
+            }
+
+            const size_t num_chunks = outer_shape_dst.numel();
+            float* dst_data = data_ptr();
+            const float* src_data = safe_src.data_ptr();
+
+#pragma omp parallel for
+            for (size_t c = 0; c < num_chunks; ++c) {
+                size_t offset_dst = BinaryNDIterator::compute_offset_from_flat(c, outer_shape_dst, outer_stride_dst);
+                size_t offset_src = BinaryNDIterator::compute_offset_from_flat(c, outer_shape_src, outer_stride_src);
+
+                float* dst_chunk = dst_data + offset_dst;
+                const float* src_chunk = src_data + offset_src;
+
+#pragma omp simd
+                for (size_t i = 0; i < chunk_size; ++i) {
+                    dst_chunk[i] = src_chunk[i];
                 }
             }
         }
     }
 
     void Tensor::zero_() {
+        if (has_internal_overlap()) {
+            throw std::runtime_error(
+                "zero_: in-place operation on a tensor with overlapping memory (stride 0) is not supported."
+            );
+        }
+
         if (is_contiguous()) {
-            std::fill_n(data_ptr(), numel(), 0.0f);
+            if (numel() > 0) {
+                std::fill_n(data_ptr(), numel(), 0.0f);
+            }
         } else {
-            std::vector<size_t> indices(rank(), 0);
-            size_t current_offset = 0;
-            float* dst_data = data_ptr();
-
-            for (size_t i = 0; i < numel(); ++i) {
-                dst_data[current_offset] = 0.0f;
-
-                for (int j = static_cast<int>(rank()) - 1; j >= 0; --j) {
-                    indices[j]++;
-                    current_offset += stride()[j];
-                    if (indices[j] < shape()[j]) {
+            // Find contiguous dimension
+            size_t chunk_dim = static_cast<size_t>(-1);
+            for (int i = static_cast<int>(rank()) - 1; i >= 0; --i) {
+                if (stride()[i] == 1) {
+                    chunk_dim = static_cast<size_t>(i);
+                    if (shape()[i] > 1) {
                         break;
                     }
-                    indices[j] = 0;
-                    current_offset -= stride()[j] * shape()[j];
+                }
+            }
+
+            size_t chunk_size = 1;
+            Shape outer_shape = shape();
+            Stride outer_stride_dst = stride();
+
+            if (chunk_dim != static_cast<size_t>(-1)) {
+                chunk_size = shape()[chunk_dim];
+                outer_shape = remove_dimension(shape(), chunk_dim);
+                outer_stride_dst = remove_dimension(stride(), chunk_dim);
+            }
+
+            const size_t num_chunks = outer_shape.numel();
+            float* dst_data = data_ptr();
+
+#pragma omp parallel for
+            for (size_t c = 0; c < num_chunks; ++c) {
+                size_t offset_dst = BinaryNDIterator::compute_offset_from_flat(c, outer_shape, outer_stride_dst);
+                float* dst_chunk = dst_data + offset_dst;
+
+#pragma omp simd
+                for (size_t i = 0; i < chunk_size; ++i) {
+                    dst_chunk[i] = 0.0f;
                 }
             }
         }
@@ -190,6 +282,15 @@ namespace helix {
     Tensor Tensor::contiguous() const {
         if (is_contiguous()) return *this;
         return clone();
+    }
+
+    bool Tensor::has_internal_overlap() const {
+        for (size_t i = 0; i < rank(); ++i) {
+            if (stride()[i] == 0 && shape()[i] > 1) {
+                return true;
+            }
+        }
+        return false;
     }
 
     Tensor Tensor::reshape(Shape new_shape) const {
