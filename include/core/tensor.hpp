@@ -169,6 +169,12 @@ namespace helix {
         bool is_contiguous() const;
         bool is_shared() const;
 
+        /**
+         * @brief Checks if the tensor has internal memory overlap (e.g., due to broadcasting).
+         * @return True if multiple logical indices map to the same physical memory location.
+         */
+        bool has_internal_overlap() const;
+
     private:
         explicit Tensor(std::shared_ptr<TensorImpl> impl);
         std::shared_ptr<TensorImpl> impl_;

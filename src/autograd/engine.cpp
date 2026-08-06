@@ -20,7 +20,8 @@ namespace helix {
             if (!meta_->has_grad()) {
                 meta_->set_grad(grad_outputs[0]);
             } else {
-                if (!meta_->grad().is_shared() && meta_->grad().shape() == grad_outputs[0].shape()) {
+                if (!meta_->grad().is_shared() && meta_->grad().shape() == grad_outputs[0].shape() &&
+                    !meta_->grad().has_internal_overlap()) {
                     meta_->grad().add_(grad_outputs[0]);
                 } else {
                     meta_->set_grad(meta_->grad() + grad_outputs[0]);
@@ -149,7 +150,8 @@ namespace helix {
                     } else {
                         // Inplace gradient accumulation if safe
                         if (!node_gradients[next][0].is_shared() &&
-                            node_gradients[next][0].shape() == input_grads[i].shape()) {
+                            node_gradients[next][0].shape() == input_grads[i].shape() &&
+                            !node_gradients[next][0].has_internal_overlap()) {
                             node_gradients[next][0].add_(input_grads[i]);
                         } else {
                             node_gradients[next][0] = node_gradients[next][0] + input_grads[i];
