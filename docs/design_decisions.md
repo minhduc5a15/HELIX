@@ -41,3 +41,7 @@ During the development of the MatMul (Matrix Multiplication) Backend, the optimi
 ### 8. Why use a JIT Profiler (AutoTuner) for Dispatching instead of a hardcoded threshold?
 
 - **Reason:** OpenMP multi-threading only outperforms Single-Core AVX2 when the matrix is large enough to amortize thread spin-up overhead. However, this threshold varies wildly across hardware architectures (e.g., Intel vs AMD vs ARM) depending on Core Count and Cache Topology. Hardcoding a threshold like `128x128` caused catastrophic slowdowns on small matrices. The `AutoTuner` solves this by benchmarking the CPU at runtime (Hybrid Lazy Evaluation) and dynamically computing the exact FLOP threshold where OpenMP becomes profitable.
+
+### 9. Why replace NDIterator with Chunked Iterator for Element-wise operations?
+
+- **Reason:** The original `NDIterator` computed flat offsets element-by-element using N-dimensional modulo arithmetic. This scalar loop structure destroyed compiler auto-vectorization (AVX/SSE) and became a major bottleneck. The `Chunked Iterator` dynamically scans tensor metadata to find the deepest contiguous dimension (`chunk_dim`). It then extracts 1D segments (`chunk_size`) that can be perfectly unrolled and vectorized using `#pragma omp simd`, unlocking SIMD performance and achieving zero-overhead memory bloat on non-contiguous in-place operations.
