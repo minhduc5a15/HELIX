@@ -56,3 +56,4 @@ plan/
 scratch
 build_asan
 format.sh
+commit_msg.txt
