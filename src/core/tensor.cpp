@@ -1,7 +1,5 @@
 #include "core/tensor.hpp"
 
-#include <omp.h>
-
 #include <algorithm>  // for std::fill_n
 #include <algorithm>
 #include <cstring>  // for memcpy
@@ -143,7 +141,7 @@ namespace helix {
             const float* src_data = data_ptr();
 
 #pragma omp parallel for
-            for (size_t c = 0; c < num_chunks; ++c) {
+            for (ptrdiff_t c = 0; c < static_cast<ptrdiff_t>(num_chunks); ++c) {
                 size_t offset_src = BinaryNDIterator::compute_offset_from_flat(c, outer_shape, outer_stride_src);
                 size_t offset_dst = BinaryNDIterator::compute_offset_from_flat(c, outer_shape, outer_stride_dst);
 
@@ -151,7 +149,7 @@ namespace helix {
                 const float* src_chunk = src_data + offset_src;
 
 #pragma omp simd
-                for (size_t i = 0; i < chunk_size; ++i) {
+                for (ptrdiff_t i = 0; i < static_cast<ptrdiff_t>(chunk_size); ++i) {
                     dst_chunk[i] = src_chunk[i];
                 }
             }
@@ -215,7 +213,7 @@ namespace helix {
             const float* src_data = safe_src.data_ptr();
 
 #pragma omp parallel for
-            for (size_t c = 0; c < num_chunks; ++c) {
+            for (ptrdiff_t c = 0; c < static_cast<ptrdiff_t>(num_chunks); ++c) {
                 size_t offset_dst = BinaryNDIterator::compute_offset_from_flat(c, outer_shape_dst, outer_stride_dst);
                 size_t offset_src = BinaryNDIterator::compute_offset_from_flat(c, outer_shape_src, outer_stride_src);
 
@@ -223,7 +221,7 @@ namespace helix {
                 const float* src_chunk = src_data + offset_src;
 
 #pragma omp simd
-                for (size_t i = 0; i < chunk_size; ++i) {
+                for (ptrdiff_t i = 0; i < static_cast<ptrdiff_t>(chunk_size); ++i) {
                     dst_chunk[i] = src_chunk[i];
                 }
             }
@@ -267,12 +265,12 @@ namespace helix {
             float* dst_data = data_ptr();
 
 #pragma omp parallel for
-            for (size_t c = 0; c < num_chunks; ++c) {
+            for (ptrdiff_t c = 0; c < static_cast<ptrdiff_t>(num_chunks); ++c) {
                 size_t offset_dst = BinaryNDIterator::compute_offset_from_flat(c, outer_shape, outer_stride_dst);
                 float* dst_chunk = dst_data + offset_dst;
 
 #pragma omp simd
-                for (size_t i = 0; i < chunk_size; ++i) {
+                for (ptrdiff_t i = 0; i < static_cast<ptrdiff_t>(chunk_size); ++i) {
                     dst_chunk[i] = 0.0f;
                 }
             }
