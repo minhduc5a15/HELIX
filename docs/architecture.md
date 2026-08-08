@@ -51,8 +51,9 @@ The central layer containing all definitions for the Tensor data structure.
 
 - **Data & Shape:** Manages the memory space (Storage) of multi-dimensional real numbers.
 - **Memory Allocator:** Utilizes a custom `Thread-Local Memory Pool` to provide O(1) memory allocation without Lock Contention during multi-threading, effectively preventing Memory Leaks.
+- **Chunked Iterator:** Deprecated the slow scalar `NDIterator`. Employs a dynamic `chunk_dim` algorithm to extract the deepest contiguous 1D segment for high-performance SIMD auto-vectorization and OpenMP processing.
 - **View Operations:** Provides zero-copy View mechanisms (Strided memory) for `reshape`, `transpose`, `flatten`.
-- **Broadcasting:** Automatically adjusts the dimensions of two Tensors with different Shapes to perform operations (O(1) memory overhead thanks to Stride adjustment).
+- **Broadcasting & Safety:** Automatically adjusts the dimensions of two Tensors with different Shapes to perform operations (O(1) memory overhead). Actively detects internal overlapping strides to prevent race conditions during in-place mutations.
 
 ### 4. Dispatcher & Backend (Core Optimization Layer)
 

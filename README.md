@@ -4,9 +4,9 @@ HELIX is a Deep Learning Framework built entirely from scratch in C++20. The pro
 
 ## 🌟 Key Features
 
-- **Tensor Runtime**: Supports n-dimensional arrays, Zero-memory Broadcasting (based on Strides), and View Operations (`reshape`, `transpose`) with $O(1)$ latency.
-- **Dynamic Autograd**: Dynamic Computational Graph (Define-by-Run). Automatically analyzes Topology and computes gradients with In-place Accumulation to optimize RAM.
-- **Neural Network Core**: Clean and extensible API. Supports `Module`, `Linear`, `Sequential`, Activation functions (`ReLU`, `Sigmoid`), Optimizers (`SGD`), and Loss functions (`MSE`).
+- **Tensor Runtime**: Supports n-dimensional arrays, Zero-memory Broadcasting, View Operations (`reshape`, `transpose`) with $O(1)$ latency, and a **Chunked Iterator** for SIMD/OpenMP optimized element-wise iteration.
+- **Dynamic Autograd**: Dynamic Computational Graph (Define-by-Run). Automatically analyzes Topology, guards against stride overlaps, and computes gradients with In-place Accumulation to optimize RAM.
+- **Neural Network Core**: Clean and extensible API. Supports `Module`, `Linear`, `Sequential`, Activation functions (`ReLU`, `Sigmoid`), Optimizers (`SGD`), and Loss functions (`MSE`, `CrossEntropyLoss`).
 - **High-Performance Backends**:
   - `Naive`: Absolute baseline for correctness.
   - `Blocked`: Memory Access Pattern optimization (Cache Tiling).
