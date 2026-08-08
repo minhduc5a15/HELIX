@@ -55,3 +55,4 @@ plan/
 .CHECKPOINT.md
 scratch
 build_asan
+format.sh
