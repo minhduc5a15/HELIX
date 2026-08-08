@@ -1,7 +1,5 @@
 #include "core/dispatcher.hpp"
 
-#include <omp.h>
-
 #include <algorithm>
 #include <stdexcept>
 
@@ -90,7 +88,7 @@ namespace helix {
                 const float* b_data = safe_b.data_ptr();
 
 #pragma omp parallel for
-                for (size_t c = 0; c < num_chunks; ++c) {
+                for (ptrdiff_t c = 0; c < static_cast<ptrdiff_t>(num_chunks); ++c) {
                     size_t offset_a = BinaryNDIterator::compute_offset_from_flat(c, outer_shape, outer_stride_a);
                     size_t offset_b = BinaryNDIterator::compute_offset_from_flat(c, outer_shape, outer_stride_b);
 
@@ -98,7 +96,7 @@ namespace helix {
                     const float* b_chunk = b_data + offset_b;
 
 #pragma omp simd
-                    for (size_t i = 0; i < chunk_size; ++i) {
+                    for (ptrdiff_t i = 0; i < static_cast<ptrdiff_t>(chunk_size); ++i) {
                         a_chunk[i] += b_chunk[i];
                     }
                 }
@@ -507,7 +505,7 @@ namespace helix {
                 const float* g_data = safe_grad.data_ptr();
 
 #pragma omp parallel for
-                for (size_t c = 0; c < num_chunks; ++c) {
+                for (ptrdiff_t c = 0; c < static_cast<ptrdiff_t>(num_chunks); ++c) {
                     size_t offset_p = BinaryNDIterator::compute_offset_from_flat(c, outer_shape, outer_stride_p);
                     size_t offset_g = BinaryNDIterator::compute_offset_from_flat(c, outer_shape, outer_stride_g);
 
@@ -515,7 +513,7 @@ namespace helix {
                     const float* g_chunk = g_data + offset_g;
 
 #pragma omp simd
-                    for (size_t i = 0; i < chunk_size; ++i) {
+                    for (ptrdiff_t i = 0; i < static_cast<ptrdiff_t>(chunk_size); ++i) {
                         p_chunk[i] -= lr * g_chunk[i];
                     }
                 }
