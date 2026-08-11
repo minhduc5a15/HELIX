@@ -2,6 +2,7 @@
 
 #include <initializer_list>
 #include <numeric>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -65,7 +66,13 @@ namespace helix {
          */
         size_t numel() const {
             if (dims_.empty()) return 1;  // Scalar tensor has 1 element
-            return std::accumulate(dims_.begin(), dims_.end(), size_t{1}, std::multiplies<size_t>());
+            size_t total = 1;
+            for (size_t dim : dims_) {
+                if (__builtin_mul_overflow(total, dim, &total)) {
+                    throw std::overflow_error("Shape numel exceeds maximum size_t");
+                }
+            }
+            return total;
         }
 
         /**
