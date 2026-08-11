@@ -12,6 +12,15 @@ include_directories(include)
 
 # Build options
 option(HELIX_NATIVE_BUILD "Enable -march=native and LTO for local performance builds" OFF)
+option(HELIX_ENABLE_TSAN "Enable ThreadSanitizer (Requires Clang/LLVM)" OFF)
+
+if(HELIX_ENABLE_TSAN)
+    if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        message(FATAL_ERROR "ThreadSanitizer in HELIX requires Clang/LLVM to avoid false positives with OpenMP barriers. Please run build with CC=clang CXX=clang++.")
+    endif()
+    add_compile_options(-fsanitize=thread -g -fPIE -pie)
+    add_link_options(-fsanitize=thread -g -fPIE -pie)
+endif()
 
 # Define the HELIX core library
 add_library(helix 

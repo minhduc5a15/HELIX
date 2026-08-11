@@ -55,5 +55,6 @@ plan/
 .CHECKPOINT.md
 scratch
 build_asan
+build_tsan
 format.sh
 commit_msg.txt

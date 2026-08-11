@@ -44,6 +44,13 @@ echo -e "${GREEN}Running unit tests in: ${BUILD_DIR}${NC}"
 mkdir -p "$WORKSPACE_DIR/output/unit_tests"
 export GTEST_OUTPUT="json:$WORKSPACE_DIR/output/unit_tests/"
 
+# Check if TSan is enabled
+CTEST_CMD="ctest"
+if [ -f "$BUILD_DIR/CMakeCache.txt" ] && grep -q "HELIX_ENABLE_TSAN:BOOL=ON" "$BUILD_DIR/CMakeCache.txt"; then
+    echo -e "${YELLOW}TSan build detected. Disabling ASLR for test execution...${NC}"
+    CTEST_CMD="setarch $(uname -m) -R ctest"
+fi
+
 # Run the tests using ctest
 # Pass any arguments received to ctest (e.g. -R to filter tests)
-ctest --test-dir "$BUILD_DIR" --output-on-failure "$@"
+$CTEST_CMD --test-dir "$BUILD_DIR" --output-on-failure "$@"

@@ -20,12 +20,14 @@ fi
 # Parse options
 CLEAN_BUILD=false
 BUILD_TYPE="Debug"
+USE_TSAN=false
 
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         --clean) CLEAN_BUILD=true ;;
         --release) BUILD_TYPE="Release" ;;
         --debug) BUILD_TYPE="Debug" ;;
+        --tsan) USE_TSAN=true ;;
         *) echo "Unknown option: $1"; exit 1 ;;
     esac
     shift
@@ -41,17 +43,26 @@ if [ "$CLEAN_BUILD" = true ]; then
     rm -rf out build
 fi
 
+# Handle TSan environment
+TSAN_CMAKE_ARGS=""
+if [ "$USE_TSAN" = true ]; then
+    echo -e "${YELLOW}TSan build enabled. Enforcing Clang/LLVM toolchain...${NC}"
+    export CC=clang
+    export CXX=clang++
+    TSAN_CMAKE_ARGS="-DHELIX_ENABLE_TSAN=ON"
+fi
+
 # Check if Preset is available and use it, otherwise fall back to standard configure
 if [ -f "CMakePresets.json" ]; then
     echo -e "${GREEN}Configuring with CMake Preset 'HELIX' (${BUILD_TYPE})...${NC}"
-    cmake --preset HELIX -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
+    cmake --preset HELIX -DCMAKE_BUILD_TYPE="$BUILD_TYPE" $TSAN_CMAKE_ARGS
     
     echo -e "${GREEN}Building the project...${NC}"
     cmake --build out/build/HELIX
 else
     echo -e "${YELLOW}CMakePresets.json not found. Falling back to standard CMake build...${NC}"
     echo -e "${GREEN}Configuring build directory (${BUILD_TYPE})...${NC}"
-    cmake -B build -S . -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
+    cmake -B build -S . -DCMAKE_BUILD_TYPE="$BUILD_TYPE" $TSAN_CMAKE_ARGS
     
     echo -e "${GREEN}Building the project...${NC}"
     cmake --build build

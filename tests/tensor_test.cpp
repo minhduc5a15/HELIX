@@ -56,3 +56,21 @@ TEST(TensorTest, ShallowCopy) {
     t2.set_item({0}, 99.0f);
     EXPECT_FLOAT_EQ(t1.item({0}), 99.0f);
 }
+
+TEST(TensorTest, ShapeIntegerOverflow) {
+    // 274177 * 67280421310721 = 18446744073709551617
+    // 18446744073709551617 % 2^64 = 1
+    // This will bypass std::bad_alloc because numel() returns 1.
+    // It allocates a 4 byte buffer instead of throwing an error!
+    Shape s({274177, 67280421310721});
+    EXPECT_EQ(s.numel(), 1);
+
+    Tensor t(s);
+
+    // Any access using logical dimensions causes OOB read!
+    // Offset for {1, 0} will be 1 * 67280421310721 = 67TB
+    // EXPECT_DEATH forces a crash check in Google Test
+    EXPECT_DEATH({
+        t.item({1, 0});
+    }, ".*");
+}
