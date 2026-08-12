@@ -1,7 +1,8 @@
 #include "core/dispatcher.hpp"
 
+#if defined(_OPENMP)
 #include <omp.h>
-
+#endif
 #include <algorithm>
 #include <stdexcept>
 
@@ -86,8 +87,13 @@ namespace helix {
 
 #pragma omp parallel
                 {
+#if defined(_OPENMP)
                     size_t tid = omp_get_thread_num();
                     size_t num_threads = omp_get_num_threads();
+#else
+                    size_t tid = 0;
+                    size_t num_threads = 1;
+#endif
                     size_t chunk = (total_elements + num_threads - 1) / num_threads;
                     size_t start = tid * chunk;
                     size_t end = std::min(start + chunk, total_elements);
@@ -505,8 +511,13 @@ namespace helix {
 
 #pragma omp parallel
                 {
+#if defined(_OPENMP)
                     size_t tid = omp_get_thread_num();
                     size_t num_threads = omp_get_num_threads();
+#else
+                    size_t tid = 0;
+                    size_t num_threads = 1;
+#endif
                     size_t chunk = (total_elements + num_threads - 1) / num_threads;
                     size_t start = tid * chunk;
                     size_t end = std::min(start + chunk, total_elements);

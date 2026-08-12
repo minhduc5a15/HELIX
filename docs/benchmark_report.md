@@ -19,17 +19,17 @@ A $1024 \times 1024$ size requires approximately 2.14 billion operations (FLOPs)
 ![Benchmark Chart](benchmark_chart.png)
 
 ```text
-Naive (1.47 GFLOPS)
+Naive (1.22 GFLOPS)
 ██
 
-Blocked (14.43 GFLOPS) - Speedup: 9.8x
+Blocked (13.19 GFLOPS) - Speedup: 10.8x
 ██▎
 
-AVX2 (41.08 GFLOPS) - Speedup: 27.9x
-██████████████████████████████
+AVX2 (35.17 GFLOPS) - Speedup: 28.8x
+█████████████████████████
 
-OpenMP (128.09 GFLOPS) - Speedup: 87.1x
-██████████████████████████████████████████████████████████████████████████████
+OpenMP (93.52 GFLOPS) - Speedup: 76.6x
+█████████████████████████████████████████████████████████████████
 ```
 
 ### Why is the Blocked Backend weak?
@@ -47,13 +47,13 @@ The table below details GFLOPS measurements across various matrix sizes after Ph
 | **64x64** | 2.50 | 3.51 | 35.11 | 2.10* |
 | **128x128** | 2.20 | 3.28 | 48.84 | 15.92* |
 | **256x256** | 1.80 | 2.56 | 55.03 | 32.85* |
-| **512x512** | 1.37 | 14.86 | 33.00 | 64.28 |
-| **1024x1024** | 1.47 | 14.43 | 41.08 | 128.09 |
+| **512x512** | 1.18 | 13.44 | 35.91 | 38.97 |
+| **1024x1024** | 1.22 | 13.19 | 35.17 | 93.52 |
 
 *\* Note: Excessively small matrix sizes cause the OpenMP Thread Pool initialization overhead to outweigh the computation time, leading to lower performance compared to single-threaded execution.*
 
 ## Conclusion
 
 - **Power of Outer Product**: By switching from Naive Dot-Product to **Outer-Product 4x16 Register Blocking**, we eliminated horizontal sums (`_mm256_hadd_ps`) and prevented memory bandwidth bottlenecks. The AVX2 micro-kernel computes effectively within 11 YMM registers.
-- **Micro-kernel Benchmark**: The new AVX2 kernel pushed OpenMP backend performance to **128.09 GFLOPS** (an 87x speedup vs Naive baseline, achieving ~53% of the CPU's theoretical peak).
+- **Micro-kernel Benchmark**: The new AVX2 kernel pushed OpenMP backend performance to **93.52 GFLOPS** (an 76.6x speedup vs Naive baseline).
 - **Next Steps (Phase 3)**: The next bottleneck is Cache Thrashing on very large matrices. Implementing Memory Packing (packing A to L2 and B to L3 cache) will be the final step to push the engine towards the 200+ GFLOPS physical limit.

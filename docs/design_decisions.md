@@ -45,3 +45,7 @@ During the development of the MatMul (Matrix Multiplication) Backend, the optimi
 ### 9. Why replace NDIterator with Chunked Iterator for Element-wise operations?
 
 - **Reason:** The original `NDIterator` computed flat offsets element-by-element using N-dimensional modulo arithmetic. This scalar loop structure destroyed compiler auto-vectorization (AVX/SSE) and became a major bottleneck. The `Chunked Iterator` dynamically scans tensor metadata to find the deepest contiguous dimension (`chunk_dim`). It then extracts 1D segments (`chunk_size`) that can be perfectly unrolled and vectorized using `#pragma omp simd`, unlocking SIMD performance and achieving zero-overhead memory bloat on non-contiguous in-place operations.
+
+### 10. Why does Autograd use `std::weak_ptr` in `AccumulateGrad`?
+
+- **Reason:** In the dynamic computational graph, an `AccumulateGrad` node represents a leaf tensor that needs gradients. If this leaf tensor is destroyed before `.backward()` is called, the graph would traverse into freed memory, causing a fatal Use-After-Free (UAF) corruption. By holding a `std::weak_ptr` to the `AutogradMeta` instead of a raw pointer, `AccumulateGrad` can safely check if the memory is still alive (`lock()`). If it fails, it gracefully drops the gradient, guaranteeing memory safety without creating cyclic references that cause leaks.

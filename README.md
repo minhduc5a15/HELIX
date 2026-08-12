@@ -36,13 +36,19 @@ To better understand **Why** we decided on this design (Why use a Dispatcher? Wh
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### System Requirements
 
 - C++20 Compiler (GCC 10+, Clang 11+).
-- CMake 3.20 or newer.
+- CMake 3.25 or newer.
 - (Optional) AVX2 supported CPU to utilize the SIMD Backend.
+
+For a fresh Ubuntu installation, you can install all required dependencies with:
+
+```bash
+sudo apt update && sudo apt install -y build-essential cmake ninja-build clang libomp-dev git unzip
+```
 
 ### Build
 
@@ -102,7 +108,7 @@ int main() {
 
 ### End-to-End Image Classification (MNIST)
 
-HELIX is capable of training realistic datasets like MNIST using its high-performance CPU backend and CrossEntropyLoss. You can run the provided example to see it in action (reaches ~97% accuracy in < 30 seconds):
+HELIX is capable of training realistic datasets like MNIST using its high-performance CPU backend and CrossEntropyLoss. You can run the provided example to see it in action (reaches ~97% accuracy in < 60 seconds):
 
 ```bash
 # 1. Download and extract the MNIST dataset (requires wget and gzip)
@@ -125,17 +131,17 @@ For the **Matrix Multiplication (1024x1024)** operation, the SIMD (AVX2) and Ope
 ![Benchmark Chart](docs/benchmark_chart.png)
 
 ```text
-Naive (1.47 GFLOPS)
+Naive (1.22 GFLOPS)
 ██
 
-Blocked (14.43 GFLOPS)
+Blocked (13.19 GFLOPS)
 ██▎
 
-AVX2 (41.08 GFLOPS)
-██████████████████████████████
+AVX2 (35.17 GFLOPS)
+█████████████████████████
 
-OpenMP (128.09 GFLOPS)
-██████████████████████████████████████████████████████████████████████████████
+OpenMP (93.52 GFLOPS)
+█████████████████████████████████████████████████████████████████
 ```
 
 👉 See the full bottleneck analysis report at [Benchmark Report](docs/benchmark_report.md).
