@@ -3,7 +3,5 @@
 #include "core/autograd_meta.hpp"
 
 namespace helix {
-
-    void AutogradMetaDeleter::operator()(const AutogradMeta* meta) const { delete meta; }
-
+    // Left intentionally blank
 }  // namespace helix

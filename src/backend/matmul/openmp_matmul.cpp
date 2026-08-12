@@ -2,6 +2,7 @@
 
 #include "matmul_config.hpp"
 #include "matmul_kernel.hpp"
+#include "core/cpu_utils.hpp"
 
 #if defined(__AVX2__)
 #include <immintrin.h>
@@ -15,7 +16,7 @@ namespace helix {
     inline bool supports_avx2_internal() {
 #if defined(__x86_64__) || defined(_M_X64)
 #if defined(__GNUC__) || defined(__clang__)
-        return __builtin_cpu_supports("avx2") && __builtin_cpu_supports("fma");
+        return cpu_supports_avx2_fma();
 #else
         return true;
 #endif

@@ -99,3 +99,21 @@ TEST_F(AutogradTest, NonScalarWithGradOutputs) {
     EXPECT_FLOAT_EQ(x.grad().data_ptr()[0], 2.0f);
     EXPECT_FLOAT_EQ(x.grad().data_ptr()[1], 6.0f);
 }
+
+// UAF Proof of Concept
+using namespace helix;
+
+Tensor build_graph_and_destroy_leaf() {
+    Tensor w(Shape{2, 2});
+    w.set_requires_grad(true); 
+
+    Tensor x(Shape{2, 2});
+
+    Tensor y = w * x; 
+    return y;
+}
+
+TEST_F(AutogradTest, AccumulateGrad_UseAfterFree) {
+    Tensor y = build_graph_and_destroy_leaf();
+    y.sum().backward(); 
+}

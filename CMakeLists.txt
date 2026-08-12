@@ -18,7 +18,7 @@ if(HELIX_ENABLE_TSAN)
     if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         message(FATAL_ERROR "ThreadSanitizer in HELIX requires Clang/LLVM to avoid false positives with OpenMP barriers. Please run build with CC=clang CXX=clang++.")
     endif()
-    add_compile_options(-fsanitize=thread -g -fPIE -pie)
+    add_compile_options(-fsanitize=thread -g -fPIE)
     add_link_options(-fsanitize=thread -g -fPIE -pie)
 endif()
 

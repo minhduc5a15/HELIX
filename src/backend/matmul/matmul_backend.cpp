@@ -1,13 +1,14 @@
 #include "backend/cpu_backend.hpp"
 #include "core/autotuner.hpp"
 #include "matmul_kernel.hpp"
+#include "core/cpu_utils.hpp"
 
 namespace helix {
     // Helper to check AVX2 support at runtime
     inline bool supports_avx2_backend() {
 #if defined(__x86_64__) || defined(_M_X64)
 #if defined(__GNUC__) || defined(__clang__)
-        return __builtin_cpu_supports("avx2") && __builtin_cpu_supports("fma");
+        return cpu_supports_avx2_fma();
 #else
         return true;
 #endif

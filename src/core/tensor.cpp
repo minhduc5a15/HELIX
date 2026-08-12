@@ -397,9 +397,7 @@ namespace helix {
     void Tensor::set_requires_grad(const bool req) const {
         if (req && !requires_grad()) {
             // Lazy allocation: only create if it doesn't exist and req is true
-            impl_->set_autograd_meta(
-                std::unique_ptr<AutogradMeta, AutogradMetaDeleter>(get_autograd_provider()->create_meta())
-            );
+            impl_->set_autograd_meta(get_autograd_provider()->create_meta());
         } else if (!req && requires_grad()) {
             // If setting to false, free the meta
             impl_->set_autograd_meta(nullptr);

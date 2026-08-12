@@ -14,7 +14,7 @@ namespace helix {
 
     class AutogradEngineProvider : public AutogradProvider {
     public:
-        AutogradMeta* create_meta() override;
+        std::shared_ptr<AutogradMeta> create_meta() override;
         void backward(Tensor& tensor, const std::vector<Tensor>& grad_outputs) override;
         Tensor& get_grad(const Tensor& tensor) override;
         const Tensor& get_grad(const Tensor& tensor) const override;

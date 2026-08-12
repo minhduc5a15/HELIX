@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "shape.hpp"
+#include "core/math_utils.hpp"
 
 namespace helix {
 
@@ -17,7 +18,7 @@ namespace helix {
             if (shape.empty()) return Stride();
             std::vector<size_t> st(shape.rank(), 1);
             for (int i = static_cast<int>(shape.rank()) - 2; i >= 0; --i) {
-                if (__builtin_mul_overflow(st[i + 1], shape[i + 1], &st[i])) {
+                if (mul_overflow(st[i + 1], shape[i + 1], &st[i])) {
                     throw std::overflow_error("Stride offset exceeds maximum size_t");
                 }
             }

@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "core/math_utils.hpp"
+
 namespace helix {
 
     /**
@@ -68,7 +70,7 @@ namespace helix {
             if (dims_.empty()) return 1;  // Scalar tensor has 1 element
             size_t total = 1;
             for (size_t dim : dims_) {
-                if (__builtin_mul_overflow(total, dim, &total)) {
+                if (mul_overflow(total, dim, &total)) {
                     throw std::overflow_error("Shape numel exceeds maximum size_t");
                 }
             }

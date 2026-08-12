@@ -15,28 +15,30 @@ namespace helix {
     // Definition of AccumulateGrad Node
     class AccumulateGrad : public Node {
     public:
-        AccumulateGrad(AutogradMeta* meta) : meta_(meta) {}
+        AccumulateGrad(std::weak_ptr<AutogradMeta> meta) : meta_(meta) {}
         std::vector<Tensor> backward(const std::vector<Tensor>& grad_outputs) override {
-            if (!meta_->has_grad()) {
-                meta_->set_grad(grad_outputs[0]);
-            } else {
-                if (!meta_->grad().is_shared() && meta_->grad().shape() == grad_outputs[0].shape() &&
-                    !meta_->grad().has_internal_overlap()) {
-                    meta_->grad().add_(grad_outputs[0]);
+            if (auto meta = meta_.lock()) {
+                if (!meta->has_grad()) {
+                    meta->set_grad(grad_outputs[0]);
                 } else {
-                    meta_->set_grad(meta_->grad() + grad_outputs[0]);
+                    if (!meta->grad().is_shared() && meta->grad().shape() == grad_outputs[0].shape() &&
+                        !meta->grad().has_internal_overlap()) {
+                        meta->grad().add_(grad_outputs[0]);
+                    } else {
+                        meta->set_grad(meta->grad() + grad_outputs[0]);
+                    }
                 }
             }
             return {};
         }
 
     private:
-        AutogradMeta* meta_;
+        std::weak_ptr<AutogradMeta> meta_;
     };
 
     // AutogradEngineProvider Implementation
-    AutogradMeta* AutogradEngineProvider::create_meta() {
-        auto meta = new AutogradMeta(true);
+    std::shared_ptr<AutogradMeta> AutogradEngineProvider::create_meta() {
+        auto meta = std::make_shared<AutogradMeta>(true);
         meta->set_grad_accumulator(std::make_shared<AccumulateGrad>(meta));
         return meta;
     }

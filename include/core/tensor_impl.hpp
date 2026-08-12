@@ -60,7 +60,7 @@ namespace helix {
         }
 
         AutogradMeta* autograd_meta() const { return autograd_meta_.get(); }
-        void set_autograd_meta(std::unique_ptr<AutogradMeta, AutogradMetaDeleter> meta) {
+        void set_autograd_meta(std::shared_ptr<AutogradMeta> meta) {
             autograd_meta_ = std::move(meta);
         }
 
@@ -73,7 +73,7 @@ namespace helix {
         std::shared_ptr<Storage> storage_;
         size_t storage_offset_;  // Offset in elements (not bytes)
 
-        std::unique_ptr<AutogradMeta, AutogradMetaDeleter> autograd_meta_;
+        std::shared_ptr<AutogradMeta> autograd_meta_;
     };
 
 }  // namespace helix
