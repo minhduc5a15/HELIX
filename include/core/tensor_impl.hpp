@@ -60,9 +60,7 @@ namespace helix {
         }
 
         AutogradMeta* autograd_meta() const { return autograd_meta_.get(); }
-        void set_autograd_meta(std::shared_ptr<AutogradMeta> meta) {
-            autograd_meta_ = std::move(meta);
-        }
+        void set_autograd_meta(std::shared_ptr<AutogradMeta> meta) { autograd_meta_ = std::move(meta); }
 
     private:
         Shape shape_;

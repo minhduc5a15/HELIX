@@ -105,15 +105,15 @@ using namespace helix;
 
 Tensor build_graph_and_destroy_leaf() {
     Tensor w(Shape{2, 2});
-    w.set_requires_grad(true); 
+    w.set_requires_grad(true);
 
     Tensor x(Shape{2, 2});
 
-    Tensor y = w * x; 
+    Tensor y = w * x;
     return y;
 }
 
 TEST_F(AutogradTest, AccumulateGrad_UseAfterFree) {
     Tensor y = build_graph_and_destroy_leaf();
-    y.sum().backward(); 
+    y.sum().backward();
 }

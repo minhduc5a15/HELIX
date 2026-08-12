@@ -1,8 +1,8 @@
 #include <algorithm>
 
+#include "core/cpu_utils.hpp"
 #include "matmul_config.hpp"
 #include "matmul_kernel.hpp"
-#include "core/cpu_utils.hpp"
 
 #if defined(__AVX2__)
 #include <immintrin.h>

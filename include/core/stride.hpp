@@ -3,8 +3,8 @@
 #include <stdexcept>
 #include <vector>
 
-#include "shape.hpp"
 #include "core/math_utils.hpp"
+#include "shape.hpp"
 
 namespace helix {
 

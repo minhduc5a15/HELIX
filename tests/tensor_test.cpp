@@ -61,9 +61,7 @@ TEST(TensorTest, ShapeIntegerOverflow) {
     // 274177 * 67280421310721 = 18446744073709551617
     // 18446744073709551617 % 2^64 = 1
     Shape s({274177, 67280421310721});
-    
+
     // The framework now throws std::overflow_error when computing numel()
-    EXPECT_THROW({
-        s.numel();
-    }, std::overflow_error);
+    EXPECT_THROW({ s.numel(); }, std::overflow_error);
 }

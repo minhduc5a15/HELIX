@@ -1,7 +1,7 @@
 #include "backend/cpu_backend.hpp"
 #include "core/autotuner.hpp"
-#include "matmul_kernel.hpp"
 #include "core/cpu_utils.hpp"
+#include "matmul_kernel.hpp"
 
 namespace helix {
     // Helper to check AVX2 support at runtime
