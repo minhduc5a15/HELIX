@@ -1,5 +1,7 @@
 #include "core/tensor.hpp"
 
+#include <omp.h>
+
 #include <algorithm>  // for std::fill_n
 #include <algorithm>
 #include <cstring>  // for memcpy
@@ -113,44 +115,46 @@ namespace helix {
             if (numel() > 0) {
                 std::memcpy(new_tensor.data_ptr(), data_ptr(), numel() * sizeof(float));
             }
-        } else {
-            size_t chunk_dim = static_cast<size_t>(-1);
-            for (int i = static_cast<int>(rank()) - 1; i >= 0; --i) {
-                if (stride()[i] == 1 && new_tensor.stride()[i] == 1) {
-                    chunk_dim = static_cast<size_t>(i);
-                    if (shape()[i] > 1) {
-                        break;
-                    }
-                }
-            }
-
-            size_t chunk_size = 1;
-            Shape outer_shape = shape();
-            Stride outer_stride_src = stride();
-            Stride outer_stride_dst = new_tensor.stride();
-
-            if (chunk_dim != static_cast<size_t>(-1)) {
-                chunk_size = shape()[chunk_dim];
-                outer_shape = remove_dimension(shape(), chunk_dim);
-                outer_stride_src = remove_dimension(stride(), chunk_dim);
-                outer_stride_dst = remove_dimension(new_tensor.stride(), chunk_dim);
-            }
-
-            const size_t num_chunks = outer_shape.numel();
+        } else if (rank() == 2) {
+            const size_t rows = shape()[0];
+            const size_t cols = shape()[1];
+            const size_t src_stride0 = stride()[0];
+            const size_t src_stride1 = stride()[1];
+            const size_t dst_stride0 = new_tensor.stride()[0];
+            const size_t dst_stride1 = new_tensor.stride()[1];
             float* dst_data = new_tensor.data_ptr();
             const float* src_data = data_ptr();
 
 #pragma omp parallel for
-            for (ptrdiff_t c = 0; c < static_cast<ptrdiff_t>(num_chunks); ++c) {
-                size_t offset_src = BinaryNDIterator::compute_offset_from_flat(c, outer_shape, outer_stride_src);
-                size_t offset_dst = BinaryNDIterator::compute_offset_from_flat(c, outer_shape, outer_stride_dst);
-
-                float* dst_chunk = dst_data + offset_dst;
-                const float* src_chunk = src_data + offset_src;
-
+            for (ptrdiff_t r = 0; r < static_cast<ptrdiff_t>(rows); ++r) {
 #pragma omp simd
-                for (ptrdiff_t i = 0; i < static_cast<ptrdiff_t>(chunk_size); ++i) {
-                    dst_chunk[i] = src_chunk[i];
+                for (size_t c = 0; c < cols; ++c) {
+                    dst_data[r * dst_stride0 + c * dst_stride1] = src_data[r * src_stride0 + c * src_stride1];
+                }
+            }
+        } else {
+            float* dst_data = new_tensor.data_ptr();
+            const float* src_data = data_ptr();
+            size_t total_elements = numel();
+
+#pragma omp parallel
+            {
+                size_t tid = omp_get_thread_num();
+                size_t num_threads = omp_get_num_threads();
+                size_t chunk = (total_elements + num_threads - 1) / num_threads;
+                size_t start = tid * chunk;
+                size_t end = std::min(start + chunk, total_elements);
+
+                if (start < end) {
+                    BinaryNDIterator it(shape());
+                    it.init_from_flat(start);
+                    size_t offset_src = it.compute_offset(stride());
+                    size_t offset_dst = it.compute_offset(new_tensor.stride());
+
+                    for (size_t i = start; i < end; ++i) {
+                        dst_data[offset_dst] = src_data[offset_src];
+                        it.advance(offset_src, stride(), offset_dst, new_tensor.stride());
+                    }
                 }
             }
         }
@@ -180,49 +184,49 @@ namespace helix {
             if (numel() > 0) {
                 std::memcpy(data_ptr(), safe_src.data_ptr(), numel() * sizeof(float));
             }
-        } else {
-            // Find contiguous dimension ONLY if shapes match
-            size_t chunk_dim = static_cast<size_t>(-1);
-            if (shape() == safe_src.shape()) {
-                for (int i = static_cast<int>(rank()) - 1; i >= 0; --i) {
-                    if (stride()[i] == 1 && safe_src.stride()[i] == 1) {
-                        chunk_dim = static_cast<size_t>(i);
-                        if (shape()[i] > 1) {
-                            break;
-                        }
-                    }
-                }
-            }
-
-            size_t chunk_size = 1;
-            Shape outer_shape_dst = shape();
-            Shape outer_shape_src = safe_src.shape();
-            Stride outer_stride_dst = stride();
-            Stride outer_stride_src = safe_src.stride();
-
-            if (chunk_dim != static_cast<size_t>(-1)) {
-                chunk_size = shape()[chunk_dim];
-                outer_shape_dst = remove_dimension(shape(), chunk_dim);
-                outer_shape_src = remove_dimension(safe_src.shape(), chunk_dim);
-                outer_stride_dst = remove_dimension(stride(), chunk_dim);
-                outer_stride_src = remove_dimension(safe_src.stride(), chunk_dim);
-            }
-
-            const size_t num_chunks = outer_shape_dst.numel();
+        } else if (rank() == 2 && shape() == safe_src.shape()) {
+            const size_t rows = shape()[0];
+            const size_t cols = shape()[1];
+            const size_t dst_stride0 = stride()[0];
+            const size_t dst_stride1 = stride()[1];
+            const size_t src_stride0 = safe_src.stride()[0];
+            const size_t src_stride1 = safe_src.stride()[1];
             float* dst_data = data_ptr();
             const float* src_data = safe_src.data_ptr();
 
 #pragma omp parallel for
-            for (ptrdiff_t c = 0; c < static_cast<ptrdiff_t>(num_chunks); ++c) {
-                size_t offset_dst = BinaryNDIterator::compute_offset_from_flat(c, outer_shape_dst, outer_stride_dst);
-                size_t offset_src = BinaryNDIterator::compute_offset_from_flat(c, outer_shape_src, outer_stride_src);
-
-                float* dst_chunk = dst_data + offset_dst;
-                const float* src_chunk = src_data + offset_src;
-
+            for (ptrdiff_t r = 0; r < static_cast<ptrdiff_t>(rows); ++r) {
 #pragma omp simd
-                for (ptrdiff_t i = 0; i < static_cast<ptrdiff_t>(chunk_size); ++i) {
-                    dst_chunk[i] = src_chunk[i];
+                for (size_t c = 0; c < cols; ++c) {
+                    dst_data[r * dst_stride0 + c * dst_stride1] = src_data[r * src_stride0 + c * src_stride1];
+                }
+            }
+        } else {
+            float* dst_data = data_ptr();
+            const float* src_data = safe_src.data_ptr();
+            size_t total_elements = numel();
+
+#pragma omp parallel
+            {
+                size_t tid = omp_get_thread_num();
+                size_t num_threads = omp_get_num_threads();
+                size_t chunk = (total_elements + num_threads - 1) / num_threads;
+                size_t start = tid * chunk;
+                size_t end = std::min(start + chunk, total_elements);
+
+                if (start < end) {
+                    NDIterator it_src(safe_src.shape());
+                    NDIterator it_dst(shape());
+                    it_src.init_from_flat(start);
+                    it_dst.init_from_flat(start);
+                    size_t offset_src = it_src.compute_offset(safe_src.stride());
+                    size_t offset_dst = it_dst.compute_offset(stride());
+
+                    for (size_t i = start; i < end; ++i) {
+                        dst_data[offset_dst] = src_data[offset_src];
+                        it_src.advance(offset_src, safe_src.stride());
+                        it_dst.advance(offset_dst, stride());
+                    }
                 }
             }
         }
@@ -239,39 +243,41 @@ namespace helix {
             if (numel() > 0) {
                 std::fill_n(data_ptr(), numel(), 0.0f);
             }
-        } else {
-            // Find contiguous dimension
-            size_t chunk_dim = static_cast<size_t>(-1);
-            for (int i = static_cast<int>(rank()) - 1; i >= 0; --i) {
-                if (stride()[i] == 1) {
-                    chunk_dim = static_cast<size_t>(i);
-                    if (shape()[i] > 1) {
-                        break;
-                    }
-                }
-            }
-
-            size_t chunk_size = 1;
-            Shape outer_shape = shape();
-            Stride outer_stride_dst = stride();
-
-            if (chunk_dim != static_cast<size_t>(-1)) {
-                chunk_size = shape()[chunk_dim];
-                outer_shape = remove_dimension(shape(), chunk_dim);
-                outer_stride_dst = remove_dimension(stride(), chunk_dim);
-            }
-
-            const size_t num_chunks = outer_shape.numel();
+        } else if (rank() == 2) {
+            const size_t rows = shape()[0];
+            const size_t cols = shape()[1];
+            const size_t dst_stride0 = stride()[0];
+            const size_t dst_stride1 = stride()[1];
             float* dst_data = data_ptr();
 
 #pragma omp parallel for
-            for (ptrdiff_t c = 0; c < static_cast<ptrdiff_t>(num_chunks); ++c) {
-                size_t offset_dst = BinaryNDIterator::compute_offset_from_flat(c, outer_shape, outer_stride_dst);
-                float* dst_chunk = dst_data + offset_dst;
-
+            for (ptrdiff_t r = 0; r < static_cast<ptrdiff_t>(rows); ++r) {
 #pragma omp simd
-                for (ptrdiff_t i = 0; i < static_cast<ptrdiff_t>(chunk_size); ++i) {
-                    dst_chunk[i] = 0.0f;
+                for (size_t c = 0; c < cols; ++c) {
+                    dst_data[r * dst_stride0 + c * dst_stride1] = 0.0f;
+                }
+            }
+        } else {
+            float* dst_data = data_ptr();
+            size_t total_elements = numel();
+
+#pragma omp parallel
+            {
+                size_t tid = omp_get_thread_num();
+                size_t num_threads = omp_get_num_threads();
+                size_t chunk = (total_elements + num_threads - 1) / num_threads;
+                size_t start = tid * chunk;
+                size_t end = std::min(start + chunk, total_elements);
+
+                if (start < end) {
+                    NDIterator it(shape());
+                    it.init_from_flat(start);
+                    size_t offset_dst = it.compute_offset(stride());
+
+                    for (size_t i = start; i < end; ++i) {
+                        dst_data[offset_dst] = 0.0f;
+                        it.advance(offset_dst, stride());
+                    }
                 }
             }
         }
