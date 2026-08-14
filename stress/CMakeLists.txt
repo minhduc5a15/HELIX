@@ -26,3 +26,7 @@ add_executable(test_autograd_inplace test_autograd_inplace.cpp)
 target_link_libraries(test_autograd_inplace PRIVATE helix GTest::gtest_main)
 gtest_discover_tests(test_autograd_inplace)
 
+
+add_executable(test_openmp_race test_openmp_race.cpp)
+target_link_libraries(test_openmp_race PRIVATE helix GTest::gtest_main)
+gtest_discover_tests(test_openmp_race)

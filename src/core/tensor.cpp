@@ -4,7 +4,6 @@
 #include <omp.h>
 #endif
 #include <algorithm>  // for std::fill_n
-#include <algorithm>
 #include <cstring>  // for memcpy
 #include <stdexcept>
 
@@ -312,11 +311,28 @@ namespace helix {
     }
 
     bool Tensor::has_internal_overlap() const {
+        if (rank() == 0 || numel() <= 1) return false;
+
+        std::vector<std::pair<size_t, size_t>> stride_shape;
         for (size_t i = 0; i < rank(); ++i) {
-            if (stride()[i] == 0 && shape()[i] > 1) {
+            if (shape()[i] > 1) {
+                if (stride()[i] == 0) return true;
+                stride_shape.push_back({stride()[i], shape()[i]});
+            }
+        }
+
+        if (stride_shape.empty()) return false;
+
+        std::sort(stride_shape.begin(), stride_shape.end(), [](const auto& a, const auto& b) {
+            return a.first < b.first;
+        });
+
+        for (size_t i = 0; i < stride_shape.size() - 1; ++i) {
+            if (stride_shape[i + 1].first < stride_shape[i].first * stride_shape[i].second) {
                 return true;
             }
         }
+
         return false;
     }
 

@@ -51,9 +51,7 @@ namespace helix {
         }
 
         if (a.has_internal_overlap()) {
-            throw std::runtime_error(
-                "add_: in-place operation on a tensor with overlapping memory (stride 0) is not supported."
-            );
+            throw std::runtime_error("add_: in-place operation on a tensor with overlapping memory is not supported.");
         }
 
         bool is_aliased = (a.impl()->storage() == b.impl()->storage()) &&
@@ -474,9 +472,7 @@ namespace helix {
         }
 
         if (param.has_internal_overlap()) {
-            throw std::runtime_error(
-                "sgd: in-place operation on a tensor with overlapping memory (stride 0) is not supported."
-            );
+            throw std::runtime_error("sgd: in-place operation on a tensor with overlapping memory is not supported.");
         }
 
         bool is_aliased =
