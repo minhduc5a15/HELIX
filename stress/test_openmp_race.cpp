@@ -1,13 +1,9 @@
 #include <gtest/gtest.h>
 
 #include <memory>
-#include <optional>
-#include <thread>
 #include <vector>
 
-#define private public
 #include "core/tensor.hpp"
-#undef private
 
 using namespace helix;
 

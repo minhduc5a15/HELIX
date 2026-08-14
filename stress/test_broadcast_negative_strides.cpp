@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+
 #include "core/tensor.hpp"
 
 using namespace helix;
@@ -9,9 +10,9 @@ TEST(BroadcastTest, ScalarTailBug) {
     // then 4x8 (won't fit), then N scalar tail, and M scalar tail.
     Tensor a = Tensor::ones(Shape({5, 5}));
     Tensor b = Tensor::ones(Shape({5, 5}));
-    
+
     Tensor c = a.matmul(b);
-    
+
     // All elements should be 5.0
     for (size_t i = 0; i < 5; ++i) {
         for (size_t j = 0; j < 5; ++j) {
@@ -23,7 +24,7 @@ TEST(BroadcastTest, ScalarTailBug) {
 TEST(BroadcastTest, ZeroSizeTensor) {
     Tensor a = Tensor::empty(Shape({0, 5}));
     Tensor b = Tensor::ones(Shape({5, 5}));
-    
+
     // matmul should throw or return zero-size tensor
     // Currently, it might crash or return invalid tensor
     try {

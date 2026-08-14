@@ -178,8 +178,10 @@ namespace helix {
          */
         bool has_internal_overlap() const;
 
-    private:
+    public:
         explicit Tensor(std::shared_ptr<TensorImpl> impl);
+
+    private:
         std::shared_ptr<TensorImpl> impl_;
     };
 
