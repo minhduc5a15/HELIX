@@ -33,15 +33,15 @@ namespace helix {
      * @param alloc_size The standardized size of the memory blocks to manage.
      * @return A pointer to the GlobalBin for the given allocation size.
      */
-    GlobalBin* MemoryPool::get_global_bin(size_t alloc_size) {
+    auto MemoryPool::get_global_bin(size_t alloc_size) -> GlobalBin* {
         // Protects access to the global_bins_ map.
         std::lock_guard<std::mutex> lock(global_map_mutex_);
-        auto it = global_bins_.find(alloc_size);
-        if (it == global_bins_.end()) {
+        auto bin_it = global_bins_.find(alloc_size);
+        if (bin_it == global_bins_.end()) {
             // If no GlobalBin exists for this size, create one.
-            it = global_bins_.emplace(alloc_size, std::make_unique<GlobalBin>()).first;
+            bin_it = global_bins_.emplace(alloc_size, std::make_unique<GlobalBin>()).first;
         }
-        return it->second.get();
+        return bin_it->second.get();
     }
 
     // Thread-local pointer to the current thread's cache.
@@ -67,7 +67,7 @@ namespace helix {
          * It performs cleanup of the thread-local cache.
          */
         ~ThreadCacheWrapper() {
-            if (tls_cache_ptr) {  // Check if a ThreadCache was actually created for this thread.
+            if (tls_cache_ptr != nullptr) {  // Check if a ThreadCache was actually created for this thread.
                 MemoryPool& pool = MemoryPool::get_instance();
 
                 // Step 1: Remove the current thread's cache from the global list of all caches.
@@ -80,7 +80,9 @@ namespace helix {
                 // Step 2: Push any remaining blocks from the thread-local cache back to the global bins.
                 // This makes the memory available for other threads or future allocations.
                 for (auto& [size, blocks] : tls_cache_ptr->blocks) {
-                    if (blocks.empty()) continue;  // Skip if no blocks of this size.
+                    if (blocks.empty()) {
+                        continue;  // Skip if no blocks of this size.
+                    }
                     GlobalBin* bin = pool.get_global_bin(size);
                     std::lock_guard<std::mutex> bin_lock(bin->mutex);  // Protects access to the GlobalBin.
                     bin->blocks.insert(bin->blocks.end(), blocks.begin(), blocks.end());
@@ -107,8 +109,8 @@ namespace helix {
      *
      * @return A pointer to the current thread's ThreadCache.
      */
-    ThreadCache* MemoryPool::get_thread_cache() {
-        if (!tls_cache_ptr) {                                 // Check if the current thread already has a cache.
+    auto MemoryPool::get_thread_cache() -> ThreadCache* {
+        if (tls_cache_ptr == nullptr) {                       // Check if the current thread already has a cache.
             tls_cache_ptr = new ThreadCache();                // Create a new cache if not.
             std::lock_guard<std::mutex> lock(caches_mutex_);  // Protects access to all_caches_ set.
             all_caches_.insert(tls_cache_ptr);                // Register the new cache with the MemoryPool.
@@ -131,12 +133,14 @@ namespace helix {
      * @return A pointer to the allocated memory block.
      * @throws std::bad_alloc if memory allocation from the OS fails.
      */
-    void* MemoryPool::allocate(const size_t bytes) {
-        if (bytes == 0) return nullptr;  // Cannot allocate zero bytes.
+    auto MemoryPool::allocate(const size_t bytes) -> void* {
+        if (bytes == 0) {
+            return nullptr;  // Cannot allocate zero bytes.
+        }
 
-        // Calculate the actual allocation size, rounded up to the nearest 32-byte boundary.
-        // This ensures memory is aligned for SIMD instructions.
-        size_t alloc_size = (bytes + 31) & ~31;
+        // Calculate the standardized allocation size (next multiple of 32 for AVX alignment).
+        constexpr size_t kAlignment = 32;
+        size_t alloc_size = (bytes + kAlignment - 1) & ~(kAlignment - 1);
 
         // Get the current thread's local cache.
         ThreadCache* local_cache = get_thread_cache();
@@ -158,7 +162,7 @@ namespace helix {
                 // Transfer a batch of blocks from the global bin to the local cache.
                 // This reduces contention on the global mutex.
                 size_t transfer_count = std::min(TRANSFER_BATCH_SIZE, bin->blocks.size());
-                auto transfer_start = bin->blocks.end() - transfer_count;
+                auto transfer_start = bin->blocks.end() - static_cast<std::ptrdiff_t>(transfer_count);
 
                 // The last block in the batch is returned directly to the caller.
                 void* ptr = *(bin->blocks.end() - 1);
@@ -180,11 +184,13 @@ namespace helix {
         void* ptr = _aligned_malloc(alloc_size, 32);
 #else
         // Use standard C++17 aligned allocation or POSIX aligned_alloc.
-        void* ptr = std::aligned_alloc(32, alloc_size);
+        void* ptr = std::aligned_alloc(kAlignment, alloc_size);
 #endif
 
         // Check for allocation failure.
-        if (!ptr) throw std::bad_alloc();
+        if (ptr == nullptr) {
+            throw std::bad_alloc();
+        }
 
         g_total_allocated.fetch_add(alloc_size, std::memory_order_relaxed);
         return ptr;
@@ -204,17 +210,20 @@ namespace helix {
      * @param bytes The original size of the memory block (used to determine `alloc_size`).
      */
     void MemoryPool::deallocate(void* ptr, const size_t bytes) {
-        if (!ptr) return;  // Cannot deallocate a nullptr.
+        if (ptr == nullptr) {
+            return;  // Cannot deallocate a nullptr.
+        }
 
         // Calculate the standardized allocation size, matching the allocate function.
-        const size_t alloc_size = (bytes + 31) & ~31;
+        constexpr size_t kAlignment = 32;
+        const size_t alloc_size = (bytes + kAlignment - 1) & ~(kAlignment - 1);
 
         g_total_allocated.fetch_sub(alloc_size, std::memory_order_relaxed);
 
         // If tls_cache_ptr is nullptr, it means the thread is exiting or has never
         // allocated memory via this allocator. In this case, bypass the thread cache
         // and return the block directly to the global bin.
-        if (!tls_cache_ptr) {
+        if (tls_cache_ptr == nullptr) {
             GlobalBin* bin = get_global_bin(alloc_size);
             std::lock_guard<std::mutex> lock(bin->mutex);  // Protects access to the GlobalBin.
             bin->blocks.push_back(ptr);                    // Return the block to the global pool.
@@ -235,7 +244,7 @@ namespace helix {
             GlobalBin* bin = get_global_bin(alloc_size);
 
             std::lock_guard<std::mutex> lock(bin->mutex);  // Protects access to the GlobalBin.
-            auto transfer_start = local_list.end() - transfer_count;
+            auto transfer_start = local_list.end() - static_cast<std::ptrdiff_t>(transfer_count);
             bin->blocks.insert(bin->blocks.end(), transfer_start, local_list.end());  // Move blocks.
             local_list.erase(transfer_start, local_list.end());                       // Remove blocks from local cache.
         }
@@ -292,7 +301,7 @@ namespace helix {
      *
      * @return A reference to the single MemoryPool instance.
      */
-    MemoryPool& MemoryPool::get_instance() {
+    auto MemoryPool::get_instance() -> MemoryPool& {
         // Meyers' singleton: thread-safe initialization on first call.
         static MemoryPool instance;
         return instance;
@@ -304,7 +313,7 @@ namespace helix {
      * @param alloc_size The standardized size of the memory blocks to query.
      * @return The number of cached memory blocks of that size.
      */
-    size_t MemoryPool::get_global_pool_size(size_t alloc_size) {
+    auto MemoryPool::get_global_pool_size(size_t alloc_size) -> size_t {
         GlobalBin* bin = get_global_bin(alloc_size);
         std::lock_guard<std::mutex> lock(bin->mutex);
         return bin->blocks.size();

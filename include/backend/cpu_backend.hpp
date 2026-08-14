@@ -1,10 +1,11 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 
 namespace helix {
 
-    enum class MatMulStrategy { Auto, Naive, Blocked, AVX2, OpenMP };
+    enum class MatMulStrategy : std::uint8_t { Auto, Naive, Blocked, AVX2, OpenMP };
 
     class CPUBackend {
     public:

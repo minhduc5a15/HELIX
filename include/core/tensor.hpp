@@ -23,21 +23,21 @@ namespace helix {
          * @param shape The dimensions of the new Tensor.
          * @return A new Tensor instance.
          */
-        static Tensor empty(const Shape& shape);
+        static auto empty(const Shape& shape) -> Tensor;
 
         /**
          * @brief Creates a Tensor filled with zeros.
          * @param shape The dimensions of the new Tensor.
          * @return A new Tensor instance.
          */
-        static Tensor zeros(const Shape& shape);
+        static auto zeros(const Shape& shape) -> Tensor;
 
         /**
          * @brief Creates a Tensor filled with ones.
          * @param shape The dimensions of the new Tensor.
          * @return A new Tensor instance.
          */
-        static Tensor ones(const Shape& shape);
+        static auto ones(const Shape& shape) -> Tensor;
 
         /**
          * @brief Creates a Tensor filled with a specific value.
@@ -45,14 +45,14 @@ namespace helix {
          * @param value The value to fill the Tensor with.
          * @return A new Tensor instance.
          */
-        static Tensor full(const Shape& shape, float value);
+        static auto full(const Shape& shape, float value) -> Tensor;
 
         /**
          * @brief Creates a Tensor with values drawn from a standard normal distribution.
          * @param shape The dimensions of the new Tensor.
          * @return A new Tensor instance.
          */
-        static Tensor randn(const Shape& shape);
+        static auto randn(const Shape& shape) -> Tensor;
 
         /**
          * @brief Constructs an empty (null) Tensor.
@@ -78,105 +78,218 @@ namespace helix {
          * @brief Gets the underlying implementation.
          * @return A shared pointer to the TensorImpl.
          */
-        const std::shared_ptr<TensorImpl>& impl() const { return impl_; }
+        [[nodiscard]] auto impl() const -> const std::shared_ptr<TensorImpl>& { return impl_; }
 
-        const Shape& shape() const;
-        const Stride& stride() const;
-        DType dtype() const;
-        Device device() const;
-        size_t numel() const;
-        size_t rank() const;
+        [[nodiscard]] auto shape() const -> const Shape&;
+        [[nodiscard]] auto stride() const -> const Stride&;
+        [[nodiscard]] auto dtype() const -> DType;
+        [[nodiscard]] auto device() const -> Device;
+        [[nodiscard]] auto numel() const -> size_t;
+        [[nodiscard]] auto rank() const -> size_t;
 
-        float* data_ptr();
-        const float* data_ptr() const;
+        auto data_ptr() -> float*;
+        [[nodiscard]] auto data_ptr() const -> const float*;
 
-        uint32_t version() const;
+        /**
+         * @brief Gets the current version of the tensor (used for autograd inplace checks).
+         * @return The version number.
+         */
+        [[nodiscard]] auto version() const -> uint32_t;
+
+        /**
+         * @brief Increments the tensor version, tracking in-place modifications.
+         */
         void increment_version();
 
-        float item() const;
-        float item(const std::vector<size_t>& indices) const;
+        /**
+         * @brief Extracts a single float value if the tensor is a scalar.
+         * @return The float value.
+         */
+        [[nodiscard]] auto item() const -> float;
+
+        /**
+         * @brief Gets the float value at the specified indices.
+         * @param indices The multi-dimensional coordinates.
+         * @return The value at the coordinate.
+         */
+        [[nodiscard]] auto item(const std::vector<size_t>& indices) const -> float;
+
+        /**
+         * @brief Sets a float value at the specified indices (in-place operation).
+         * @param indices The multi-dimensional coordinates.
+         * @param value The new value to set.
+         */
         void set_item(const std::vector<size_t>& indices, float value);
 
         Tensor(const Tensor&) = default;
-        Tensor& operator=(const Tensor&) = default;
+        auto operator=(const Tensor&) -> Tensor& = default;
         Tensor(Tensor&&) noexcept = default;
-        Tensor& operator=(Tensor&&) noexcept = default;
+        auto operator=(Tensor&&) noexcept -> Tensor& = default;
 
         /**
          * @brief Returns a new Tensor with the same data but a different shape.
          * @param new_shape The target shape.
          * @return A viewed Tensor. Throws if contiguous layout is violated.
          */
-        Tensor view(Shape new_shape) const;
-        Tensor reshape(Shape new_shape) const;
-        Tensor transpose(size_t dim0, size_t dim1) const;
-        Tensor flatten() const;
-        Tensor slice(size_t dim, size_t start, size_t end) const;
+        [[nodiscard]] auto view(Shape new_shape) const -> Tensor;
+        /**
+         * @brief Reshapes the tensor in-place if contiguous, or copies if not.
+         * @param new_shape The desired target shape.
+         * @return A reshaped tensor.
+         */
+        [[nodiscard]] auto reshape(Shape new_shape) const -> Tensor;
+
+        /**
+         * @brief Transposes two dimensions of the tensor.
+         * @param dim0 The first dimension to transpose.
+         * @param dim1 The second dimension to transpose.
+         * @return A transposed tensor view.
+         */
+        [[nodiscard]] auto transpose(size_t dim0, size_t dim1) const -> Tensor;
+
+        /**
+         * @brief Flattens the tensor into a 1D tensor.
+         * @return A flattened tensor.
+         */
+        [[nodiscard]] auto flatten() const -> Tensor;
+
+        /**
+         * @brief Slices the tensor along a specific dimension.
+         * @param dim The dimension to slice.
+         * @param start The starting index.
+         * @param end The ending index.
+         * @return A tensor view representing the slice.
+         */
+        [[nodiscard]] auto slice(size_t dim, size_t start, size_t end) const -> Tensor;
 
         /**
          * @brief Broadcasts the Tensor to a new shape using stride manipulation.
          * @param new_shape The target shape to broadcast to.
          * @return A broadcasted Tensor view.
          */
-        Tensor broadcast_to(Shape new_shape) const;
+        [[nodiscard]] auto broadcast_to(Shape new_shape) const -> Tensor;
 
-        Tensor operator+(const Tensor& other) const;
-        Tensor operator-(const Tensor& other) const;
-        Tensor operator*(const Tensor& other) const;
-        Tensor operator/(const Tensor& other) const;
-        Tensor& add_(const Tensor& other);
+        auto operator+(const Tensor& other) const -> Tensor;
+        auto operator-(const Tensor& other) const -> Tensor;
+        auto operator*(const Tensor& other) const -> Tensor;
+        auto operator/(const Tensor& other) const -> Tensor;
+        auto add_(const Tensor& other) -> Tensor&;
 
-        Tensor operator+(float scalar) const;
-        Tensor operator-(float scalar) const;
-        Tensor operator*(float scalar) const;
-        Tensor operator/(float scalar) const;
+        auto operator+(float scalar) const -> Tensor;
+        auto operator-(float scalar) const -> Tensor;
+        auto operator*(float scalar) const -> Tensor;
+        auto operator/(float scalar) const -> Tensor;
 
         /**
          * @brief Performs matrix multiplication between this Tensor and another.
          * @param other The right-hand side Tensor.
          * @return The resulting Tensor.
          */
-        Tensor matmul(const Tensor& other) const;
+        [[nodiscard]] auto matmul(const Tensor& other) const -> Tensor;
 
-        Tensor operator-() const;
-        Tensor exp() const;
-        Tensor log() const;
-        Tensor sqrt() const;
-        Tensor relu() const;
-        Tensor pow(float exponent) const;
+        /**
+         * @brief Element-wise negation.
+         * @return The negated tensor.
+         */
+        auto operator-() const -> Tensor;
+
+        /**
+         * @brief Element-wise exponential (e^x).
+         * @return The resulting tensor.
+         */
+        [[nodiscard]] auto exp() const -> Tensor;
+
+        /**
+         * @brief Element-wise natural logarithm (ln(x)).
+         * @return The resulting tensor.
+         */
+        [[nodiscard]] auto log() const -> Tensor;
+
+        /**
+         * @brief Element-wise square root.
+         * @return The resulting tensor.
+         */
+        [[nodiscard]] auto sqrt() const -> Tensor;
+
+        /**
+         * @brief Rectified Linear Unit (ReLU) activation.
+         * @return The resulting tensor.
+         */
+        [[nodiscard]] auto relu() const -> Tensor;
+
+        /**
+         * @brief Element-wise power.
+         * @param exponent The power to raise elements to.
+         * @return The resulting tensor.
+         */
+        [[nodiscard]] auto pow(float exponent) const -> Tensor;
 
         /**
          * @brief Checks if the Tensor requires gradient computation.
          * @return True if gradients are tracked, false otherwise.
          */
-        bool requires_grad() const;
+        [[nodiscard]] auto requires_grad() const -> bool;
         void set_requires_grad(bool req) const;
-        bool has_grad() const;
-        Tensor& grad();
-        const Tensor& grad() const;
+        [[nodiscard]] auto has_grad() const -> bool;
+        auto grad() -> Tensor&;
+        [[nodiscard]] auto grad() const -> const Tensor&;
 
         /**
          * @brief Computes the gradient of current tensor w.r.t. graph leaves.
          * @param grad_outputs Optional starting gradient for non-scalar outputs.
+         * @param retain_graph If true, preserves the compute graph for subsequent backward passes.
          */
         void backward(const std::vector<Tensor>& grad_outputs = {}, bool retain_graph = false);
-        Tensor detach() const;
 
-        Tensor sum(std::optional<size_t> axis = std::nullopt, bool keepdim = false) const;
-        Tensor mean(std::optional<size_t> axis = std::nullopt, bool keepdim = false) const;
+        /**
+         * @brief Detaches the tensor from the autograd graph.
+         * @return A new tensor sharing the same memory, but requiring no gradients.
+         */
+        [[nodiscard]] auto detach() const -> Tensor;
 
-        Tensor clone() const;
+        [[nodiscard]] auto sum(std::optional<size_t> axis = std::nullopt, bool keepdim = false) const -> Tensor;
+        [[nodiscard]] auto mean(std::optional<size_t> axis = std::nullopt, bool keepdim = false) const -> Tensor;
+
+        /**
+         * @brief Creates a deep copy of the tensor, including its memory.
+         * @return A cloned tensor.
+         */
+        [[nodiscard]] auto clone() const -> Tensor;
+
+        /**
+         * @brief Copies data from another tensor into this one (in-place).
+         * @param src The source tensor.
+         */
         void copy_(const Tensor& src);
+
+        /**
+         * @brief Fills the tensor with zeros (in-place).
+         */
         void zero_();
-        Tensor contiguous() const;
-        bool is_contiguous() const;
-        bool is_shared() const;
+
+        /**
+         * @brief Ensures the tensor memory is contiguous.
+         * @return A contiguous tensor (may be a copy or a reference if already contiguous).
+         */
+        [[nodiscard]] auto contiguous() const -> Tensor;
+
+        /**
+         * @brief Checks if the memory layout is contiguous (no strides).
+         * @return True if contiguous.
+         */
+        [[nodiscard]] auto is_contiguous() const -> bool;
+
+        /**
+         * @brief Checks if this tensor shares memory with another tensor (is a view).
+         * @return True if it is a view.
+         */
+        [[nodiscard]] auto is_shared() const -> bool;
 
         /**
          * @brief Checks if the tensor has internal memory overlap (e.g., due to broadcasting).
          * @return True if multiple logical indices map to the same physical memory location.
          */
-        bool has_internal_overlap() const;
+        [[nodiscard]] auto has_internal_overlap() const -> bool;
 
     public:
         explicit Tensor(std::shared_ptr<TensorImpl> impl);
