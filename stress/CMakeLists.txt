@@ -21,3 +21,20 @@ gtest_discover_tests(sequential_stress)
 add_executable(nn_integration_stress nn_integration_stress.cpp ../tests/grad_check.cpp)
 target_link_libraries(nn_integration_stress PRIVATE helix GTest::gtest_main)
 gtest_discover_tests(nn_integration_stress)
+
+add_executable(test_allocator_leak test_allocator_leak.cpp)
+target_link_libraries(test_allocator_leak PRIVATE helix GTest::gtest_main)
+gtest_discover_tests(test_allocator_leak)
+
+add_executable(test_openmp_race test_openmp_race.cpp)
+target_link_libraries(test_openmp_race PRIVATE helix GTest::gtest_main)
+gtest_discover_tests(test_openmp_race)
+
+add_executable(test_autograd_inplace test_autograd_inplace.cpp)
+target_link_libraries(test_autograd_inplace PRIVATE helix GTest::gtest_main)
+gtest_discover_tests(test_autograd_inplace)
+
+add_executable(test_broadcast_negative_strides test_broadcast_negative_strides.cpp)
+target_link_libraries(test_broadcast_negative_strides PRIVATE helix GTest::gtest_main)
+gtest_discover_tests(test_broadcast_negative_strides)
+
