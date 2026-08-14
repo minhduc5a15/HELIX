@@ -42,6 +42,9 @@ namespace helix {
         // Global singleton accessor
         static MemoryPool& get_instance();
 
+        // Diagnostic tool: returns the number of blocks currently in the global pool for a given size.
+        size_t get_global_pool_size(size_t alloc_size);
+
     private:
         friend struct ThreadCacheWrapper;
 

@@ -53,6 +53,7 @@ data/
 plan/
 /docs/api_output
 .CHECKPOINT.md
+TIMELINE.md
 scratch
 build_asan
 build_tsan

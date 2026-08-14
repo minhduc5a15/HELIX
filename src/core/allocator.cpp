@@ -1,7 +1,7 @@
 #include <atomic>
-// An external atomic variable to track the total memory currently allocated by the custom allocator.
+// An atomic variable to track the total memory currently allocated by the custom allocator.
 // This is useful for debugging and monitoring memory usage across the application.
-extern std::atomic<size_t> g_total_allocated;
+std::atomic<size_t> g_total_allocated{0};
 
 #include <algorithm>  // For std::min
 #include <cstdlib>    // For std::aligned_alloc and std::free
@@ -185,6 +185,8 @@ namespace helix {
 
         // Check for allocation failure.
         if (!ptr) throw std::bad_alloc();
+
+        g_total_allocated.fetch_add(alloc_size, std::memory_order_relaxed);
         return ptr;
     }
 
@@ -206,6 +208,8 @@ namespace helix {
 
         // Calculate the standardized allocation size, matching the allocate function.
         const size_t alloc_size = (bytes + 31) & ~31;
+
+        g_total_allocated.fetch_sub(alloc_size, std::memory_order_relaxed);
 
         // If tls_cache_ptr is nullptr, it means the thread is exiting or has never
         // allocated memory via this allocator. In this case, bypass the thread cache
@@ -290,8 +294,20 @@ namespace helix {
      */
     MemoryPool& MemoryPool::get_instance() {
         // Meyers' singleton: thread-safe initialization on first call.
-        static MemoryPool* instance = new MemoryPool();
-        return *instance;
+        static MemoryPool instance;
+        return instance;
+    }
+
+    /**
+     * @brief Returns the number of blocks currently in the global pool for a given size.
+     *
+     * @param alloc_size The standardized size of the memory blocks to query.
+     * @return The number of cached memory blocks of that size.
+     */
+    size_t MemoryPool::get_global_pool_size(size_t alloc_size) {
+        GlobalBin* bin = get_global_bin(alloc_size);
+        std::lock_guard<std::mutex> lock(bin->mutex);
+        return bin->blocks.size();
     }
 
 }  // namespace helix
