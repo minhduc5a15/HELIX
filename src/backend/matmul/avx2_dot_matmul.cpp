@@ -11,7 +11,7 @@
 #endif
 
 namespace helix {
-    void avx2_dot_matmul(const float* a, const float* b, float* out, size_t M, size_t K, size_t N) {
+    void avx2_dot_matmul(const float* a, const float* b, float* out, const size_t M, const size_t K, const size_t N) {
         std::fill_n(out, M * N, 0.0f);
 
 #if defined(__AVX2__)

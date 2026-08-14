@@ -39,21 +39,24 @@ namespace helix {
 
     // Helper function to measure kernel speed
     static double measure_matmul_time(
-        size_t M, size_t K, size_t N, void (*func)(const float*, const float*, float*, size_t, size_t, size_t)
+        const size_t M,
+        const size_t K,
+        const size_t N,
+        void (*func)(const float*, const float*, float*, size_t, size_t, size_t)
     ) {
-        std::vector<float> A(M * K, 1.0f);
-        std::vector<float> B(K * N, 1.0f);
+        const std::vector<float> A(M * K, 1.0f);
+        const std::vector<float> B(K * N, 1.0f);
         std::vector<float> C(M * N, 0.0f);
 
         // Warmup
         func(A.data(), B.data(), C.data(), M, K, N);
 
-        int iters = (M <= 256) ? 10 : 3;  // Reduce iterations for large matrices to minimize autotune time
-        auto start = std::chrono::high_resolution_clock::now();
+        const int iters = (M <= 256) ? 10 : 3;  // Reduce iterations for large matrices to minimize autotune time
+        const auto start = std::chrono::high_resolution_clock::now();
         for (int i = 0; i < iters; ++i) {
             func(A.data(), B.data(), C.data(), M, K, N);
         }
-        auto end = std::chrono::high_resolution_clock::now();
+        const auto end = std::chrono::high_resolution_clock::now();
         return std::chrono::duration<double, std::milli>(end - start).count() / iters;
     }
 
@@ -67,8 +70,8 @@ namespace helix {
 
         // Perform Profiling
         // Test 1: Large size (OpenMP might win depending on CPU)
-        double t_avx2_large = measure_matmul_time(512, 512, 512, helix::avx2_micro_matmul);
-        double t_omp_large = measure_matmul_time(512, 512, 512, helix::openmp_matmul);
+        const double t_avx2_large = measure_matmul_time(512, 512, 512, helix::avx2_micro_matmul);
+        const double t_omp_large = measure_matmul_time(512, 512, 512, helix::openmp_matmul);
 
         // Decision logic
         if (t_avx2_large <= t_omp_large) {
@@ -77,8 +80,8 @@ namespace helix {
             omp_threshold_ = 1024ULL * 1024ULL * 1024ULL;
         } else {
             // At 512, OpenMP wins. Test 256x256 to find the break-even point.
-            double t_avx2_mid = measure_matmul_time(256, 256, 256, helix::avx2_micro_matmul);
-            double t_omp_mid = measure_matmul_time(256, 256, 256, helix::openmp_matmul);
+            const double t_avx2_mid = measure_matmul_time(256, 256, 256, helix::avx2_micro_matmul);
+            const double t_omp_mid = measure_matmul_time(256, 256, 256, helix::openmp_matmul);
 
             if (t_omp_mid < t_avx2_mid) {
                 omp_threshold_ = 256ULL * 256ULL * 256ULL;

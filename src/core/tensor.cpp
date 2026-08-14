@@ -138,20 +138,20 @@ namespace helix {
         } else {
             float* dst_data = new_tensor.data_ptr();
             const float* src_data = data_ptr();
-            size_t total_elements = numel();
+            const size_t total_elements = numel();
 
 #pragma omp parallel
             {
 #if defined(_OPENMP)
-                size_t tid = omp_get_thread_num();
-                size_t num_threads = omp_get_num_threads();
+                const size_t tid = omp_get_thread_num();
+                const size_t num_threads = omp_get_num_threads();
 #else
-                size_t tid = 0;
-                size_t num_threads = 1;
+                const size_t tid = 0;
+                const size_t num_threads = 1;
 #endif
-                size_t chunk = (total_elements + num_threads - 1) / num_threads;
-                size_t start = tid * chunk;
-                size_t end = std::min(start + chunk, total_elements);
+                const size_t chunk = (total_elements + num_threads - 1) / num_threads;
+                const size_t start = tid * chunk;
+                const size_t end = std::min(start + chunk, total_elements);
 
                 if (start < end) {
                     BinaryNDIterator it(shape());
@@ -184,8 +184,8 @@ namespace helix {
             );
         }
 
-        bool is_aliased = (impl_->storage() == src.impl_->storage()) &&
-                          (data_ptr() != src.data_ptr() || stride() != src.stride() || shape() != src.shape());
+        const bool is_aliased = (impl_->storage() == src.impl_->storage()) &&
+                                (data_ptr() != src.data_ptr() || stride() != src.stride() || shape() != src.shape());
         Tensor safe_src = is_aliased ? src.clone() : src;
 
         if (is_contiguous() && safe_src.is_contiguous()) {
@@ -212,20 +212,20 @@ namespace helix {
         } else {
             float* dst_data = data_ptr();
             const float* src_data = safe_src.data_ptr();
-            size_t total_elements = numel();
+            const size_t total_elements = numel();
 
 #pragma omp parallel
             {
 #if defined(_OPENMP)
-                size_t tid = omp_get_thread_num();
-                size_t num_threads = omp_get_num_threads();
+                const size_t tid = omp_get_thread_num();
+                const size_t num_threads = omp_get_num_threads();
 #else
-                size_t tid = 0;
-                size_t num_threads = 1;
+                const size_t tid = 0;
+                const size_t num_threads = 1;
 #endif
-                size_t chunk = (total_elements + num_threads - 1) / num_threads;
-                size_t start = tid * chunk;
-                size_t end = std::min(start + chunk, total_elements);
+                const size_t chunk = (total_elements + num_threads - 1) / num_threads;
+                const size_t start = tid * chunk;
+                const size_t end = std::min(start + chunk, total_elements);
 
                 if (start < end) {
                     NDIterator it_src(safe_src.shape());
@@ -274,20 +274,20 @@ namespace helix {
             }
         } else {
             float* dst_data = data_ptr();
-            size_t total_elements = numel();
+            const size_t total_elements = numel();
 
 #pragma omp parallel
             {
 #if defined(_OPENMP)
-                size_t tid = omp_get_thread_num();
-                size_t num_threads = omp_get_num_threads();
+                const size_t tid = omp_get_thread_num();
+                const size_t num_threads = omp_get_num_threads();
 #else
-                size_t tid = 0;
-                size_t num_threads = 1;
+                const size_t tid = 0;
+                const size_t num_threads = 1;
 #endif
-                size_t chunk = (total_elements + num_threads - 1) / num_threads;
-                size_t start = tid * chunk;
-                size_t end = std::min(start + chunk, total_elements);
+                const size_t chunk = (total_elements + num_threads - 1) / num_threads;
+                const size_t start = tid * chunk;
+                const size_t end = std::min(start + chunk, total_elements);
 
                 if (start < end) {
                     NDIterator it(shape());
@@ -323,9 +323,7 @@ namespace helix {
 
         if (stride_shape.empty()) return false;
 
-        std::sort(stride_shape.begin(), stride_shape.end(), [](const auto& a, const auto& b) {
-            return a.first < b.first;
-        });
+        std::ranges::sort(stride_shape, [](const auto& a, const auto& b) { return a.first < b.first; });
 
         for (size_t i = 0; i < stride_shape.size() - 1; ++i) {
             if (stride_shape[i + 1].first < stride_shape[i].first * stride_shape[i].second) {
@@ -462,7 +460,7 @@ namespace helix {
 
     void Tensor::backward(const std::vector<Tensor>& grad_outputs, bool retain_graph) {
         if (!requires_grad()) throw std::runtime_error("Cannot backward on a tensor that does not require grad");
-        auto provider = get_autograd_provider();
+        const auto provider = get_autograd_provider();
         if (!provider) {
             throw std::runtime_error("Autograd system is not initialized.");
         }

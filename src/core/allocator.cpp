@@ -161,8 +161,8 @@ namespace helix {
             if (!bin->blocks.empty()) {
                 // Transfer a batch of blocks from the global bin to the local cache.
                 // This reduces contention on the global mutex.
-                size_t transfer_count = std::min(TRANSFER_BATCH_SIZE, bin->blocks.size());
-                auto transfer_start = bin->blocks.end() - static_cast<std::ptrdiff_t>(transfer_count);
+                const size_t transfer_count = std::min(TRANSFER_BATCH_SIZE, bin->blocks.size());
+                const auto transfer_start = bin->blocks.end() - static_cast<std::ptrdiff_t>(transfer_count);
 
                 // The last block in the batch is returned directly to the caller.
                 void* ptr = *(bin->blocks.end() - 1);
@@ -240,11 +240,11 @@ namespace helix {
         // back to the global pool. This helps balance memory distribution and prevents
         // a single thread from hoarding too much memory.
         if (local_list.size() >= MAX_LOCAL_CACHE_SIZE) {
-            size_t transfer_count = MAX_LOCAL_CACHE_SIZE / 2;
+            constexpr size_t transfer_count = MAX_LOCAL_CACHE_SIZE / 2;
             GlobalBin* bin = get_global_bin(alloc_size);
 
             std::lock_guard<std::mutex> lock(bin->mutex);  // Protects access to the GlobalBin.
-            auto transfer_start = local_list.end() - static_cast<std::ptrdiff_t>(transfer_count);
+            const auto transfer_start = local_list.end() - static_cast<std::ptrdiff_t>(transfer_count);
             bin->blocks.insert(bin->blocks.end(), transfer_start, local_list.end());  // Move blocks.
             local_list.erase(transfer_start, local_list.end());                       // Remove blocks from local cache.
         }
@@ -313,7 +313,7 @@ namespace helix {
      * @param alloc_size The standardized size of the memory blocks to query.
      * @return The number of cached memory blocks of that size.
      */
-    auto MemoryPool::get_global_pool_size(size_t alloc_size) -> size_t {
+    auto MemoryPool::get_global_pool_size(const size_t alloc_size) -> size_t {
         GlobalBin* bin = get_global_bin(alloc_size);
         std::lock_guard<std::mutex> lock(bin->mutex);
         return bin->blocks.size();

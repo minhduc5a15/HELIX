@@ -54,8 +54,8 @@ namespace helix {
             throw std::runtime_error("add_: in-place operation on a tensor with overlapping memory is not supported.");
         }
 
-        bool is_aliased = (a.impl()->storage() == b.impl()->storage()) &&
-                          (a.data_ptr() != b.data_ptr() || a.stride() != b.stride() || a.shape() != b.shape());
+        const bool is_aliased = (a.impl()->storage() == b.impl()->storage()) &&
+                                (a.data_ptr() != b.data_ptr() || a.stride() != b.stride() || a.shape() != b.shape());
         Tensor safe_b = is_aliased ? b.clone() : b;
 
         if (a.device().is_cpu()) {
@@ -81,20 +81,20 @@ namespace helix {
             } else {
                 float* a_data = a.data_ptr();
                 const float* b_data = safe_b.data_ptr();
-                size_t total_elements = a.numel();
+                const size_t total_elements = a.numel();
 
 #pragma omp parallel
                 {
 #if defined(_OPENMP)
-                    size_t tid = omp_get_thread_num();
-                    size_t num_threads = omp_get_num_threads();
+                    const size_t tid = omp_get_thread_num();
+                    const size_t num_threads = omp_get_num_threads();
 #else
-                    size_t tid = 0;
-                    size_t num_threads = 1;
+                    const size_t tid = 0;
+                    const size_t num_threads = 1;
 #endif
-                    size_t chunk = (total_elements + num_threads - 1) / num_threads;
-                    size_t start = tid * chunk;
-                    size_t end = std::min(start + chunk, total_elements);
+                    const size_t chunk = (total_elements + num_threads - 1) / num_threads;
+                    const size_t start = tid * chunk;
+                    const size_t end = std::min(start + chunk, total_elements);
 
                     if (start < end) {
                         BinaryNDIterator it(a.shape());
@@ -124,7 +124,9 @@ namespace helix {
         else
             throw std::runtime_error("Unsupported device");
         if (g_graph_builder) {
-            g_graph_builder->build(OperationContext{OpCategory::Binary, OpType::Sub, out, {a, b}});
+            g_graph_builder->build(
+                OperationContext{.category = OpCategory::Binary, .type = OpType::Sub, .out = out, .inputs = {a, b}}
+            );
         }
         return out;
     }
@@ -139,7 +141,9 @@ namespace helix {
         else
             throw std::runtime_error("Unsupported device");
         if (g_graph_builder) {
-            g_graph_builder->build(OperationContext{OpCategory::Binary, OpType::Mul, out, {a, b}});
+            g_graph_builder->build(
+                OperationContext{.category = OpCategory::Binary, .type = OpType::Mul, .out = out, .inputs = {a, b}}
+            );
         }
         return out;
     }
@@ -154,12 +158,14 @@ namespace helix {
         else
             throw std::runtime_error("Unsupported device");
         if (g_graph_builder) {
-            g_graph_builder->build(OperationContext{OpCategory::Binary, OpType::Div, out, {a, b}});
+            g_graph_builder->build(
+                OperationContext{.category = OpCategory::Binary, .type = OpType::Div, .out = out, .inputs = {a, b}}
+            );
         }
         return out;
     }
 
-    Tensor Dispatcher::add_scalar(const Tensor& a, float scalar) {
+    Tensor Dispatcher::add_scalar(const Tensor& a, const float scalar) {
         Tensor lhs = ensure_contiguous(a);
         Tensor out(a.shape(), a.dtype(), a.device());
         if (a.device().is_cpu())
@@ -171,7 +177,7 @@ namespace helix {
         return out;
     }
 
-    Tensor Dispatcher::sub_scalar(const Tensor& a, float scalar) {
+    Tensor Dispatcher::sub_scalar(const Tensor& a, const float scalar) {
         Tensor lhs = ensure_contiguous(a);
         Tensor out(a.shape(), a.dtype(), a.device());
         if (a.device().is_cpu())
@@ -181,7 +187,7 @@ namespace helix {
         return out;
     }
 
-    Tensor Dispatcher::mul_scalar(const Tensor& a, float scalar) {
+    Tensor Dispatcher::mul_scalar(const Tensor& a, const float scalar) {
         Tensor lhs = ensure_contiguous(a);
         Tensor out(a.shape(), a.dtype(), a.device());
         if (a.device().is_cpu())
@@ -191,7 +197,7 @@ namespace helix {
         return out;
     }
 
-    Tensor Dispatcher::div_scalar(const Tensor& a, float scalar) {
+    Tensor Dispatcher::div_scalar(const Tensor& a, const float scalar) {
         Tensor lhs = ensure_contiguous(a);
         Tensor out(a.shape(), a.dtype(), a.device());
         if (a.device().is_cpu())
@@ -209,7 +215,9 @@ namespace helix {
         else
             throw std::runtime_error("Unsupported device");
         if (g_graph_builder) {
-            g_graph_builder->build(OperationContext{OpCategory::Unary, OpType::Neg, out, {a}});
+            g_graph_builder->build(
+                OperationContext{.category = OpCategory::Unary, .type = OpType::Neg, .out = out, .inputs = {a}}
+            );
         }
         return out;
     }
@@ -222,7 +230,9 @@ namespace helix {
         else
             throw std::runtime_error("Unsupported device");
         if (g_graph_builder) {
-            g_graph_builder->build(OperationContext{OpCategory::Unary, OpType::Exp, out, {a}});
+            g_graph_builder->build(
+                OperationContext{.category = OpCategory::Unary, .type = OpType::Exp, .out = out, .inputs = {a}}
+            );
         }
         return out;
     }
@@ -235,7 +245,9 @@ namespace helix {
         else
             throw std::runtime_error("Unsupported device");
         if (g_graph_builder) {
-            g_graph_builder->build(OperationContext{OpCategory::Unary, OpType::Log, out, {a}});
+            g_graph_builder->build(
+                OperationContext{.category = OpCategory::Unary, .type = OpType::Log, .out = out, .inputs = {a}}
+            );
         }
         return out;
     }
@@ -248,7 +260,9 @@ namespace helix {
         else
             throw std::runtime_error("Unsupported device");
         if (g_graph_builder) {
-            g_graph_builder->build(OperationContext{OpCategory::Unary, OpType::Sqrt, out, {a}});
+            g_graph_builder->build(
+                OperationContext{.category = OpCategory::Unary, .type = OpType::Sqrt, .out = out, .inputs = {a}}
+            );
         }
         return out;
     }
@@ -261,7 +275,9 @@ namespace helix {
         else
             throw std::runtime_error("Unsupported device");
         if (g_graph_builder) {
-            g_graph_builder->build(OperationContext{OpCategory::Unary, OpType::ReLU, out, {a}});
+            g_graph_builder->build(
+                OperationContext{.category = OpCategory::Unary, .type = OpType::ReLU, .out = out, .inputs = {a}}
+            );
         }
         return out;
     }
@@ -285,7 +301,7 @@ namespace helix {
         else
             throw std::runtime_error("Unsupported device");
         if (g_graph_builder) {
-            OperationContext ctx{OpCategory::Unary, OpType::Pow, out, {a}};
+            OperationContext ctx{.category = OpCategory::Unary, .type = OpType::Pow, .out = out, .inputs = {a}};
             ctx.attributes["exponent"] = exponent;
             g_graph_builder->build(ctx);
         }
@@ -315,7 +331,9 @@ namespace helix {
             throw std::runtime_error("Unsupported device");
         }
         if (g_graph_builder) {
-            g_graph_builder->build(OperationContext{OpCategory::Matrix, OpType::MatMul, out, {a, b}});
+            g_graph_builder->build(
+                OperationContext{.category = OpCategory::Matrix, .type = OpType::MatMul, .out = out, .inputs = {a, b}}
+            );
         }
         return out;
     }
@@ -332,7 +350,7 @@ namespace helix {
                 throw std::runtime_error("Unsupported device");
             }
             if (g_graph_builder) {
-                OperationContext ctx{OpCategory::Reduce, OpType::Sum, out, {a}};
+                OperationContext ctx{.category = OpCategory::Reduce, .type = OpType::Sum, .out = out, .inputs = {a}};
                 ctx.attributes["axis"] = axis;
                 ctx.attributes["keepdim"] = keepdim;
                 g_graph_builder->build(ctx);
@@ -366,7 +384,7 @@ namespace helix {
             throw std::runtime_error("Unsupported device");
         }
         if (g_graph_builder) {
-            OperationContext ctx{OpCategory::Reduce, OpType::Sum, out, {a}};
+            OperationContext ctx{.category = OpCategory::Reduce, .type = OpType::Sum, .out = out, .inputs = {a}};
             ctx.attributes["axis"] = axis;
             ctx.attributes["keepdim"] = keepdim;
             g_graph_builder->build(ctx);
@@ -386,7 +404,7 @@ namespace helix {
                 throw std::runtime_error("Unsupported device");
             }
             if (g_graph_builder) {
-                OperationContext ctx{OpCategory::Reduce, OpType::Mean, out, {a}};
+                OperationContext ctx{.category = OpCategory::Reduce, .type = OpType::Mean, .out = out, .inputs = {a}};
                 ctx.attributes["axis"] = axis;
                 ctx.attributes["keepdim"] = keepdim;
                 g_graph_builder->build(ctx);
@@ -420,7 +438,7 @@ namespace helix {
             throw std::runtime_error("Unsupported device");
         }
         if (g_graph_builder) {
-            OperationContext ctx{OpCategory::Reduce, OpType::Mean, out, {a}};
+            OperationContext ctx{.category = OpCategory::Reduce, .type = OpType::Mean, .out = out, .inputs = {a}};
             ctx.attributes["axis"] = axis;
             ctx.attributes["keepdim"] = keepdim;
             g_graph_builder->build(ctx);
@@ -454,7 +472,9 @@ namespace helix {
         }
 
         if (g_graph_builder) {
-            OperationContext ctx{OpCategory::Loss, OpType::CrossEntropy, out, {pred, target}};
+            OperationContext ctx{
+                .category = OpCategory::Loss, .type = OpType::CrossEntropy, .out = out, .inputs = {pred, target}
+            };
             ctx.attributes["log_softmax"] = log_softmax_out;
             g_graph_builder->build(ctx);
         }
@@ -475,7 +495,7 @@ namespace helix {
             throw std::runtime_error("sgd: in-place operation on a tensor with overlapping memory is not supported.");
         }
 
-        bool is_aliased =
+        const bool is_aliased =
             (param.impl()->storage() == grad.impl()->storage()) &&
             (param.data_ptr() != grad.data_ptr() || param.stride() != grad.stride() || param.shape() != grad.shape());
         Tensor safe_grad = is_aliased ? grad.clone() : grad;
@@ -503,20 +523,20 @@ namespace helix {
             } else {
                 float* p_data = param.data_ptr();
                 const float* g_data = safe_grad.data_ptr();
-                size_t total_elements = param.numel();
+                const size_t total_elements = param.numel();
 
 #pragma omp parallel
                 {
 #if defined(_OPENMP)
-                    size_t tid = omp_get_thread_num();
-                    size_t num_threads = omp_get_num_threads();
+                    const size_t tid = omp_get_thread_num();
+                    const size_t num_threads = omp_get_num_threads();
 #else
                     size_t tid = 0;
                     size_t num_threads = 1;
 #endif
-                    size_t chunk = (total_elements + num_threads - 1) / num_threads;
-                    size_t start = tid * chunk;
-                    size_t end = std::min(start + chunk, total_elements);
+                    const size_t chunk = (total_elements + num_threads - 1) / num_threads;
+                    const size_t start = tid * chunk;
+                    const size_t end = std::min(start + chunk, total_elements);
 
                     if (start < end) {
                         BinaryNDIterator it(param.shape());

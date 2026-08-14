@@ -7,7 +7,7 @@
 namespace helix {
 
     void CPUBackend::cross_entropy(
-        const float* pred, const float* target, float* loss_out, float* log_softmax_out, size_t N, size_t C
+        const float* pred, const float* target, float* loss_out, float* log_softmax_out, const size_t N, const size_t C
     ) {
         double total_loss = 0.0;
         const std::ptrdiff_t N_signed = static_cast<std::ptrdiff_t>(N);
@@ -31,12 +31,12 @@ namespace helix {
             }
 
             // 3. Compute log_softmax and accumulate loss
-            double log_sum_exp = std::log(sum_exp);
+            const double log_sum_exp = std::log(sum_exp);
             double row_loss = 0.0;
 
             for (size_t j = 0; j < C; ++j) {
-                float shifted = p_row[j] - max_val;
-                float log_softmax = shifted - static_cast<float>(log_sum_exp);
+                const float shifted = p_row[j] - max_val;
+                const float log_softmax = shifted - static_cast<float>(log_sum_exp);
                 ls_row[j] = log_softmax;
 
                 // Accumulate loss: -target * log_softmax

@@ -18,12 +18,18 @@ namespace helix {
     }
 
     void CPUBackend::matmul(
-        const float* a, const float* b, float* out, size_t M, size_t K, size_t N, MatMulStrategy strategy
+        const float* a,
+        const float* b,
+        float* out,
+        const size_t M,
+        const size_t K,
+        const size_t N,
+        MatMulStrategy strategy
     ) {
         if (strategy == MatMulStrategy::Auto) {
 #if defined(_OPENMP)
-            size_t volume = (size_t)M * (size_t)N * (size_t)K;
-            size_t threshold = AutoTuner::get_instance().get_omp_threshold();
+            const size_t volume = static_cast<size_t>(M) * static_cast<size_t>(N) * static_cast<size_t>(K);
+            const size_t threshold = AutoTuner::get_instance().get_omp_threshold();
             if (volume >= threshold) {
                 strategy = MatMulStrategy::OpenMP;
             } else {

@@ -25,8 +25,8 @@ namespace helix {
 #endif
     }
 
-    void openmp_matmul(const float* a, const float* b, float* out, size_t M, size_t K, size_t N) {
-        bool use_avx2 = supports_avx2_internal();
+    void openmp_matmul(const float* a, const float* b, float* out, const size_t M, const size_t K, const size_t N) {
+        const bool use_avx2 = supports_avx2_internal();
         constexpr size_t BLOCK = MatMulConfig::block_size;
 
         // Bypass OpenMP thread management overhead for small matrices

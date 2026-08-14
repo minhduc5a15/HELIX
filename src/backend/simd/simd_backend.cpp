@@ -15,137 +15,139 @@ namespace helix {
 #endif
     }
 
-    void SIMDBackend::add(const float* a, const float* b, float* out, size_t size) {
+    void SIMDBackend::add(const float* a, const float* b, float* out, const size_t size) {
         size_t i = 0;
 #if defined(__AVX2__)
         for (; i + 8 <= size; i += 8) {
-            __m256 va = _mm256_loadu_ps(a + i);
-            __m256 vb = _mm256_loadu_ps(b + i);
-            __m256 vout = _mm256_add_ps(va, vb);
+            const __m256 va = _mm256_loadu_ps(a + i);
+            const __m256 vb = _mm256_loadu_ps(b + i);
+            const __m256 vout = _mm256_add_ps(va, vb);
             _mm256_storeu_ps(out + i, vout);
         }
 #endif
         for (; i < size; ++i) out[i] = a[i] + b[i];
     }
 
-    void SIMDBackend::sub(const float* a, const float* b, float* out, size_t size) {
+    void SIMDBackend::sub(const float* a, const float* b, float* out, const size_t size) {
         size_t i = 0;
 #if defined(__AVX2__)
         for (; i + 8 <= size; i += 8) {
-            __m256 va = _mm256_loadu_ps(a + i);
-            __m256 vb = _mm256_loadu_ps(b + i);
-            __m256 vout = _mm256_sub_ps(va, vb);
+            const __m256 va = _mm256_loadu_ps(a + i);
+            const __m256 vb = _mm256_loadu_ps(b + i);
+            const __m256 vout = _mm256_sub_ps(va, vb);
             _mm256_storeu_ps(out + i, vout);
         }
 #endif
         for (; i < size; ++i) out[i] = a[i] - b[i];
     }
 
-    void SIMDBackend::mul(const float* a, const float* b, float* out, size_t size) {
+    void SIMDBackend::mul(const float* a, const float* b, float* out, const size_t size) {
         size_t i = 0;
 #if defined(__AVX2__)
         for (; i + 8 <= size; i += 8) {
-            __m256 va = _mm256_loadu_ps(a + i);
-            __m256 vb = _mm256_loadu_ps(b + i);
-            __m256 vout = _mm256_mul_ps(va, vb);
+            const __m256 va = _mm256_loadu_ps(a + i);
+            const __m256 vb = _mm256_loadu_ps(b + i);
+            const __m256 vout = _mm256_mul_ps(va, vb);
             _mm256_storeu_ps(out + i, vout);
         }
 #endif
         for (; i < size; ++i) out[i] = a[i] * b[i];
     }
 
-    void SIMDBackend::div(const float* a, const float* b, float* out, size_t size) {
+    void SIMDBackend::div(const float* a, const float* b, float* out, const size_t size) {
         size_t i = 0;
 #if defined(__AVX2__)
         for (; i + 8 <= size; i += 8) {
-            __m256 va = _mm256_loadu_ps(a + i);
-            __m256 vb = _mm256_loadu_ps(b + i);
-            __m256 vout = _mm256_div_ps(va, vb);
+            const __m256 va = _mm256_loadu_ps(a + i);
+            const __m256 vb = _mm256_loadu_ps(b + i);
+            const __m256 vout = _mm256_div_ps(va, vb);
             _mm256_storeu_ps(out + i, vout);
         }
 #endif
         for (; i < size; ++i) out[i] = a[i] / b[i];
     }
 
-    void SIMDBackend::add_scalar(const float* a, float scalar, float* out, size_t size) {
+    void SIMDBackend::add_scalar(const float* a, const float scalar, float* out, const size_t size) {
         size_t i = 0;
 #if defined(__AVX2__)
-        __m256 vscalar = _mm256_set1_ps(scalar);
+        const __m256 vscalar = _mm256_set1_ps(scalar);
         for (; i + 8 <= size; i += 8) {
-            __m256 va = _mm256_loadu_ps(a + i);
-            __m256 vout = _mm256_add_ps(va, vscalar);
+            const __m256 va = _mm256_loadu_ps(a + i);
+            const __m256 vout = _mm256_add_ps(va, vscalar);
             _mm256_storeu_ps(out + i, vout);
         }
 #endif
         for (; i < size; ++i) out[i] = a[i] + scalar;
     }
 
-    void SIMDBackend::sub_scalar(const float* a, float scalar, float* out, size_t size) {
+    void SIMDBackend::sub_scalar(const float* a, const float scalar, float* out, const size_t size) {
         size_t i = 0;
 #if defined(__AVX2__)
         __m256 vscalar = _mm256_set1_ps(scalar);
         for (; i + 8 <= size; i += 8) {
-            __m256 va = _mm256_loadu_ps(a + i);
-            __m256 vout = _mm256_sub_ps(va, vscalar);
+            const __m256 va = _mm256_loadu_ps(a + i);
+            const __m256 vout = _mm256_sub_ps(va, vscalar);
             _mm256_storeu_ps(out + i, vout);
         }
 #endif
         for (; i < size; ++i) out[i] = a[i] - scalar;
     }
 
-    void SIMDBackend::mul_scalar(const float* a, float scalar, float* out, size_t size) {
+    void SIMDBackend::mul_scalar(const float* a, const float scalar, float* out, const size_t size) {
         size_t i = 0;
 #if defined(__AVX2__)
-        __m256 vscalar = _mm256_set1_ps(scalar);
+        const __m256 vscalar = _mm256_set1_ps(scalar);
         for (; i + 8 <= size; i += 8) {
-            __m256 va = _mm256_loadu_ps(a + i);
-            __m256 vout = _mm256_mul_ps(va, vscalar);
+            const __m256 va = _mm256_loadu_ps(a + i);
+            const __m256 vout = _mm256_mul_ps(va, vscalar);
             _mm256_storeu_ps(out + i, vout);
         }
 #endif
         for (; i < size; ++i) out[i] = a[i] * scalar;
     }
 
-    void SIMDBackend::div_scalar(const float* a, float scalar, float* out, size_t size) {
+    void SIMDBackend::div_scalar(const float* a, const float scalar, float* out, const size_t size) {
         size_t i = 0;
 #if defined(__AVX2__)
-        __m256 vscalar = _mm256_set1_ps(scalar);
+        const __m256 vscalar = _mm256_set1_ps(scalar);
         for (; i + 8 <= size; i += 8) {
-            __m256 va = _mm256_loadu_ps(a + i);
-            __m256 vout = _mm256_div_ps(va, vscalar);
+            const __m256 va = _mm256_loadu_ps(a + i);
+            const __m256 vout = _mm256_div_ps(va, vscalar);
             _mm256_storeu_ps(out + i, vout);
         }
 #endif
         for (; i < size; ++i) out[i] = a[i] / scalar;
     }
 
-    void SIMDBackend::neg(const float* a, float* out, size_t size) {
+    void SIMDBackend::neg(const float* a, float* out, const size_t size) {
         size_t i = 0;
 #if defined(__AVX2__)
-        __m256 vzero = _mm256_setzero_ps();
+        const __m256 vzero = _mm256_setzero_ps();
         for (; i + 8 <= size; i += 8) {
-            __m256 va = _mm256_loadu_ps(a + i);
-            __m256 vout = _mm256_sub_ps(vzero, va);
+            const __m256 va = _mm256_loadu_ps(a + i);
+            const __m256 vout = _mm256_sub_ps(vzero, va);
             _mm256_storeu_ps(out + i, vout);
         }
 #endif
         for (; i < size; ++i) out[i] = -a[i];
     }
 
-    void SIMDBackend::relu(const float* a, float* out, size_t size) {
+    void SIMDBackend::relu(const float* a, float* out, const size_t size) {
         size_t i = 0;
 #if defined(__AVX2__)
-        __m256 vzero = _mm256_setzero_ps();
+        const __m256 vzero = _mm256_setzero_ps();
         for (; i + 8 <= size; i += 8) {
-            __m256 va = _mm256_loadu_ps(a + i);
-            __m256 vout = _mm256_max_ps(vzero, va);
+            const __m256 va = _mm256_loadu_ps(a + i);
+            const __m256 vout = _mm256_max_ps(vzero, va);
             _mm256_storeu_ps(out + i, vout);
         }
 #endif
         for (; i < size; ++i) out[i] = std::max(0.0f, a[i]);
     }
 
-    void SIMDBackend::sum(const float* input, float* output, size_t outer_size, size_t dim_size, size_t inner_size) {
+    void SIMDBackend::sum(
+        const float* input, float* output, const size_t outer_size, const size_t dim_size, const size_t inner_size
+    ) {
         if (inner_size == 1) {
             for (size_t i = 0; i < outer_size; ++i) {
                 const float* ptr = input + i * dim_size;
@@ -157,7 +159,7 @@ namespace helix {
                     vsum = _mm256_add_ps(vsum, _mm256_loadu_ps(ptr + j));
                 }
                 __m128 vlow = _mm256_castps256_ps128(vsum);
-                __m128 vhigh = _mm256_extractf128_ps(vsum, 1);
+                const __m128 vhigh = _mm256_extractf128_ps(vsum, 1);
                 vlow = _mm_add_ps(vlow, vhigh);
                 __m128 shuf = _mm_movehl_ps(vlow, vlow);
                 vlow = _mm_add_ps(vlow, shuf);
@@ -184,7 +186,9 @@ namespace helix {
         }
     }
 
-    void SIMDBackend::mean(const float* input, float* output, size_t outer_size, size_t dim_size, size_t inner_size) {
+    void SIMDBackend::mean(
+        const float* input, float* output, const size_t outer_size, const size_t dim_size, const size_t inner_size
+    ) {
         const float scale = 1.0f / static_cast<float>(dim_size);
         if (inner_size == 1) {
             for (size_t i = 0; i < outer_size; ++i) {
@@ -197,7 +201,7 @@ namespace helix {
                     vsum = _mm256_add_ps(vsum, _mm256_loadu_ps(ptr + j));
                 }
                 __m128 vlow = _mm256_castps256_ps128(vsum);
-                __m128 vhigh = _mm256_extractf128_ps(vsum, 1);
+                const __m128 vhigh = _mm256_extractf128_ps(vsum, 1);
                 vlow = _mm_add_ps(vlow, vhigh);
                 __m128 shuf = _mm_movehl_ps(vlow, vlow);
                 vlow = _mm_add_ps(vlow, shuf);
