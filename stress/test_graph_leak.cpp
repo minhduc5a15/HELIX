@@ -25,13 +25,9 @@ TEST_F(GraphLeakTest, GraphDestructionAfterBackward) {
 
     b.backward();
 
-    // AFTER backward, PyTorch clears the graph. HELIX does NOT!
-    // Let's prove HELIX does not clear it by EXPECT_TRUE.
-    EXPECT_TRUE(grad_fn->next_edges().size() > 0) << "BUG PROOF: HELIX does not clear next_edges after backward!";
+    // AFTER backward, PyTorch clears the graph. HELIX should too!
+    EXPECT_EQ(grad_fn->next_edges().size(), 0) << "Graph should be cleared after backward.";
 
-    // Because it doesn't clear, we can call backward again!
-    b.backward();
-
-    // And gradient accumulates!
-    EXPECT_EQ(a.grad().item(), 4.0f) << "BUG PROOF: Gradient accumulated to 4.0!";
+    // Because it is cleared, calling backward again should throw an exception
+    EXPECT_ANY_THROW(b.backward()) << "Should throw exception when calling backward on cleared graph.";
 }
