@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
+#include "autograd/autograd_meta.hpp"
 #include "autograd/engine.hpp"
+#include "autograd/node.hpp"
 #include "core/dispatcher.hpp"
 #include "core/tensor.hpp"
 
@@ -63,12 +65,39 @@ TEST_F(AutogradTest, MultipleBackwardPasses) {
     Tensor two = Tensor::full(Shape({1}), 2.0f);
     Tensor b = a * two;
 
+    auto meta_b = static_cast<AutogradMeta*>(b.impl()->autograd_meta());
+    auto grad_fn = meta_b->grad_fn();
+
+    // Check that graph is intact before backward
+    EXPECT_TRUE(grad_fn->next_edges().size() > 0) << "Graph should have edges before backward.";
+
     b.backward();
     EXPECT_EQ(a.grad().item(), 2.0f);
 
-    // Calling backward again without clearing gradients accumulates!
+    // AFTER backward, the graph should be cleared.
+    EXPECT_EQ(grad_fn->next_edges().size(), 0) << "Graph was not cleared after backward!";
+
+    // Calling backward again should throw because graph is destroyed!
+    EXPECT_THROW(b.backward(), std::runtime_error) << "Backward should throw on cleared graph!";
+}
+
+TEST_F(AutogradTest, MultipleBackwardPasses_RetainGraph) {
+    Tensor a = Tensor::ones(Shape({1}));
+    a.set_requires_grad(true);
+    Tensor two = Tensor::full(Shape({1}), 2.0f);
+    Tensor b = a * two;
+
+    auto meta_b = static_cast<AutogradMeta*>(b.impl()->autograd_meta());
+    auto grad_fn = meta_b->grad_fn();
+
+    // Pass retain_graph = true
+    b.backward({}, true);
+    EXPECT_EQ(a.grad().item(), 2.0f);
+
+    // The graph should still be intact
+    EXPECT_TRUE(grad_fn->next_edges().size() > 0) << "Graph should be retained!";
+
+    // We can call backward again!
     b.backward();
-    EXPECT_EQ(
-        a.grad().item(), 4.0f
-    ) << "BUG: Multiple backward passes accumulate gradients uncontrollably without retain_graph.";
+    EXPECT_EQ(a.grad().item(), 4.0f) << "Gradient should accumulate with retain_graph!";
 }

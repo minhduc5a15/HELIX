@@ -159,7 +159,7 @@ namespace helix {
          * @brief Computes the gradient of current tensor w.r.t. graph leaves.
          * @param grad_outputs Optional starting gradient for non-scalar outputs.
          */
-        void backward(const std::vector<Tensor>& grad_outputs = {});
+        void backward(const std::vector<Tensor>& grad_outputs = {}, bool retain_graph = false);
         Tensor detach() const;
 
         Tensor sum(std::optional<size_t> axis = std::nullopt, bool keepdim = false) const;

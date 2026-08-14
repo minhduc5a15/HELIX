@@ -4,7 +4,7 @@
 #include <omp.h>
 #endif
 #include <algorithm>  // for std::fill_n
-#include <cstring>  // for memcpy
+#include <cstring>    // for memcpy
 #include <stdexcept>
 
 #include "core/autograd_meta.hpp"
@@ -460,9 +460,13 @@ namespace helix {
         return get_autograd_provider()->get_grad(*this);
     }
 
-    void Tensor::backward(const std::vector<Tensor>& grad_outputs) {
+    void Tensor::backward(const std::vector<Tensor>& grad_outputs, bool retain_graph) {
         if (!requires_grad()) throw std::runtime_error("Cannot backward on a tensor that does not require grad");
-        get_autograd_provider()->backward(*this, grad_outputs);
+        auto provider = get_autograd_provider();
+        if (!provider) {
+            throw std::runtime_error("Autograd system is not initialized.");
+        }
+        provider->backward(*this, grad_outputs, retain_graph);
     }
 
 }  // namespace helix

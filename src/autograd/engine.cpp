@@ -43,8 +43,8 @@ namespace helix {
         return meta;
     }
 
-    void AutogradEngineProvider::backward(Tensor& tensor, const std::vector<Tensor>& grad_outputs) {
-        engine_.run(tensor, grad_outputs);
+    void AutogradEngineProvider::backward(Tensor& tensor, const std::vector<Tensor>& grad_outputs, bool retain_graph) {
+        engine_.run(tensor, grad_outputs, retain_graph);
     }
 
     Tensor& AutogradEngineProvider::get_grad(const Tensor& tensor) {
@@ -74,7 +74,7 @@ namespace helix {
     };
 
     // BackwardEngine Implementation
-    void BackwardEngine::run(Tensor& target, const std::vector<Tensor>& grad_outputs) {
+    void BackwardEngine::run(Tensor& target, const std::vector<Tensor>& grad_outputs, bool retain_graph) {
         auto meta = static_cast<AutogradMeta*>(target.impl()->autograd_meta());
         if (!meta || !meta->requires_grad() || (!meta->grad_fn() && !meta->grad_accumulator())) {
             throw std::runtime_error("Cannot run backward on this tensor.");
@@ -96,20 +96,20 @@ namespace helix {
         std::queue<Node*> queue;
         std::unordered_set<Node*> visited;
 
-        std::vector<Node*> nodes_to_process;
-        nodes_to_process.push_back(root.get());
+        std::vector<std::shared_ptr<Node>> nodes_to_process;
+        nodes_to_process.push_back(root);
         visited.insert(root.get());
 
         size_t head = 0;
         while (head < nodes_to_process.size()) {
-            Node* curr = nodes_to_process[head++];
+            std::shared_ptr<Node> curr = nodes_to_process[head++];
             for (const auto& next_node_ptr : curr->next_edges()) {
                 if (next_node_ptr) {
                     Node* next = next_node_ptr.get();
                     in_degrees[next]++;
                     if (!visited.contains(next)) {
                         visited.insert(next);
-                        nodes_to_process.push_back(next);
+                        nodes_to_process.push_back(next_node_ptr);
                     }
                 }
             }
@@ -165,6 +165,12 @@ namespace helix {
                         ready_queue.push(next);
                     }
                 }
+            }
+        }
+
+        if (!retain_graph) {
+            for (auto& node_ptr : nodes_to_process) {
+                node_ptr->clear_next_edges();
             }
         }
     }

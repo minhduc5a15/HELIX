@@ -18,6 +18,7 @@ namespace helix {
         void add_next_edge(std::shared_ptr<Node> node) { next_edges_.push_back(std::move(node)); }
 
         const std::vector<std::shared_ptr<Node>>& next_edges() const { return next_edges_; }
+        void clear_next_edges() { next_edges_.clear(); }
 
     protected:
         // The edges pointing to the nodes that this node depends on (parents in the forward graph)

@@ -70,10 +70,9 @@ TEST_F(NNIntegrationTest, GraphLifecycle_MultipleBackwards) {
     Tensor y = net(x);
     Tensor loss = mse_loss(y, target);
 
-    loss.backward();
-    // HELIX currently retains graph indefinitely since it's stored in TensorImpl.
-    // Calling backward again will just accumulate gradients.
-    loss.backward();
+    loss.backward({}, true);
+    // Since we passed retain_graph = true, calling backward again accumulates gradients without throwing.
+    loss.backward({}, true);
     EXPECT_NO_THROW({ loss.backward(); });
 }
 
