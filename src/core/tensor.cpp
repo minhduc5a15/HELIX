@@ -77,6 +77,9 @@ namespace helix {
         return data_ptr()[0];
     }
 
+    uint32_t Tensor::version() const { return impl_->storage()->version(); }
+    void Tensor::increment_version() { impl_->storage()->increment_version(); }
+
     float Tensor::item(const std::vector<size_t>& indices) const {
         const size_t offset = stride().compute_offset(indices);
         return data_ptr()[offset];
@@ -241,6 +244,8 @@ namespace helix {
                 }
             }
         }
+
+        increment_version();
     }
 
     void Tensor::zero_() {
@@ -297,6 +302,8 @@ namespace helix {
                 }
             }
         }
+
+        increment_version();
     }
 
     Tensor Tensor::contiguous() const {
@@ -383,6 +390,7 @@ namespace helix {
     Tensor Tensor::operator+(const Tensor& other) const { return Dispatcher::add(*this, other); }
     Tensor& Tensor::add_(const Tensor& other) {
         Dispatcher::add_(*this, other);
+        increment_version();
         return *this;
     }
     Tensor Tensor::operator-(const Tensor& other) const { return Dispatcher::sub(*this, other); }

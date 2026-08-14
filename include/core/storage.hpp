@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+
 #include "core/allocator.hpp"
 
 namespace helix {
@@ -27,10 +29,14 @@ namespace helix {
         const void* data() const { return data_; }
         size_t size_bytes() const { return size_bytes_; }
 
+        uint32_t version() const { return version_.load(std::memory_order_relaxed); }
+        void increment_version() { version_.fetch_add(1, std::memory_order_relaxed); }
+
     private:
         void* data_{nullptr};
         size_t size_bytes_{0};
         Allocator* allocator_{nullptr};
+        std::atomic<uint32_t> version_{0};
     };
 
 }  // namespace helix

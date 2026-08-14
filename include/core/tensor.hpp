@@ -90,6 +90,9 @@ namespace helix {
         float* data_ptr();
         const float* data_ptr() const;
 
+        uint32_t version() const;
+        void increment_version();
+
         float item() const;
         float item(const std::vector<size_t>& indices) const;
         void set_item(const std::vector<size_t>& indices, float value);

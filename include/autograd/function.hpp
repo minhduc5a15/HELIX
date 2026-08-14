@@ -13,11 +13,19 @@ namespace helix {
     // Tensor -> AutogradMeta -> Node -> SavedTensor -> Tensor.
     class SavedTensor {
     public:
-        SavedTensor(const Tensor& t) : tensor_(t.detach()) {}
-        const Tensor& unpack() const { return tensor_; }
+        SavedTensor(const Tensor& t) : tensor_(t.detach()), saved_version_(t.version()) {}
+        const Tensor& unpack() const {
+            if (tensor_.version() != saved_version_) {
+                throw std::runtime_error(
+                    "one of the variables needed for gradient computation has been modified by an inplace operation"
+                );
+            }
+            return tensor_;
+        }
 
     private:
         Tensor tensor_;
+        uint32_t saved_version_;
     };
 
     class AddBackward : public Node {

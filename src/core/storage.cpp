@@ -18,7 +18,10 @@ namespace helix {
     }
 
     Storage::Storage(Storage&& other) noexcept
-        : data_(other.data_), size_bytes_(other.size_bytes_), allocator_(other.allocator_) {
+        : data_(other.data_),
+          size_bytes_(other.size_bytes_),
+          allocator_(other.allocator_),
+          version_(other.version_.load(std::memory_order_relaxed)) {
         other.data_ = nullptr;
         other.size_bytes_ = 0;
     }
@@ -31,6 +34,7 @@ namespace helix {
             data_ = other.data_;
             size_bytes_ = other.size_bytes_;
             allocator_ = other.allocator_;
+            version_.store(other.version_.load(std::memory_order_relaxed), std::memory_order_relaxed);
 
             other.data_ = nullptr;
             other.size_bytes_ = 0;

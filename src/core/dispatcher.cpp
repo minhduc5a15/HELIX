@@ -538,6 +538,8 @@ namespace helix {
         } else {
             throw std::runtime_error("Unsupported device");
         }
+
+        param.increment_version();
     }
 
 }  // namespace helix
