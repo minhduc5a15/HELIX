@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <memory>
 #include <mutex>
 #include <unordered_map>
@@ -22,6 +23,7 @@ namespace helix {
     };
 
     struct ThreadCache {
+        uint64_t epoch{0};
         std::unordered_map<size_t, std::vector<void*>> blocks;
     };
 
@@ -53,6 +55,8 @@ namespace helix {
 
         std::unordered_set<ThreadCache*> all_caches_;
         std::mutex caches_mutex_;
+
+        std::atomic<uint64_t> current_epoch_{0};
 
         static constexpr size_t MAX_LOCAL_CACHE_SIZE = 64;
         static constexpr size_t TRANSFER_BATCH_SIZE = 32;

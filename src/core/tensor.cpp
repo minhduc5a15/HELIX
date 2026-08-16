@@ -93,13 +93,9 @@ namespace helix {
 
     auto Tensor::is_shared() const -> bool { return impl_.use_count() > 1 || impl_->storage().use_count() > 1; }
 
-    auto Tensor::view(Shape new_shape) const -> Tensor {
-        return Dispatcher::view(*this, std::move(new_shape));
-    }
+    auto Tensor::view(Shape new_shape) const -> Tensor { return Dispatcher::view(*this, std::move(new_shape)); }
 
-    auto Tensor::clone() const -> Tensor {
-        return Dispatcher::clone(*this);
-    }
+    auto Tensor::clone() const -> Tensor { return Dispatcher::clone(*this); }
 
     void Tensor::copy_(const Tensor& src) {
         if (numel() != src.numel()) {

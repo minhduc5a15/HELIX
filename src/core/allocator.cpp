@@ -22,7 +22,27 @@ namespace helix {
      * Cleans up all allocated memory when the MemoryPool instance is destroyed.
      * This is crucial to prevent memory leaks.
      */
-    MemoryPool::~MemoryPool() { reset(); }
+    MemoryPool::~MemoryPool() {
+        // Force synchronous cleanup during static teardown.
+        // It's safe to iterate here because all threads must have been joined
+        // prior to the destruction of the static MemoryPool singleton.
+        {
+            std::lock_guard<std::mutex> lock(caches_mutex_);
+            for (ThreadCache* cache : all_caches_) {
+                for (auto& [size, blocks] : cache->blocks) {
+                    for (void* ptr : blocks) {
+#if defined(_WIN32)
+                        _aligned_free(ptr);
+#else
+                        std::free(ptr);
+#endif
+                    }
+                    blocks.clear();
+                }
+            }
+        }
+        reset();
+    }
 
     /**
      * @brief Retrieves or creates a GlobalBin for a specific allocation size.
@@ -144,6 +164,23 @@ namespace helix {
 
         // Get the current thread's local cache.
         ThreadCache* local_cache = get_thread_cache();
+
+        // Epoch check for lazy thread cache clearing
+        const uint64_t global_epoch = current_epoch_.load(std::memory_order_relaxed);
+        if (local_cache->epoch < global_epoch) {
+            for (auto& [size, blocks] : local_cache->blocks) {
+                for (void* p : blocks) {
+#if defined(_WIN32)
+                    _aligned_free(p);
+#else
+                    std::free(p);
+#endif
+                }
+                blocks.clear();
+            }
+            local_cache->epoch = global_epoch;
+        }
+
         // Get the list of blocks for the specific alloc_size within the local cache.
         auto& local_list = local_cache->blocks[alloc_size];
 
@@ -232,6 +269,23 @@ namespace helix {
 
         // Return the block to the current thread's local cache.
         ThreadCache* local_cache = tls_cache_ptr;
+
+        // Epoch check for lazy thread cache clearing
+        const uint64_t global_epoch = current_epoch_.load(std::memory_order_relaxed);
+        if (local_cache->epoch < global_epoch) {
+            for (auto& [size, blocks] : local_cache->blocks) {
+                for (void* p : blocks) {
+#if defined(_WIN32)
+                    _aligned_free(p);
+#else
+                    std::free(p);
+#endif
+                }
+                blocks.clear();
+            }
+            local_cache->epoch = global_epoch;
+        }
+
         auto& local_list = local_cache->blocks[alloc_size];
         local_list.push_back(ptr);
 
@@ -258,22 +312,9 @@ namespace helix {
      * It's called by the MemoryPool destructor and can be used for explicit cleanup.
      */
     void MemoryPool::reset() {
-        // Step 1: Clear all thread-local caches.
-        {
-            std::lock_guard<std::mutex> lock(caches_mutex_);  // Protects access to the all_caches_ set.
-            for (ThreadCache* cache : all_caches_) {
-                for (auto& [size, blocks] : cache->blocks) {
-                    for (void* ptr : blocks) {
-#if defined(_WIN32)
-                        _aligned_free(ptr);  // Windows-specific aligned free.
-#else
-                        std::free(ptr);  // Standard free for aligned_alloc.
-#endif
-                    }
-                    blocks.clear();  // Clear the list of blocks for this size.
-                }
-            }
-        }
+        // Step 1: Signal threads to lazily clear their own caches.
+        // This lock-free approach prevents Race Conditions (SEGV) if threads are actively allocating.
+        current_epoch_.fetch_add(1, std::memory_order_relaxed);
 
         // Step 2: Clear all global bins.
         {
@@ -289,7 +330,6 @@ namespace helix {
                 }
                 bin_ptr->blocks.clear();  // Clear the list of blocks.
             }
-            global_bins_.clear();  // Clear the map of global bins.
         }
     }
 

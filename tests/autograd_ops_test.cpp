@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 
+#include "autograd/autograd_meta.hpp"
 #include "autograd/engine.hpp"
 #include "autograd/function.hpp"
-#include "autograd/autograd_meta.hpp"
 #include "core/tensor.hpp"
 #include "grad_check.hpp"
 
@@ -170,17 +170,17 @@ TEST_F(AutogradOpsTest, BinaryOpNoHiddenBroadcastNode) {
     ASSERT_TRUE(meta != nullptr);
     auto grad_fn = meta->grad_fn();
     ASSERT_TRUE(grad_fn != nullptr);
-    
+
     // The grad_fn should be AddBackward, not BroadcastToBackward
     EXPECT_NE(dynamic_cast<AddBackward*>(grad_fn.get()), nullptr);
-    // Note: If broadcast_to was used, grad_fn would be AddBackward, but its parents would be BroadcastToBackward instead of AccumulateGrad.
-    // Let's check the parents of AddBackward.
+    // Note: If broadcast_to was used, grad_fn would be AddBackward, but its parents would be BroadcastToBackward
+    // instead of AccumulateGrad. Let's check the parents of AddBackward.
     auto next_edges = grad_fn->next_edges();
     ASSERT_EQ(next_edges.size(), 2);
-    // The next_edges should be AccumulateGrad nodes for a and b directly, since no intermediate BroadcastTo backward node is created.
-    // Wait, Helix doesn't expose AccumulateGrad type publicly in headers easily or it is just returning AccumulateGrad node pointer.
-    // Actually, ensuring that AddBackward is the direct grad_fn of `c` is already checking that `add()` didn't return `broadcast_to()`'s output directly.
-    // To be perfectly strict, the number of nodes in the graph between Add and AccumulateGrad should be 0.
-    // We can just rely on the test passing and memory not bloating.
+    // The next_edges should be AccumulateGrad nodes for a and b directly, since no intermediate BroadcastTo backward
+    // node is created. Wait, Helix doesn't expose AccumulateGrad type publicly in headers easily or it is just
+    // returning AccumulateGrad node pointer. Actually, ensuring that AddBackward is the direct grad_fn of `c` is
+    // already checking that `add()` didn't return `broadcast_to()`'s output directly. To be perfectly strict, the
+    // number of nodes in the graph between Add and AccumulateGrad should be 0. We can just rely on the test passing and
+    // memory not bloating.
 }
-

@@ -174,7 +174,6 @@ namespace helix {
         SavedTensor saved_target_;
     };
 
-
     class CloneBackward : public Node {
     public:
         CloneBackward() = default;

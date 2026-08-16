@@ -1,4 +1,5 @@
 #include "core/dispatcher.hpp"
+
 #include <cstring>
 
 #if defined(_OPENMP)
@@ -20,7 +21,6 @@ namespace helix {
     void Dispatcher::register_graph_builder(GraphBuilderInterface* builder) { g_graph_builder = builder; }
 
     GraphBuilderInterface* Dispatcher::get_graph_builder() { return g_graph_builder; }
-
 
     Tensor Dispatcher::clone(const Tensor& a) {
         Tensor new_tensor(a.shape(), a.dtype(), a.device());
@@ -80,7 +80,9 @@ namespace helix {
 
         if (g_graph_builder) {
             std::unordered_map<std::string, std::any> attributes;
-            g_graph_builder->build(OperationContext{OpCategory::View, OpType::Clone, new_tensor, {a}, std::move(attributes)});
+            g_graph_builder->build(
+                OperationContext{OpCategory::View, OpType::Clone, new_tensor, {a}, std::move(attributes)}
+            );
         }
         return new_tensor;
     }
@@ -125,8 +127,9 @@ namespace helix {
         auto a_impl = a.impl();
         size_t new_offset = a_impl->storage_offset() + start * a.stride()[dim];
 
-        const auto new_impl =
-            std::make_shared<TensorImpl>(a_impl->storage(), new_offset, Shape(new_dims), a.stride(), a.dtype(), a.device());
+        const auto new_impl = std::make_shared<TensorImpl>(
+            a_impl->storage(), new_offset, Shape(new_dims), a.stride(), a.dtype(), a.device()
+        );
         Tensor out(new_impl);
 
         if (g_graph_builder) {
@@ -161,7 +164,9 @@ namespace helix {
             std::unordered_map<std::string, std::any> attributes;
             attributes["dim0"] = dim0;
             attributes["dim1"] = dim1;
-            g_graph_builder->build(OperationContext{OpCategory::View, OpType::Transpose, out, {a}, std::move(attributes)});
+            g_graph_builder->build(
+                OperationContext{OpCategory::View, OpType::Transpose, out, {a}, std::move(attributes)}
+            );
         }
         return out;
     }
@@ -172,7 +177,9 @@ namespace helix {
         if (g_graph_builder) {
             std::unordered_map<std::string, std::any> attributes;
             attributes["input_shape"] = a.shape();
-            g_graph_builder->build(OperationContext{OpCategory::View, OpType::BroadcastTo, out, {a}, std::move(attributes)});
+            g_graph_builder->build(
+                OperationContext{OpCategory::View, OpType::BroadcastTo, out, {a}, std::move(attributes)}
+            );
         }
         return out;
     }
