@@ -79,8 +79,36 @@ namespace helix {
                 node = std::make_shared<CrossEntropyLossBackward>(log_softmax, ctx.inputs[1].get());
                 break;
             }
+
+            case OpType::Clone:
+                node = std::make_shared<CloneBackward>();
+                break;
+            case OpType::View: {
+                auto original_shape = std::any_cast<Shape>(ctx.attributes.at("original_shape"));
+                node = std::make_shared<ViewBackward>(original_shape);
+                break;
+            }
+            case OpType::Slice: {
+                auto dim = std::any_cast<size_t>(ctx.attributes.at("dim"));
+                auto start = std::any_cast<size_t>(ctx.attributes.at("start"));
+                auto end = std::any_cast<size_t>(ctx.attributes.at("end"));
+                auto input_shape = std::any_cast<Shape>(ctx.attributes.at("input_shape"));
+                node = std::make_shared<SliceBackward>(input_shape, dim, start, end);
+                break;
+            }
+            case OpType::Transpose: {
+                auto dim0 = std::any_cast<size_t>(ctx.attributes.at("dim0"));
+                auto dim1 = std::any_cast<size_t>(ctx.attributes.at("dim1"));
+                node = std::make_shared<TransposeBackward>(dim0, dim1);
+                break;
+            }
+            case OpType::BroadcastTo: {
+                auto input_shape = std::any_cast<Shape>(ctx.attributes.at("input_shape"));
+                node = std::make_shared<BroadcastToBackward>(input_shape);
+                break;
+            }
             default:
-                // View operations or unsupported ops will be ignored.
+                // Unsupported ops will be ignored.
                 // In a complete framework, these would also require backward nodes.
                 return;
         }

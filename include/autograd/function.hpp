@@ -174,4 +174,52 @@ namespace helix {
         SavedTensor saved_target_;
     };
 
+
+    class CloneBackward : public Node {
+    public:
+        CloneBackward() = default;
+        std::vector<Tensor> backward(const std::vector<Tensor>& grad_outputs) override;
+    };
+
+    class ViewBackward : public Node {
+    public:
+        ViewBackward(Shape original_shape) : original_shape_(std::move(original_shape)) {}
+        std::vector<Tensor> backward(const std::vector<Tensor>& grad_outputs) override;
+
+    private:
+        Shape original_shape_;
+    };
+
+    class SliceBackward : public Node {
+    public:
+        SliceBackward(Shape input_shape, size_t dim, size_t start, size_t end)
+            : input_shape_(std::move(input_shape)), dim_(dim), start_(start), end_(end) {}
+        std::vector<Tensor> backward(const std::vector<Tensor>& grad_outputs) override;
+
+    private:
+        Shape input_shape_;
+        size_t dim_;
+        size_t start_;
+        size_t end_;
+    };
+
+    class TransposeBackward : public Node {
+    public:
+        TransposeBackward(size_t dim0, size_t dim1) : dim0_(dim0), dim1_(dim1) {}
+        std::vector<Tensor> backward(const std::vector<Tensor>& grad_outputs) override;
+
+    private:
+        size_t dim0_;
+        size_t dim1_;
+    };
+
+    class BroadcastToBackward : public Node {
+    public:
+        BroadcastToBackward(Shape input_shape) : input_shape_(std::move(input_shape)) {}
+        std::vector<Tensor> backward(const std::vector<Tensor>& grad_outputs) override;
+
+    private:
+        Shape input_shape_;
+    };
+
 }  // namespace helix

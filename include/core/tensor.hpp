@@ -168,6 +168,7 @@ namespace helix {
          * @return A broadcasted Tensor view.
          */
         [[nodiscard]] auto broadcast_to(Shape new_shape) const -> Tensor;
+        [[nodiscard]] auto broadcast_to_view(Shape new_shape) const -> Tensor;
 
         auto operator+(const Tensor& other) const -> Tensor;
         auto operator-(const Tensor& other) const -> Tensor;

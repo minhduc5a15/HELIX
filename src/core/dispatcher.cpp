@@ -1,4 +1,5 @@
 #include "core/dispatcher.hpp"
+#include <cstring>
 
 #if defined(_OPENMP)
 #include <omp.h>
@@ -20,6 +21,162 @@ namespace helix {
 
     GraphBuilderInterface* Dispatcher::get_graph_builder() { return g_graph_builder; }
 
+
+    Tensor Dispatcher::clone(const Tensor& a) {
+        Tensor new_tensor(a.shape(), a.dtype(), a.device());
+
+        if (a.is_contiguous()) {
+            if (a.numel() > 0) {
+                std::memcpy(new_tensor.data_ptr(), a.data_ptr(), a.numel() * sizeof(float));
+            }
+        } else if (a.rank() == 2) {
+            const size_t rows = a.shape()[0];
+            const size_t cols = a.shape()[1];
+            const size_t src_stride0 = a.stride()[0];
+            const size_t src_stride1 = a.stride()[1];
+            const size_t dst_stride0 = new_tensor.stride()[0];
+            const size_t dst_stride1 = new_tensor.stride()[1];
+            float* dst_data = new_tensor.data_ptr();
+            const float* src_data = a.data_ptr();
+
+#pragma omp parallel for
+            for (ptrdiff_t r = 0; r < static_cast<ptrdiff_t>(rows); ++r) {
+#pragma omp simd
+                for (size_t c = 0; c < cols; ++c) {
+                    dst_data[r * dst_stride0 + c * dst_stride1] = src_data[r * src_stride0 + c * src_stride1];
+                }
+            }
+        } else {
+            float* dst_data = new_tensor.data_ptr();
+            const float* src_data = a.data_ptr();
+            const size_t total_elements = a.numel();
+
+#pragma omp parallel
+            {
+#if defined(_OPENMP)
+                const size_t tid = omp_get_thread_num();
+                const size_t num_threads = omp_get_num_threads();
+#else
+                const size_t tid = 0;
+                const size_t num_threads = 1;
+#endif
+                const size_t chunk = (total_elements + num_threads - 1) / num_threads;
+                const size_t start = tid * chunk;
+                const size_t end = std::min(start + chunk, total_elements);
+
+                if (start < end) {
+                    BinaryNDIterator it(a.shape());
+                    it.init_from_flat(start);
+                    size_t offset_src = it.compute_offset(a.stride());
+                    size_t offset_dst = it.compute_offset(new_tensor.stride());
+
+                    for (size_t i = start; i < end; ++i) {
+                        dst_data[offset_dst] = src_data[offset_src];
+                        it.advance(offset_src, a.stride(), offset_dst, new_tensor.stride());
+                    }
+                }
+            }
+        }
+
+        if (g_graph_builder) {
+            std::unordered_map<std::string, std::any> attributes;
+            g_graph_builder->build(OperationContext{OpCategory::View, OpType::Clone, new_tensor, {a}, std::move(attributes)});
+        }
+        return new_tensor;
+    }
+
+    Tensor Dispatcher::view(const Tensor& a, Shape new_shape) {
+        if (new_shape.numel() != a.numel()) {
+            throw std::invalid_argument("view shape must have the same number of elements");
+        }
+        if (!a.is_contiguous()) {
+            throw std::runtime_error("view cannot be called on non-contiguous tensor, use reshape instead");
+        }
+        auto a_impl = a.impl();
+        const auto new_impl = std::make_shared<TensorImpl>(
+            a_impl->storage(),
+            a_impl->storage_offset(),
+            new_shape,
+            Stride::compute_contiguous(new_shape),
+            a.dtype(),
+            a.device()
+        );
+        Tensor out(new_impl);
+
+        if (g_graph_builder) {
+            std::unordered_map<std::string, std::any> attributes;
+            attributes["original_shape"] = a.shape();
+            g_graph_builder->build(OperationContext{OpCategory::View, OpType::View, out, {a}, std::move(attributes)});
+        }
+        return out;
+    }
+
+    Tensor Dispatcher::slice(const Tensor& a, size_t dim, size_t start, size_t end) {
+        if (dim >= a.rank()) {
+            throw std::out_of_range("slice dimension out of range");
+        }
+        if (start >= end || end > a.shape()[dim]) {
+            throw std::invalid_argument("invalid slice bounds");
+        }
+
+        std::vector<size_t> new_dims = a.shape().vec();
+        new_dims[dim] = end - start;
+
+        auto a_impl = a.impl();
+        size_t new_offset = a_impl->storage_offset() + start * a.stride()[dim];
+
+        const auto new_impl =
+            std::make_shared<TensorImpl>(a_impl->storage(), new_offset, Shape(new_dims), a.stride(), a.dtype(), a.device());
+        Tensor out(new_impl);
+
+        if (g_graph_builder) {
+            std::unordered_map<std::string, std::any> attributes;
+            attributes["dim"] = dim;
+            attributes["start"] = start;
+            attributes["end"] = end;
+            attributes["input_shape"] = a.shape();
+            g_graph_builder->build(OperationContext{OpCategory::View, OpType::Slice, out, {a}, std::move(attributes)});
+        }
+        return out;
+    }
+
+    Tensor Dispatcher::transpose(const Tensor& a, size_t dim0, size_t dim1) {
+        if (dim0 >= a.rank() || dim1 >= a.rank()) {
+            throw std::out_of_range("transpose dimensions out of range");
+        }
+
+        std::vector<size_t> new_dims = a.shape().vec();
+        std::swap(new_dims[dim0], new_dims[dim1]);
+
+        std::vector<size_t> new_strides = a.stride().vec();
+        std::swap(new_strides[dim0], new_strides[dim1]);
+
+        auto a_impl = a.impl();
+        const auto new_impl = std::make_shared<TensorImpl>(
+            a_impl->storage(), a_impl->storage_offset(), Shape(new_dims), Stride(new_strides), a.dtype(), a.device()
+        );
+        Tensor out(new_impl);
+
+        if (g_graph_builder) {
+            std::unordered_map<std::string, std::any> attributes;
+            attributes["dim0"] = dim0;
+            attributes["dim1"] = dim1;
+            g_graph_builder->build(OperationContext{OpCategory::View, OpType::Transpose, out, {a}, std::move(attributes)});
+        }
+        return out;
+    }
+
+    Tensor Dispatcher::broadcast_to(const Tensor& a, Shape new_shape) {
+        Tensor out = a.broadcast_to_view(new_shape);
+
+        if (g_graph_builder) {
+            std::unordered_map<std::string, std::any> attributes;
+            attributes["input_shape"] = a.shape();
+            g_graph_builder->build(OperationContext{OpCategory::View, OpType::BroadcastTo, out, {a}, std::move(attributes)});
+        }
+        return out;
+    }
+
     Tensor Dispatcher::ensure_contiguous(const Tensor& t) { return t.contiguous(); }
 
     // NOTE:
@@ -28,8 +185,8 @@ namespace helix {
     // remove these contiguous() calls.
     Tensor Dispatcher::add(const Tensor& a, const Tensor& b) {
         const Shape out_shape = compute_broadcast_shape(a.shape(), b.shape());
-        Tensor lhs = ensure_contiguous(a.broadcast_to(out_shape));
-        Tensor rhs = ensure_contiguous(b.broadcast_to(out_shape));
+        Tensor lhs = ensure_contiguous(a.broadcast_to_view(out_shape));
+        Tensor rhs = ensure_contiguous(b.broadcast_to_view(out_shape));
         Tensor out(out_shape, a.dtype(), a.device());
         if (a.device().is_cpu())
             CPUBackend::add(lhs.data_ptr(), rhs.data_ptr(), out.data_ptr(), out.numel());
@@ -116,8 +273,8 @@ namespace helix {
 
     Tensor Dispatcher::sub(const Tensor& a, const Tensor& b) {
         const Shape out_shape = compute_broadcast_shape(a.shape(), b.shape());
-        Tensor lhs = ensure_contiguous(a.broadcast_to(out_shape));
-        Tensor rhs = ensure_contiguous(b.broadcast_to(out_shape));
+        Tensor lhs = ensure_contiguous(a.broadcast_to_view(out_shape));
+        Tensor rhs = ensure_contiguous(b.broadcast_to_view(out_shape));
         Tensor out(out_shape, a.dtype(), a.device());
         if (a.device().is_cpu())
             CPUBackend::sub(lhs.data_ptr(), rhs.data_ptr(), out.data_ptr(), out.numel());
@@ -133,8 +290,8 @@ namespace helix {
 
     Tensor Dispatcher::mul(const Tensor& a, const Tensor& b) {
         const Shape out_shape = compute_broadcast_shape(a.shape(), b.shape());
-        Tensor lhs = ensure_contiguous(a.broadcast_to(out_shape));
-        Tensor rhs = ensure_contiguous(b.broadcast_to(out_shape));
+        Tensor lhs = ensure_contiguous(a.broadcast_to_view(out_shape));
+        Tensor rhs = ensure_contiguous(b.broadcast_to_view(out_shape));
         Tensor out(out_shape, a.dtype(), a.device());
         if (a.device().is_cpu())
             CPUBackend::mul(lhs.data_ptr(), rhs.data_ptr(), out.data_ptr(), out.numel());
@@ -150,8 +307,8 @@ namespace helix {
 
     Tensor Dispatcher::div(const Tensor& a, const Tensor& b) {
         const Shape out_shape = compute_broadcast_shape(a.shape(), b.shape());
-        Tensor lhs = ensure_contiguous(a.broadcast_to(out_shape));
-        Tensor rhs = ensure_contiguous(b.broadcast_to(out_shape));
+        Tensor lhs = ensure_contiguous(a.broadcast_to_view(out_shape));
+        Tensor rhs = ensure_contiguous(b.broadcast_to_view(out_shape));
         Tensor out(out_shape, a.dtype(), a.device());
         if (a.device().is_cpu())
             CPUBackend::div(lhs.data_ptr(), rhs.data_ptr(), out.data_ptr(), out.numel());

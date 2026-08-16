@@ -165,4 +165,26 @@ namespace helix {
         return {grad, Tensor()};  // Only returning grad w.r.t pred, target doesn't need grad
     }
 
+    std::vector<Tensor> CloneBackward::backward(const std::vector<Tensor>& grad_outputs) {
+        return {grad_outputs[0]};
+    }
+
+    std::vector<Tensor> ViewBackward::backward(const std::vector<Tensor>& grad_outputs) {
+        return {grad_outputs[0].reshape(original_shape_)};
+    }
+
+    std::vector<Tensor> SliceBackward::backward(const std::vector<Tensor>& grad_outputs) {
+        Tensor grad_full = Tensor::zeros(input_shape_);
+        grad_full.slice(dim_, start_, end_).add_(grad_outputs[0]);
+        return {grad_full};
+    }
+
+    std::vector<Tensor> TransposeBackward::backward(const std::vector<Tensor>& grad_outputs) {
+        return {grad_outputs[0].transpose(dim0_, dim1_)};
+    }
+
+    std::vector<Tensor> BroadcastToBackward::backward(const std::vector<Tensor>& grad_outputs) {
+        return {sum_to_shape(grad_outputs[0], input_shape_)};
+    }
+
 }  // namespace helix

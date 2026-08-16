@@ -26,6 +26,8 @@ namespace helix {
         Transpose,
         Flatten,
         Slice,
+        BroadcastTo,
+        Clone,
         Exp,
         Tanh,
         Log,

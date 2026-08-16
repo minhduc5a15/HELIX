@@ -94,79 +94,11 @@ namespace helix {
     auto Tensor::is_shared() const -> bool { return impl_.use_count() > 1 || impl_->storage().use_count() > 1; }
 
     auto Tensor::view(Shape new_shape) const -> Tensor {
-        if (new_shape.numel() != numel()) {
-            throw std::invalid_argument("view shape must have the same number of elements");
-        }
-        if (!is_contiguous()) {
-            throw std::runtime_error("view cannot be called on non-contiguous tensor, use reshape instead");
-        }
-        const auto new_impl = std::make_shared<TensorImpl>(
-            impl_->storage(),
-            impl_->storage_offset(),
-            std::move(new_shape),
-            Stride::compute_contiguous(new_shape),
-            dtype(),
-            device()
-        );
-        return Tensor(new_impl);
+        return Dispatcher::view(*this, std::move(new_shape));
     }
 
     auto Tensor::clone() const -> Tensor {
-        Tensor new_tensor(shape(), dtype(), device());
-
-        if (is_contiguous()) {
-            if (numel() > 0) {
-                std::memcpy(new_tensor.data_ptr(), data_ptr(), numel() * sizeof(float));
-            }
-        } else if (rank() == 2) {
-            const size_t rows = shape()[0];
-            const size_t cols = shape()[1];
-            const size_t src_stride0 = stride()[0];
-            const size_t src_stride1 = stride()[1];
-            const size_t dst_stride0 = new_tensor.stride()[0];
-            const size_t dst_stride1 = new_tensor.stride()[1];
-            float* dst_data = new_tensor.data_ptr();
-            const float* src_data = data_ptr();
-
-#pragma omp parallel for
-            for (ptrdiff_t r = 0; r < static_cast<ptrdiff_t>(rows); ++r) {
-#pragma omp simd
-                for (size_t c = 0; c < cols; ++c) {
-                    dst_data[r * dst_stride0 + c * dst_stride1] = src_data[r * src_stride0 + c * src_stride1];
-                }
-            }
-        } else {
-            float* dst_data = new_tensor.data_ptr();
-            const float* src_data = data_ptr();
-            const size_t total_elements = numel();
-
-#pragma omp parallel
-            {
-#if defined(_OPENMP)
-                const size_t tid = omp_get_thread_num();
-                const size_t num_threads = omp_get_num_threads();
-#else
-                const size_t tid = 0;
-                const size_t num_threads = 1;
-#endif
-                const size_t chunk = (total_elements + num_threads - 1) / num_threads;
-                const size_t start = tid * chunk;
-                const size_t end = std::min(start + chunk, total_elements);
-
-                if (start < end) {
-                    BinaryNDIterator it(shape());
-                    it.init_from_flat(start);
-                    size_t offset_src = it.compute_offset(stride());
-                    size_t offset_dst = it.compute_offset(new_tensor.stride());
-
-                    for (size_t i = start; i < end; ++i) {
-                        dst_data[offset_dst] = src_data[offset_src];
-                        it.advance(offset_src, stride(), offset_dst, new_tensor.stride());
-                    }
-                }
-            }
-        }
-        return new_tensor;
+        return Dispatcher::clone(*this);
     }
 
     void Tensor::copy_(const Tensor& src) {
@@ -356,41 +288,18 @@ namespace helix {
     }
 
     auto Tensor::slice(const size_t dim, const size_t start, const size_t end) const -> Tensor {
-        if (dim >= rank()) {
-            throw std::out_of_range("slice dimension out of range");
-        }
-        if (start >= end || end > shape()[dim]) {
-            throw std::invalid_argument("invalid slice bounds");
-        }
-
-        std::vector<size_t> new_dims = shape().vec();
-        new_dims[dim] = end - start;
-
-        size_t new_offset = impl_->storage_offset() + start * stride()[dim];
-
-        const auto new_impl =
-            std::make_shared<TensorImpl>(impl_->storage(), new_offset, Shape(new_dims), stride(), dtype(), device());
-        return Tensor(new_impl);
+        return Dispatcher::slice(*this, dim, start, end);
     }
 
     auto Tensor::transpose(const size_t dim0, const size_t dim1) const -> Tensor {
-        if (dim0 >= rank() || dim1 >= rank()) {
-            throw std::out_of_range("transpose dimensions out of range");
-        }
-
-        std::vector<size_t> new_dims = shape().vec();
-        std::swap(new_dims[dim0], new_dims[dim1]);
-
-        std::vector<size_t> new_strides = stride().vec();
-        std::swap(new_strides[dim0], new_strides[dim1]);
-
-        const auto new_impl = std::make_shared<TensorImpl>(
-            impl_->storage(), impl_->storage_offset(), Shape(new_dims), Stride(new_strides), dtype(), device()
-        );
-        return Tensor(new_impl);
+        return Dispatcher::transpose(*this, dim0, dim1);
     }
 
     auto Tensor::broadcast_to(Shape new_shape) const -> Tensor {
+        return Dispatcher::broadcast_to(*this, std::move(new_shape));
+    }
+
+    auto Tensor::broadcast_to_view(Shape new_shape) const -> Tensor {
         if (shape() == new_shape) return *this;
 
         Stride new_stride = compute_broadcast_strides(shape(), stride(), new_shape);

@@ -14,7 +14,7 @@ namespace helix {
         // 1. Create input tensors with requires_grad = true for autograd
         std::vector<Tensor> inputs_with_grad;
         for (const auto& t : inputs) {
-            Tensor cloned = t.clone();
+            Tensor cloned = t.detach().clone();
             cloned.set_requires_grad(true);
             inputs_with_grad.push_back(cloned);
         }
@@ -43,7 +43,7 @@ namespace helix {
             for (size_t j = 0; j < orig_t.numel(); ++j) {
                 // Create an independent copy of inputs for perturbation
                 std::vector<Tensor> perturbed_inputs = inputs;
-                Tensor p_input = inputs[i].clone();
+                Tensor p_input = inputs[i].detach().clone();
                 p_input.set_requires_grad(false);  // No need to track autograd for numerical pass
                 perturbed_inputs[i] = p_input;
 

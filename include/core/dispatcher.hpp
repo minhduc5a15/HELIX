@@ -16,6 +16,13 @@ namespace helix {
         // Ensure the tensor is contiguous. If not, returns a contiguous clone.
         static Tensor ensure_contiguous(const Tensor& t);
 
+        // View Operations
+        static Tensor clone(const Tensor& a);
+        static Tensor view(const Tensor& a, Shape new_shape);
+        static Tensor slice(const Tensor& a, size_t dim, size_t start, size_t end);
+        static Tensor transpose(const Tensor& a, size_t dim0, size_t dim1);
+        static Tensor broadcast_to(const Tensor& a, Shape new_shape);
+
         // Mathematical Operations
         static Tensor add(const Tensor& a, const Tensor& b);
         static void add_(Tensor& a, const Tensor& b);

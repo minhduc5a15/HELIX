@@ -58,7 +58,7 @@ if [ -f "CMakePresets.json" ]; then
     cmake --preset HELIX -DCMAKE_BUILD_TYPE="$BUILD_TYPE" $TSAN_CMAKE_ARGS
     
     echo -e "${GREEN}Building the project...${NC}"
-    cmake --build out/build/HELIX
+    cmake --build build
 else
     echo -e "${YELLOW}CMakePresets.json not found. Falling back to standard CMake build...${NC}"
     echo -e "${GREEN}Configuring build directory (${BUILD_TYPE})...${NC}"
