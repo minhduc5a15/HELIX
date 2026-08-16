@@ -93,6 +93,15 @@ namespace helix {
         SavedTensor saved_out_;
     };
 
+    class TanhBackward : public Node {
+    public:
+        TanhBackward(const Tensor& out) : saved_out_(out) {}
+        std::vector<Tensor> backward(const std::vector<Tensor>& grad_outputs) override;
+
+    private:
+        SavedTensor saved_out_;
+    };
+
     class LogBackward : public Node {
     public:
         LogBackward(const Tensor& a) : saved_a_(a) {}

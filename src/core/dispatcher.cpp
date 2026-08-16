@@ -237,6 +237,21 @@ namespace helix {
         return out;
     }
 
+    Tensor Dispatcher::tanh(const Tensor& a) {
+        Tensor lhs = ensure_contiguous(a);
+        Tensor out(a.shape(), a.dtype(), a.device());
+        if (a.device().is_cpu())
+            CPUBackend::tanh(lhs.data_ptr(), out.data_ptr(), out.numel());
+        else
+            throw std::runtime_error("Unsupported device");
+        if (g_graph_builder) {
+            g_graph_builder->build(
+                OperationContext{.category = OpCategory::Unary, .type = OpType::Tanh, .out = out, .inputs = {a}}
+            );
+        }
+        return out;
+    }
+
     Tensor Dispatcher::log(const Tensor& a) {
         Tensor lhs = ensure_contiguous(a);
         Tensor out(a.shape(), a.dtype(), a.device());

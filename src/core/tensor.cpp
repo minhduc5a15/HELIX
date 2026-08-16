@@ -417,6 +417,7 @@ namespace helix {
     auto Tensor::operator/(const float scalar) const -> Tensor { return Dispatcher::div_scalar(*this, scalar); }
     auto Tensor::operator-() const -> Tensor { return Dispatcher::neg(*this); }
     auto Tensor::exp() const -> Tensor { return Dispatcher::exp(*this); }
+    auto Tensor::tanh() const -> Tensor { return Dispatcher::tanh(*this); }
     auto Tensor::log() const -> Tensor { return Dispatcher::log(*this); }
     auto Tensor::sqrt() const -> Tensor { return Dispatcher::sqrt(*this); }
     auto Tensor::relu() const -> Tensor { return Dispatcher::relu(*this); }

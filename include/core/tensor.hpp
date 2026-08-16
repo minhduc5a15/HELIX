@@ -198,6 +198,7 @@ namespace helix {
          * @return The resulting tensor.
          */
         [[nodiscard]] auto exp() const -> Tensor;
+        [[nodiscard]] auto tanh() const -> Tensor;
 
         /**
          * @brief Element-wise natural logarithm (ln(x)).

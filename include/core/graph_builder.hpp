@@ -27,6 +27,7 @@ namespace helix {
         Flatten,
         Slice,
         Exp,
+        Tanh,
         Log,
         Sqrt,
         Pow,

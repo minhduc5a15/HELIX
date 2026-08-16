@@ -40,6 +40,12 @@ TEST_F(AutogradOpsTest, ExpGradientCheck) {
     EXPECT_TRUE(gradient_check(func, {a}));
 }
 
+TEST_F(AutogradOpsTest, TanhGradientCheck) {
+    Tensor a({-2.0f, -0.5f, 0.5f, 2.0f}, Shape{2, 2});
+    auto func = [](const std::vector<Tensor>& inputs) { return inputs[0].tanh().sum(); };
+    EXPECT_TRUE(gradient_check(func, {a}));
+}
+
 TEST_F(AutogradOpsTest, LogGradientCheck) {
     Tensor a({0.1f, 0.5f, 1.0f, 2.0f}, Shape{2, 2});  // inputs > 0 for log
     auto func = [](const std::vector<Tensor>& inputs) { return inputs[0].log().sum(); };

@@ -102,6 +102,12 @@ namespace helix {
         }
     }
 
+    void CPUBackend::tanh(const float* a, float* out, const size_t size) {
+        for (size_t i = 0; i < size; ++i) {
+            out[i] = std::tanh(a[i]);
+        }
+    }
+
     void CPUBackend::log(const float* a, float* out, const size_t size) {
         for (size_t i = 0; i < size; ++i) {
             out[i] = std::log(a[i]);

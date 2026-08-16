@@ -32,6 +32,7 @@ namespace helix {
         // Unary Operations
         static Tensor neg(const Tensor& a);
         static Tensor exp(const Tensor& a);
+        static Tensor tanh(const Tensor& a);
         static Tensor log(const Tensor& a);
         static Tensor sqrt(const Tensor& a);
         static Tensor relu(const Tensor& a);

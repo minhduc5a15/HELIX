@@ -25,6 +25,7 @@ namespace helix {
         // Unary operations
         static void neg(const float* a, float* out, size_t size);
         static void exp(const float* a, float* out, size_t size);
+        static void tanh(const float* a, float* out, size_t size);
         static void log(const float* a, float* out, size_t size);
         static void sqrt(const float* a, float* out, size_t size);
         static void relu(const float* a, float* out, size_t size);

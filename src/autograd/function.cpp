@@ -81,6 +81,11 @@ namespace helix {
         return {grad_outputs[0] * out};
     }
 
+    std::vector<Tensor> TanhBackward::backward(const std::vector<Tensor>& grad_outputs) {
+        const Tensor& out = saved_out_.unpack();
+        return {grad_outputs[0] * (out * out * -1.0f + 1.0f)};
+    }
+
     std::vector<Tensor> LogBackward::backward(const std::vector<Tensor>& grad_outputs) {
         const Tensor& a = saved_a_.unpack();
         return {grad_outputs[0] / a};

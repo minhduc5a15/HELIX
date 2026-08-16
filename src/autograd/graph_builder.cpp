@@ -45,6 +45,9 @@ namespace helix {
             case OpType::Exp:
                 node = std::make_shared<ExpBackward>(ctx.out);
                 break;
+            case OpType::Tanh:
+                node = std::make_shared<TanhBackward>(ctx.out);
+                break;
             case OpType::Log:
                 node = std::make_shared<LogBackward>(ctx.inputs[0].get());
                 break;
