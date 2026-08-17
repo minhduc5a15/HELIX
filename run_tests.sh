@@ -47,8 +47,10 @@ export GTEST_OUTPUT="json:$WORKSPACE_DIR/output/unit_tests/"
 # Check if TSan is enabled
 CTEST_CMD="ctest"
 if [ -f "$BUILD_DIR/CMakeCache.txt" ] && grep -q "HELIX_ENABLE_TSAN:BOOL=ON" "$BUILD_DIR/CMakeCache.txt"; then
-    echo -e "${YELLOW}TSan build detected. Disabling ASLR for test execution...${NC}"
+    echo -e "${YELLOW}TSan build detected. Disabling ASLR for test execution and applying OpenMP suppressions...${NC}"
     CTEST_CMD="setarch $(uname -m) -R ctest"
+    # Suppress false positives from OpenMP runtime (libomp/libgomp) which is usually not instrumented with TSan
+    export TSAN_OPTIONS="ignore_noninstrumented_modules=1"
 fi
 
 # Run the tests using ctest
