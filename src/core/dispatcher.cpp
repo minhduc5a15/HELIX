@@ -39,7 +39,7 @@ namespace helix {
             float* dst_data = new_tensor.data_ptr();
             const float* src_data = a.data_ptr();
 
-#pragma omp parallel for
+#pragma omp parallel for if (a.numel() >= OMP_THRESHOLD)
             for (ptrdiff_t r = 0; r < static_cast<ptrdiff_t>(rows); ++r) {
 #pragma omp simd
                 for (size_t c = 0; c < cols; ++c) {
@@ -51,7 +51,7 @@ namespace helix {
             const float* src_data = a.data_ptr();
             const size_t total_elements = a.numel();
 
-#pragma omp parallel
+#pragma omp parallel if (total_elements >= OMP_NON_CONTIGUOUS_THRESHOLD)
             {
 #if defined(_OPENMP)
                 const size_t tid = omp_get_thread_num();
@@ -224,7 +224,27 @@ namespace helix {
 
         if (a.device().is_cpu()) {
             if (a.is_contiguous() && safe_b.is_contiguous()) {
-                CPUBackend::add(a.data_ptr(), safe_b.data_ptr(), a.data_ptr(), a.numel());
+                const size_t total_elements = a.numel();
+                float* a_data = a.data_ptr();
+                const float* b_data = safe_b.data_ptr();
+
+#pragma omp parallel if (total_elements >= OMP_THRESHOLD)
+                {
+#if defined(_OPENMP)
+                    const size_t num_threads = omp_get_num_threads();
+                    const size_t tid = omp_get_thread_num();
+#else
+                    const size_t num_threads = 1;
+                    const size_t tid = 0;
+#endif
+                    const size_t chunk = (total_elements + num_threads - 1) / num_threads;
+                    const size_t start = tid * chunk;
+                    const size_t end = std::min(start + chunk, total_elements);
+
+                    if (start < end) {
+                        CPUBackend::add(a_data + start, b_data + start, a_data + start, end - start);
+                    }
+                }
             } else if (a.rank() == 2) {
                 const size_t rows = a.shape()[0];
                 const size_t cols = a.shape()[1];
@@ -235,7 +255,7 @@ namespace helix {
                 float* a_data = a.data_ptr();
                 const float* b_data = safe_b.data_ptr();
 
-#pragma omp parallel for
+#pragma omp parallel for if (a.numel() >= OMP_THRESHOLD)
                 for (ptrdiff_t r = 0; r < static_cast<ptrdiff_t>(rows); ++r) {
 #pragma omp simd
                     for (size_t c = 0; c < cols; ++c) {
@@ -247,7 +267,7 @@ namespace helix {
                 const float* b_data = safe_b.data_ptr();
                 const size_t total_elements = a.numel();
 
-#pragma omp parallel
+#pragma omp parallel if (total_elements >= OMP_NON_CONTIGUOUS_THRESHOLD)
                 {
 #if defined(_OPENMP)
                     const size_t tid = omp_get_thread_num();
@@ -681,7 +701,27 @@ namespace helix {
 
         if (param.device().is_cpu()) {
             if (param.is_contiguous() && safe_grad.is_contiguous()) {
-                CPUBackend::sgd(param.data_ptr(), safe_grad.data_ptr(), lr, param.numel());
+                const size_t total_elements = param.numel();
+                float* p_data = param.data_ptr();
+                const float* g_data = safe_grad.data_ptr();
+
+#pragma omp parallel if (total_elements >= OMP_THRESHOLD)
+                {
+#if defined(_OPENMP)
+                    const size_t num_threads = omp_get_num_threads();
+                    const size_t tid = omp_get_thread_num();
+#else
+                    const size_t num_threads = 1;
+                    const size_t tid = 0;
+#endif
+                    const size_t chunk = (total_elements + num_threads - 1) / num_threads;
+                    const size_t start = tid * chunk;
+                    const size_t end = std::min(start + chunk, total_elements);
+
+                    if (start < end) {
+                        CPUBackend::sgd(p_data + start, g_data + start, lr, end - start);
+                    }
+                }
             } else if (param.rank() == 2) {
                 const size_t rows = param.shape()[0];
                 const size_t cols = param.shape()[1];
@@ -692,7 +732,7 @@ namespace helix {
                 float* p_data = param.data_ptr();
                 const float* g_data = safe_grad.data_ptr();
 
-#pragma omp parallel for
+#pragma omp parallel for if (param.numel() >= OMP_THRESHOLD)
                 for (ptrdiff_t r = 0; r < static_cast<ptrdiff_t>(rows); ++r) {
 #pragma omp simd
                     for (size_t c = 0; c < cols; ++c) {
@@ -704,7 +744,7 @@ namespace helix {
                 const float* g_data = safe_grad.data_ptr();
                 const size_t total_elements = param.numel();
 
-#pragma omp parallel
+#pragma omp parallel if (total_elements >= OMP_NON_CONTIGUOUS_THRESHOLD)
                 {
 #if defined(_OPENMP)
                     const size_t tid = omp_get_thread_num();

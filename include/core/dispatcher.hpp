@@ -8,6 +8,9 @@ namespace helix {
 
     class GraphBuilderInterface;
 
+    constexpr size_t OMP_THRESHOLD = 262144;
+    constexpr size_t OMP_NON_CONTIGUOUS_THRESHOLD = 262144;
+
     class Dispatcher {
     public:
         static void register_graph_builder(GraphBuilderInterface* builder);
