@@ -117,3 +117,15 @@ TEST_F(AutogradTest, AccumulateGrad_UseAfterFree) {
     Tensor y = build_graph_and_destroy_leaf();
     y.sum().backward();
 }
+
+TEST_F(AutogradTest, AccumulateGrad_BroadcastedViewSafety) {
+    Tensor x({1.0f, 2.0f, 3.0f, 4.0f}, Shape{2, 2});
+    x.set_requires_grad(true);
+
+    Tensor y = x.sum();
+    y.backward();
+
+    // The gradient should have been cloned by AccumulateGrad if it was a broadcasted view,
+    // so in-place operations like zero_() should succeed without throwing overlapping memory errors.
+    EXPECT_NO_THROW({ x.grad().zero_(); });
+}

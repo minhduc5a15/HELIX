@@ -19,7 +19,14 @@ namespace helix {
         std::vector<Tensor> backward(const std::vector<Tensor>& grad_outputs) override {
             if (auto meta = meta_.lock()) {
                 if (!meta->has_grad()) {
-                    meta->set_grad(grad_outputs[0]);
+                    // Safe-guard: The parameter's gradient must be a safe, unique, and dense tensor
+                    // so that future in-place optimizer operations (like .zero_() or .add_()) succeed.
+                    if (grad_outputs[0].has_internal_overlap() || grad_outputs[0].is_shared() ||
+                        !grad_outputs[0].is_contiguous()) {
+                        meta->set_grad(grad_outputs[0].clone());
+                    } else {
+                        meta->set_grad(grad_outputs[0]);
+                    }
                 } else {
                     if (!meta->grad().is_shared() && meta->grad().shape() == grad_outputs[0].shape() &&
                         !meta->grad().has_internal_overlap()) {
