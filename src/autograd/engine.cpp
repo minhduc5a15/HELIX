@@ -91,6 +91,13 @@ namespace helix {
 
         auto root = meta->grad_fn() ? meta->grad_fn() : meta->grad_accumulator();
 
+        if (meta->grad_fn() && root->next_edges().empty()) {
+            throw std::runtime_error(
+                "RuntimeError: Trying to backward through the graph a second time. Specify retain_graph=true if you "
+                "need to backward through the graph a second time."
+            );
+        }
+
         // WHY TOPOLOGICAL SORT?
         // In real-world Neural Networks (especially ResNets with Residual Connections),
         // a Tensor can act as an input for multiple Operations.

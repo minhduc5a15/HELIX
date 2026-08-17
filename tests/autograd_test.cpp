@@ -129,3 +129,35 @@ TEST_F(AutogradTest, AccumulateGrad_BroadcastedViewSafety) {
     // so in-place operations like zero_() should succeed without throwing overlapping memory errors.
     EXPECT_NO_THROW({ x.grad().zero_(); });
 }
+
+TEST_F(AutogradTest, BackwardTwiceWithoutRetainGraphThrows) {
+    Tensor a({1.0f, 2.0f}, {2});
+    a.set_requires_grad(true);
+    Tensor b({3.0f, 4.0f}, {2});
+    b.set_requires_grad(true);
+
+    Tensor c = a * b;
+    Tensor d = c.sum();
+
+    // First backward should succeed
+    EXPECT_NO_THROW(d.backward());
+    EXPECT_EQ(a.grad().data_ptr()[0], 3.0f);
+
+    // Second backward should throw because graph was destroyed
+    EXPECT_THROW(
+        {
+            try {
+                d.backward();
+            } catch (const std::runtime_error& e) {
+                // Check if error message contains the expected string
+                EXPECT_STREQ(
+                    "RuntimeError: Trying to backward through the graph a second time. Specify retain_graph=true if "
+                    "you need to backward through the graph a second time.",
+                    e.what()
+                );
+                throw;
+            }
+        },
+        std::runtime_error
+    );
+}
