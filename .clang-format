@@ -1,0 +1,22 @@
+BasedOnStyle: Google
+
+IndentWidth: 4
+NamespaceIndentation: All
+
+FixNamespaceComments: true
+
+AccessModifierOffset: -4
+ColumnLimit: 120
+
+BinPackParameters: false
+BinPackArguments: false
+
+AlignAfterOpenBracket: BlockIndent
+
+BraceWrapping:
+  AfterEnum: true
+  AfterClass: true
+  AfterStruct: true
+  AfterControlStatement: true
+  AfterFunction: true
+  BeforeElse: true

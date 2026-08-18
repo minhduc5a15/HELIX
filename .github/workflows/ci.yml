@@ -1,0 +1,54 @@
+name: HELIX CI
+
+on:
+  push:
+    branches: [ "main"]
+  pull_request:
+    branches: [ "main"]
+
+jobs:
+  build-and-test:
+    name: Build and Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        build_type: [Release]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Configure CMake
+      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{matrix.build_type}}
+
+    - name: Build
+      run: cmake --build ${{github.workspace}}/build --config ${{matrix.build_type}} -j 4
+
+    - name: Evaluate (Test and Benchmark)
+      shell: bash
+      working-directory: ${{github.workspace}}
+      run: |
+        mkdir -p output
+        TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+        TEST_OUT="output/test_results_${TIMESTAMP}.xml"
+        BENCH_OUT="output/benchmark_results_${TIMESTAMP}.json"
+        
+        echo "Running Unit Tests and saving to XML..."
+        ctest --test-dir build -C ${{matrix.build_type}} --output-on-failure --output-junit "$TEST_OUT"
+        
+        echo "Running Google Benchmark and saving to JSON..."
+        BENCHMARK_BIN=$(find build -type f \( -name "matmul_benchmark" -o -name "matmul_benchmark.exe" \) | head -n 1)
+        if [ -n "$BENCHMARK_BIN" ]; then
+            "$BENCHMARK_BIN" --benchmark_format=json --benchmark_out="$BENCH_OUT"
+        else
+            echo "Benchmark executable not found! Skipping benchmark."
+        fi
+
+    - name: Upload Evaluation Artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: helix-eval-results-${{matrix.os}}
+        path: output/
