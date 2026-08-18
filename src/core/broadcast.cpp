@@ -44,7 +44,7 @@ namespace helix {
         const size_t rank_orig = original_shape.rank();
         const size_t rank_target = target_shape.rank();
 
-        std::vector<size_t> out_strides(rank_target, 0);
+        std::vector<ptrdiff_t> out_strides(rank_target, 0);
 
         // Iterate right-to-left
         for (size_t i = 0; i < rank_target; ++i) {

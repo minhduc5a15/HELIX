@@ -23,25 +23,10 @@ namespace helix {
      * This is crucial to prevent memory leaks.
      */
     MemoryPool::~MemoryPool() {
-        // Force synchronous cleanup during static teardown.
-        // It's safe to iterate here because all threads must have been joined
-        // prior to the destruction of the static MemoryPool singleton.
-        {
-            std::lock_guard<std::mutex> lock(caches_mutex_);
-            for (ThreadCache* cache : all_caches_) {
-                for (auto& [size, blocks] : cache->blocks) {
-                    for (void* ptr : blocks) {
-#if defined(_WIN32)
-                        _aligned_free(ptr);
-#else
-                        std::free(ptr);
-#endif
-                    }
-                    blocks.clear();
-                }
-            }
-        }
-        reset();
+        // ISSUE 4 FIX: Do not manually std::free() allocated blocks.
+        // We rely on the OS to reclaim heap memory upon process exit.
+        // This prevents Use-After-Free (UAF) crashes in detached background threads
+        // that may outlive the main thread and attempt to access Tensor data during teardown.
     }
 
     /**
@@ -67,6 +52,7 @@ namespace helix {
     // Thread-local pointer to the current thread's cache.
     // Initialized to nullptr and managed by get_thread_cache and ThreadCacheWrapper.
     thread_local ThreadCache* tls_cache_ptr = nullptr;
+    thread_local bool tls_teardown_initiated = false;
 
     /**
      * @brief Helper struct to manage the lifecycle of thread-local caches.
@@ -87,6 +73,7 @@ namespace helix {
          * It performs cleanup of the thread-local cache.
          */
         ~ThreadCacheWrapper() {
+            tls_teardown_initiated = true;
             if (tls_cache_ptr != nullptr) {  // Check if a ThreadCache was actually created for this thread.
                 MemoryPool& pool = MemoryPool::get_instance();
 
@@ -130,6 +117,9 @@ namespace helix {
      * @return A pointer to the current thread's ThreadCache.
      */
     auto MemoryPool::get_thread_cache() -> ThreadCache* {
+        if (tls_teardown_initiated) {
+            return nullptr;
+        }
         if (tls_cache_ptr == nullptr) {                       // Check if the current thread already has a cache.
             tls_cache_ptr = new ThreadCache();                // Create a new cache if not.
             std::lock_guard<std::mutex> lock(caches_mutex_);  // Protects access to all_caches_ set.
@@ -165,47 +155,51 @@ namespace helix {
         // Get the current thread's local cache.
         ThreadCache* local_cache = get_thread_cache();
 
-        // Epoch check for lazy thread cache clearing
-        const uint64_t global_epoch = current_epoch_.load(std::memory_order_relaxed);
-        if (local_cache->epoch < global_epoch) {
-            for (auto& [size, blocks] : local_cache->blocks) {
-                for (void* p : blocks) {
+        if (local_cache) {
+            // Epoch check for lazy thread cache clearing
+            const uint64_t global_epoch = current_epoch_.load(std::memory_order_relaxed);
+            if (local_cache->epoch < global_epoch) {
+                for (auto& [size, blocks] : local_cache->blocks) {
+                    for (void* p : blocks) {
 #if defined(_WIN32)
-                    _aligned_free(p);
+                        _aligned_free(p);
 #else
-                    std::free(p);
+                        std::free(p);
 #endif
+                    }
+                    blocks.clear();
                 }
-                blocks.clear();
+                local_cache->epoch = global_epoch;
             }
-            local_cache->epoch = global_epoch;
+
+            // Get the list of blocks for the specific alloc_size within the local cache.
+            auto& local_list = local_cache->blocks[alloc_size];
+
+            // --- Fast-path: Allocate from thread-local cache ---
+            if (!local_list.empty()) {
+                void* ptr = local_list.back();  // Take the last available block.
+                local_list.pop_back();          // Remove it from the list.
+                return ptr;
+            }
         }
 
-        // Get the list of blocks for the specific alloc_size within the local cache.
-        auto& local_list = local_cache->blocks[alloc_size];
-
-        // --- Fast-path: Allocate from thread-local cache ---
-        if (!local_list.empty()) {
-            void* ptr = local_list.back();  // Take the last available block.
-            local_list.pop_back();          // Remove it from the list.
-            return ptr;
-        }
-
-        // --- Slow-path: Thread-local cache is empty, fetch from global pool ---
+        // --- Slow-path: Thread-local cache is empty (or tearing down), fetch from global pool ---
         GlobalBin* bin = get_global_bin(alloc_size);  // Get the global bin for this allocation size.
         {
             std::lock_guard<std::mutex> lock(bin->mutex);  // Protects access to the global bin's blocks.
             if (!bin->blocks.empty()) {
                 // Transfer a batch of blocks from the global bin to the local cache.
                 // This reduces contention on the global mutex.
-                const size_t transfer_count = std::min(TRANSFER_BATCH_SIZE, bin->blocks.size());
+                const size_t max_transfer = local_cache ? TRANSFER_BATCH_SIZE : 1;
+                const size_t transfer_count = std::min(max_transfer, bin->blocks.size());
                 const auto transfer_start = bin->blocks.end() - static_cast<std::ptrdiff_t>(transfer_count);
 
                 // The last block in the batch is returned directly to the caller.
                 void* ptr = *(bin->blocks.end() - 1);
 
                 // If more than one block was transferred, put the rest into the local cache.
-                if (transfer_count > 1) {
+                if (transfer_count > 1 && local_cache) {
+                    auto& local_list = local_cache->blocks[alloc_size];
                     local_list.insert(local_list.end(), transfer_start, bin->blocks.end() - 1);
                 }
                 // Erase the transferred blocks from the global bin.

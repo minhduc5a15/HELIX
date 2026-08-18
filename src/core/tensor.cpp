@@ -123,10 +123,10 @@ namespace helix {
         } else if (rank() == 2 && shape() == safe_src.shape()) {
             const size_t rows = shape()[0];
             const size_t cols = shape()[1];
-            const size_t dst_stride0 = stride()[0];
-            const size_t dst_stride1 = stride()[1];
-            const size_t src_stride0 = safe_src.stride()[0];
-            const size_t src_stride1 = safe_src.stride()[1];
+            const ptrdiff_t dst_stride0 = stride()[0];
+            const ptrdiff_t dst_stride1 = stride()[1];
+            const ptrdiff_t src_stride0 = safe_src.stride()[0];
+            const ptrdiff_t src_stride1 = safe_src.stride()[1];
             float* dst_data = data_ptr();
             const float* src_data = safe_src.data_ptr();
 
@@ -160,8 +160,8 @@ namespace helix {
                     NDIterator it_dst(shape());
                     it_src.init_from_flat(start);
                     it_dst.init_from_flat(start);
-                    size_t offset_src = it_src.compute_offset(safe_src.stride());
-                    size_t offset_dst = it_dst.compute_offset(stride());
+                    ptrdiff_t offset_src = it_src.compute_offset(safe_src.stride());
+                    ptrdiff_t offset_dst = it_dst.compute_offset(stride());
 
                     for (size_t i = start; i < end; ++i) {
                         dst_data[offset_dst] = src_data[offset_src];
@@ -189,8 +189,8 @@ namespace helix {
         } else if (rank() == 2) {
             const size_t rows = shape()[0];
             const size_t cols = shape()[1];
-            const size_t dst_stride0 = stride()[0];
-            const size_t dst_stride1 = stride()[1];
+            const ptrdiff_t dst_stride0 = stride()[0];
+            const ptrdiff_t dst_stride1 = stride()[1];
             float* dst_data = data_ptr();
 
 #pragma omp parallel for
@@ -220,7 +220,7 @@ namespace helix {
                 if (start < end) {
                     NDIterator it(shape());
                     it.init_from_flat(start);
-                    size_t offset_dst = it.compute_offset(stride());
+                    ptrdiff_t offset_dst = it.compute_offset(stride());
 
                     for (size_t i = start; i < end; ++i) {
                         dst_data[offset_dst] = 0.0f;
@@ -245,7 +245,7 @@ namespace helix {
         for (size_t i = 0; i < rank(); ++i) {
             if (shape()[i] > 1) {
                 if (stride()[i] == 0) return true;
-                stride_shape.push_back({stride()[i], shape()[i]});
+                stride_shape.push_back({static_cast<size_t>(std::abs(stride()[i])), shape()[i]});
             }
         }
 

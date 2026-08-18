@@ -55,10 +55,10 @@ namespace helix {
          * @param stride The stride of the tensor.
          * @return The exact memory offset.
          */
-        inline size_t compute_offset(const Stride& stride) const {
-            size_t offset = 0;
+        inline ptrdiff_t compute_offset(const Stride& stride) const {
+            ptrdiff_t offset = 0;
             for (size_t j = 0; j < rank; ++j) {
-                offset += indices[j] * stride[j];
+                offset += static_cast<ptrdiff_t>(indices[j]) * stride[j];
             }
             return offset;
         }
@@ -72,15 +72,15 @@ namespace helix {
          * @param offset Reference to the linear offset to be updated.
          * @param stride The stride information of the tensor.
          */
-        inline void advance(size_t& offset, const Stride& stride) {
+        inline void advance(ptrdiff_t& offset, const Stride& stride) {
             for (int j = static_cast<int>(rank) - 1; j >= 0; --j) {
                 indices[j]++;
                 offset += stride[j];
                 if (indices[j] < shape[j]) {
-                    break;
+                    return;
                 }
                 indices[j] = 0;
-                offset -= stride[j] * shape[j];
+                offset -= stride[j] * static_cast<ptrdiff_t>(shape[j]);
             }
         }
     };
@@ -129,10 +129,10 @@ namespace helix {
          * @param stride The stride of the tensor.
          * @return The exact memory offset.
          */
-        inline size_t compute_offset(const Stride& stride) const {
-            size_t offset = 0;
+        inline ptrdiff_t compute_offset(const Stride& stride) const {
+            ptrdiff_t offset = 0;
             for (size_t j = 0; j < rank; ++j) {
-                offset += indices[j] * stride[j];
+                offset += static_cast<ptrdiff_t>(indices[j]) * stride[j];
             }
             return offset;
         }
@@ -148,29 +148,29 @@ namespace helix {
          * @param offset2 Reference to the linear offset of the second tensor to be updated.
          * @param stride2 The stride information of the second tensor.
          */
-        inline void advance(size_t& offset1, const Stride& stride1, size_t& offset2, const Stride& stride2) {
+        inline void advance(ptrdiff_t& offset1, const Stride& stride1, ptrdiff_t& offset2, const Stride& stride2) {
             for (int j = static_cast<int>(rank) - 1; j >= 0; --j) {
                 indices[j]++;
                 offset1 += stride1[j];
                 offset2 += stride2[j];
                 if (indices[j] < shape[j]) {
-                    break;
+                    return;
                 }
                 indices[j] = 0;
-                offset1 -= stride1[j] * shape[j];
-                offset2 -= stride2[j] * shape[j];
+                offset1 -= stride1[j] * static_cast<ptrdiff_t>(shape[j]);
+                offset2 -= stride2[j] * static_cast<ptrdiff_t>(shape[j]);
             }
         }
         /**
          * @brief Computes the memory offset from a flat index without needing state initialization.
          */
-        static inline size_t compute_offset_from_flat(size_t flat_index, const Shape& s, const Stride& st) {
-            size_t offset = 0;
+        static inline ptrdiff_t compute_offset_from_flat(size_t flat_index, const Shape& s, const Stride& st) {
+            ptrdiff_t offset = 0;
             size_t current_idx = flat_index;
             for (int j = static_cast<int>(s.rank()) - 1; j >= 0; --j) {
                 size_t dim_size = s[j];
                 size_t coord = current_idx % dim_size;
-                offset += coord * st[j];
+                offset += static_cast<ptrdiff_t>(coord) * st[j];
                 current_idx /= dim_size;
             }
             return offset;
@@ -184,7 +184,7 @@ namespace helix {
     }
 
     inline Stride remove_dimension(const Stride& s, size_t dim) {
-        std::vector<size_t> strides = s.vec();
+        std::vector<ptrdiff_t> strides = s.vec();
         strides.erase(strides.begin() + dim);
         return Stride(strides);
     }

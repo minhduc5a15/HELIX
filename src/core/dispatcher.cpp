@@ -32,10 +32,10 @@ namespace helix {
         } else if (a.rank() == 2) {
             const size_t rows = a.shape()[0];
             const size_t cols = a.shape()[1];
-            const size_t src_stride0 = a.stride()[0];
-            const size_t src_stride1 = a.stride()[1];
-            const size_t dst_stride0 = new_tensor.stride()[0];
-            const size_t dst_stride1 = new_tensor.stride()[1];
+            const ptrdiff_t src_stride0 = a.stride()[0];
+            const ptrdiff_t src_stride1 = a.stride()[1];
+            const ptrdiff_t dst_stride0 = new_tensor.stride()[0];
+            const ptrdiff_t dst_stride1 = new_tensor.stride()[1];
             float* dst_data = new_tensor.data_ptr();
             const float* src_data = a.data_ptr();
 
@@ -67,8 +67,8 @@ namespace helix {
                 if (start < end) {
                     BinaryNDIterator it(a.shape());
                     it.init_from_flat(start);
-                    size_t offset_src = it.compute_offset(a.stride());
-                    size_t offset_dst = it.compute_offset(new_tensor.stride());
+                    ptrdiff_t offset_src = it.compute_offset(a.stride());
+                    ptrdiff_t offset_dst = it.compute_offset(new_tensor.stride());
 
                     for (size_t i = start; i < end; ++i) {
                         dst_data[offset_dst] = src_data[offset_src];
@@ -151,7 +151,7 @@ namespace helix {
         std::vector<size_t> new_dims = a.shape().vec();
         std::swap(new_dims[dim0], new_dims[dim1]);
 
-        std::vector<size_t> new_strides = a.stride().vec();
+        std::vector<ptrdiff_t> new_strides = a.stride().vec();
         std::swap(new_strides[dim0], new_strides[dim1]);
 
         auto a_impl = a.impl();
@@ -283,8 +283,8 @@ namespace helix {
                     if (start < end) {
                         BinaryNDIterator it(a.shape());
                         it.init_from_flat(start);
-                        size_t offset_a = it.compute_offset(a.stride());
-                        size_t offset_b = it.compute_offset(safe_b.stride());
+                        ptrdiff_t offset_a = it.compute_offset(a.stride());
+                        ptrdiff_t offset_b = it.compute_offset(safe_b.stride());
 
                         for (size_t i = start; i < end; ++i) {
                             a_data[offset_a] += b_data[offset_b];
@@ -760,8 +760,8 @@ namespace helix {
                     if (start < end) {
                         BinaryNDIterator it(param.shape());
                         it.init_from_flat(start);
-                        size_t offset_p = it.compute_offset(param.stride());
-                        size_t offset_g = it.compute_offset(safe_grad.stride());
+                        ptrdiff_t offset_p = it.compute_offset(param.stride());
+                        ptrdiff_t offset_g = it.compute_offset(safe_grad.stride());
 
                         for (size_t i = start; i < end; ++i) {
                             p_data[offset_p] -= lr * g_data[offset_g];

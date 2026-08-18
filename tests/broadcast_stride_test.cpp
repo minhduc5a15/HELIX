@@ -10,8 +10,8 @@ TEST(BroadcastStrideTest, ZeroStride) {
     // Broadcast to (2, 3, 4)
     Tensor b = a.broadcast_to(Shape{2, 3, 4});
 
-    EXPECT_EQ(b.shape(), Shape({2, 3, 4}));
-    EXPECT_EQ(b.stride().vec(), std::vector<size_t>({4, 0, 1}));
+    EXPECT_EQ(b.shape().vec(), std::vector<size_t>({2, 3, 4}));
+    EXPECT_EQ(b.stride().vec(), std::vector<ptrdiff_t>({4, 0, 1}));
 }
 
 TEST(BroadcastStrideTest, RankIncrease) {
@@ -20,8 +20,8 @@ TEST(BroadcastStrideTest, RankIncrease) {
     // Broadcast to (2, 3, 4)
     Tensor b = a.broadcast_to(Shape{2, 3, 4});
 
-    EXPECT_EQ(b.shape(), Shape({2, 3, 4}));
-    EXPECT_EQ(b.stride().vec(), std::vector<size_t>({0, 0, 1}));
+    EXPECT_EQ(b.shape().vec(), std::vector<size_t>({2, 3, 4}));
+    EXPECT_EQ(b.stride().vec(), std::vector<ptrdiff_t>({0, 0, 1}));
 }
 
 TEST(BroadcastStrideTest, NonContiguousBroadcast) {
@@ -34,5 +34,5 @@ TEST(BroadcastStrideTest, NonContiguousBroadcast) {
 
     EXPECT_EQ(b.shape(), Shape({2, 4, 3}));
     // Stride should be (0, 1, 4)
-    EXPECT_EQ(b.stride().vec(), std::vector<size_t>({0, 1, 4}));
+    EXPECT_EQ(b.stride().vec(), std::vector<ptrdiff_t>({0, 1, 4}));
 }
