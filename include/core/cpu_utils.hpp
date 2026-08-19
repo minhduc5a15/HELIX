@@ -11,7 +11,9 @@ namespace helix {
      * @return true if the CPU supports both AVX2 and FMA, false otherwise.
      */
     inline bool cpu_supports_avx2_fma() {
-#if defined(__GNUC__) || defined(__clang__)
+#if defined(__EMSCRIPTEN__)
+        return false;
+#elif defined(__GNUC__) || defined(__clang__)
         return __builtin_cpu_supports("avx2") && __builtin_cpu_supports("fma");
 #elif defined(_MSC_VER)
         int cpuInfo[4];

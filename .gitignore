@@ -59,3 +59,5 @@ build_asan
 build_tsan
 format.sh
 commit_msg.txt
+helix-web
+venv

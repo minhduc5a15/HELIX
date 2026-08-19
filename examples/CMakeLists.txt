@@ -6,3 +6,8 @@ target_link_libraries(linear_regression PRIVATE helix)
 
 add_executable(mnist mnist.cpp)
 target_link_libraries(mnist PRIVATE helix)
+add_executable(export_mnist_weights ../scripts/export_mnist_weights.cpp)
+target_link_libraries(export_mnist_weights PRIVATE helix)
+
+add_executable(logic_gates logic_gates.cpp)
+target_link_libraries(logic_gates PRIVATE helix)
