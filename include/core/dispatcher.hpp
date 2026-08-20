@@ -26,6 +26,9 @@ namespace helix {
         static Tensor transpose(const Tensor& a, size_t dim0, size_t dim1);
         static Tensor broadcast_to(const Tensor& a, Shape new_shape);
 
+        // Type Conversion
+        static Tensor cast(const Tensor& a, DType new_dtype);
+
         // Mathematical Operations
         static Tensor add(const Tensor& a, const Tensor& b);
         static void add_(Tensor& a, const Tensor& b);

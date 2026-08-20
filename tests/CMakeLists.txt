@@ -83,3 +83,7 @@ gtest_discover_tests(benchmark_test)
 add_executable(autotuner_test autotuner_test.cpp)
 target_link_libraries(autotuner_test PRIVATE helix GTest::gtest_main)
 gtest_discover_tests(autotuner_test)
+
+add_executable(naive_cross_validation_test naive_cross_validation_test.cpp)
+target_link_libraries(naive_cross_validation_test PRIVATE helix GTest::gtest_main)
+gtest_discover_tests(naive_cross_validation_test)

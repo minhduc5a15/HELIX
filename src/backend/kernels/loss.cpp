@@ -6,20 +6,21 @@
 
 namespace helix {
 
+    template <typename T>
     void CPUBackend::cross_entropy(
-        const float* pred, const float* target, float* loss_out, float* log_softmax_out, const size_t N, const size_t C
+        const T* pred, const T* target, T* loss_out, T* log_softmax_out, const size_t N, const size_t C
     ) {
         double total_loss = 0.0;
         const std::ptrdiff_t N_signed = static_cast<std::ptrdiff_t>(N);
 
 #pragma omp parallel for reduction(+ : total_loss)
         for (std::ptrdiff_t i = 0; i < N_signed; ++i) {
-            const float* p_row = pred + i * C;
-            const float* t_row = target + i * C;
-            float* ls_row = log_softmax_out + i * C;
+            const T* p_row = pred + i * C;
+            const T* t_row = target + i * C;
+            T* ls_row = log_softmax_out + i * C;
 
             // 1. Find max for numerical stability (Log-Sum-Exp Trick)
-            float max_val = p_row[0];
+            T max_val = p_row[0];
             for (size_t j = 1; j < C; ++j) {
                 max_val = std::max(max_val, p_row[j]);
             }
@@ -27,7 +28,7 @@ namespace helix {
             // 2. Compute sum of exp(shifted)
             double sum_exp = 0.0;
             for (size_t j = 0; j < C; ++j) {
-                sum_exp += std::exp(p_row[j] - max_val);
+                sum_exp += std::exp(static_cast<double>(p_row[j] - max_val));
             }
 
             // 3. Compute log_softmax and accumulate loss
@@ -35,13 +36,13 @@ namespace helix {
             double row_loss = 0.0;
 
             for (size_t j = 0; j < C; ++j) {
-                const float shifted = p_row[j] - max_val;
-                const float log_softmax = shifted - static_cast<float>(log_sum_exp);
-                ls_row[j] = log_softmax;
+                const double shifted = static_cast<double>(p_row[j] - max_val);
+                const double log_softmax = shifted - log_sum_exp;
+                ls_row[j] = static_cast<T>(log_softmax);
 
                 // Accumulate loss: -target * log_softmax
-                if (t_row[j] > 0.0f) {
-                    row_loss -= t_row[j] * log_softmax;
+                if (t_row[j] > static_cast<T>(0)) {
+                    row_loss -= static_cast<double>(t_row[j]) * log_softmax;
                 }
             }
 
@@ -49,7 +50,16 @@ namespace helix {
         }
 
         // 4. Mean over batch size N
-        loss_out[0] = static_cast<float>(total_loss / N);
+        loss_out[0] = static_cast<T>(total_loss / static_cast<double>(N));
     }
+
+    template void CPUBackend::cross_entropy<float>(const float*, const float*, float*, float*, size_t, size_t);
+    template void CPUBackend::cross_entropy<double>(const double*, const double*, double*, double*, size_t, size_t);
+    template void CPUBackend::cross_entropy<int32_t>(
+        const int32_t*, const int32_t*, int32_t*, int32_t*, size_t, size_t
+    );
+    template void CPUBackend::cross_entropy<int64_t>(
+        const int64_t*, const int64_t*, int64_t*, int64_t*, size_t, size_t
+    );
 
 }  // namespace helix

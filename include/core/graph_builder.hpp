@@ -34,7 +34,8 @@ namespace helix {
         Sqrt,
         Pow,
         ReLU,
-        CrossEntropy
+        CrossEntropy,
+        Cast
     };
 
     struct OperationContext {

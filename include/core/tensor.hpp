@@ -87,8 +87,24 @@ namespace helix {
         [[nodiscard]] auto numel() const -> size_t;
         [[nodiscard]] auto rank() const -> size_t;
 
-        auto data_ptr() -> float*;
-        [[nodiscard]] auto data_ptr() const -> const float*;
+        template <typename T>
+        auto data_ptr() -> T* {
+            if (dtype() != dtype_of<T>()) {
+                throw std::invalid_argument("data_ptr<T> called with mismatched dtype");
+            }
+            return static_cast<T*>(impl_->data());
+        }
+        template <typename T>
+        [[nodiscard]] auto data_ptr() const -> const T* {
+            if (dtype() != dtype_of<T>()) {
+                throw std::invalid_argument("data_ptr<T> called with mismatched dtype");
+            }
+            return static_cast<const T*>(impl_->data());
+        }
+
+        // Backward compatibility
+        auto data_ptr() -> float* { return data_ptr<float>(); }
+        [[nodiscard]] auto data_ptr() const -> const float* { return data_ptr<float>(); }
 
         /**
          * @brief Gets the current version of the tensor (used for autograd inplace checks).

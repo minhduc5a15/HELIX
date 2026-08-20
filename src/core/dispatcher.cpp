@@ -15,6 +15,164 @@
 #include "core/tensor.hpp"
 
 namespace helix {
+    namespace {
+        template <typename src_t, typename dst_t>
+        void cast_kernel(const src_t* src_data, dst_t* dst_data, size_t numel) {
+#pragma omp parallel for if (numel >= OMP_THRESHOLD)
+            for (size_t i = 0; i < numel; ++i) {
+                dst_data[i] = static_cast<dst_t>(src_data[i]);
+            }
+        }
+
+        template <typename scalar_t>
+        void add_inplace_kernel(Tensor& a, const Tensor& safe_b) {
+            if (a.is_contiguous() && safe_b.is_contiguous()) {
+                const size_t total_elements = a.numel();
+                scalar_t* a_data = a.data_ptr<scalar_t>();
+                const scalar_t* b_data = safe_b.data_ptr<scalar_t>();
+
+#pragma omp parallel if (total_elements >= OMP_THRESHOLD)
+                {
+#if defined(_OPENMP)
+                    const size_t num_threads = omp_get_num_threads();
+                    const size_t tid = omp_get_thread_num();
+#else
+                    const size_t num_threads = 1;
+                    const size_t tid = 0;
+#endif
+                    const size_t chunk = (total_elements + num_threads - 1) / num_threads;
+                    const size_t start = tid * chunk;
+                    const size_t end = std::min(start + chunk, total_elements);
+
+                    if (start < end) {
+                        CPUBackend::add(a_data + start, b_data + start, a_data + start, end - start);
+                    }
+                }
+            } else if (a.rank() == 2) {
+                const size_t rows = a.shape()[0];
+                const size_t cols = a.shape()[1];
+                const size_t a_stride0 = a.stride()[0];
+                const size_t a_stride1 = a.stride()[1];
+                const size_t b_stride0 = safe_b.stride()[0];
+                const size_t b_stride1 = safe_b.stride()[1];
+                scalar_t* a_data = a.data_ptr<scalar_t>();
+                const scalar_t* b_data = safe_b.data_ptr<scalar_t>();
+
+#pragma omp parallel for if (a.numel() >= OMP_THRESHOLD)
+                for (ptrdiff_t r = 0; r < static_cast<ptrdiff_t>(rows); ++r) {
+#pragma omp simd
+                    for (size_t c = 0; c < cols; ++c) {
+                        a_data[r * a_stride0 + c * a_stride1] += b_data[r * b_stride0 + c * b_stride1];
+                    }
+                }
+            } else {
+                scalar_t* a_data = a.data_ptr<scalar_t>();
+                const scalar_t* b_data = safe_b.data_ptr<scalar_t>();
+                const size_t total_elements = a.numel();
+
+#pragma omp parallel if (total_elements >= OMP_NON_CONTIGUOUS_THRESHOLD)
+                {
+#if defined(_OPENMP)
+                    const size_t tid = omp_get_thread_num();
+                    const size_t num_threads = omp_get_num_threads();
+#else
+                    const size_t tid = 0;
+                    const size_t num_threads = 1;
+#endif
+                    const size_t chunk = (total_elements + num_threads - 1) / num_threads;
+                    const size_t start = tid * chunk;
+                    const size_t end = std::min(start + chunk, total_elements);
+
+                    if (start < end) {
+                        BinaryNDIterator it(a.shape());
+                        it.init_from_flat(start);
+                        ptrdiff_t offset_a = it.compute_offset(a.stride());
+                        ptrdiff_t offset_b = it.compute_offset(safe_b.stride());
+
+                        for (size_t i = start; i < end; ++i) {
+                            a_data[offset_a] += b_data[offset_b];
+                            it.advance(offset_a, a.stride(), offset_b, safe_b.stride());
+                        }
+                    }
+                }
+            }
+        }
+
+        template <typename scalar_t>
+        void sgd_inplace_kernel(Tensor& param, const Tensor& safe_grad, const float lr) {
+            if (param.is_contiguous() && safe_grad.is_contiguous()) {
+                const size_t total_elements = param.numel();
+                scalar_t* p_data = param.data_ptr<scalar_t>();
+                const scalar_t* g_data = safe_grad.data_ptr<scalar_t>();
+
+#pragma omp parallel if (total_elements >= OMP_THRESHOLD)
+                {
+#if defined(_OPENMP)
+                    const size_t num_threads = omp_get_num_threads();
+                    const size_t tid = omp_get_thread_num();
+#else
+                    const size_t num_threads = 1;
+                    const size_t tid = 0;
+#endif
+                    const size_t chunk = (total_elements + num_threads - 1) / num_threads;
+                    const size_t start = tid * chunk;
+                    const size_t end = std::min(start + chunk, total_elements);
+
+                    if (start < end) {
+                        CPUBackend::sgd(p_data + start, g_data + start, lr, end - start);
+                    }
+                }
+            } else if (param.rank() == 2) {
+                const size_t rows = param.shape()[0];
+                const size_t cols = param.shape()[1];
+                const size_t p_stride0 = param.stride()[0];
+                const size_t p_stride1 = param.stride()[1];
+                const size_t g_stride0 = safe_grad.stride()[0];
+                const size_t g_stride1 = safe_grad.stride()[1];
+                scalar_t* p_data = param.data_ptr<scalar_t>();
+                const scalar_t* g_data = safe_grad.data_ptr<scalar_t>();
+
+#pragma omp parallel for if (param.numel() >= OMP_THRESHOLD)
+                for (ptrdiff_t r = 0; r < static_cast<ptrdiff_t>(rows); ++r) {
+#pragma omp simd
+                    for (size_t c = 0; c < cols; ++c) {
+                        p_data[r * p_stride0 + c * p_stride1] -=
+                            static_cast<scalar_t>(lr) * g_data[r * g_stride0 + c * g_stride1];
+                    }
+                }
+            } else {
+                scalar_t* p_data = param.data_ptr<scalar_t>();
+                const scalar_t* g_data = safe_grad.data_ptr<scalar_t>();
+                const size_t total_elements = param.numel();
+
+#pragma omp parallel if (total_elements >= OMP_NON_CONTIGUOUS_THRESHOLD)
+                {
+#if defined(_OPENMP)
+                    const size_t tid = omp_get_thread_num();
+                    const size_t num_threads = omp_get_num_threads();
+#else
+                    size_t tid = 0;
+                    size_t num_threads = 1;
+#endif
+                    const size_t chunk = (total_elements + num_threads - 1) / num_threads;
+                    const size_t start = tid * chunk;
+                    const size_t end = std::min(start + chunk, total_elements);
+
+                    if (start < end) {
+                        BinaryNDIterator it(param.shape());
+                        it.init_from_flat(start);
+                        ptrdiff_t offset_p = it.compute_offset(param.stride());
+                        ptrdiff_t offset_g = it.compute_offset(safe_grad.stride());
+
+                        for (size_t i = start; i < end; ++i) {
+                            p_data[offset_p] -= static_cast<scalar_t>(lr) * g_data[offset_g];
+                            it.advance(offset_p, param.stride(), offset_g, safe_grad.stride());
+                        }
+                    }
+                }
+            }
+        }
+    }  // namespace
 
     static GraphBuilderInterface* g_graph_builder = nullptr;
 
@@ -186,19 +344,50 @@ namespace helix {
 
     Tensor Dispatcher::ensure_contiguous(const Tensor& t) { return t.contiguous(); }
 
+    Tensor Dispatcher::cast(const Tensor& a, DType new_dtype) {
+        if (a.dtype() == new_dtype) return clone(a);
+        Tensor out(a.shape(), new_dtype, a.device());
+        Tensor lhs = ensure_contiguous(a);
+
+        HELIX_DISPATCH_ALL_TYPES(a.dtype(), "cast_src", [&] {
+            using src_t = scalar_t;
+            HELIX_DISPATCH_ALL_TYPES(new_dtype, "cast_dst", [&] {
+                using dst_t = scalar_t;
+                cast_kernel<src_t, dst_t>(lhs.data_ptr<src_t>(), out.data_ptr<dst_t>(), lhs.numel());
+            });
+        });
+
+        if (g_graph_builder) {
+            std::unordered_map<std::string, std::any> attrs;
+            attrs["dtype"] = dtype_name(new_dtype);
+            g_graph_builder->build(OperationContext{OpCategory::View, OpType::Cast, out, {a}, std::move(attrs)});
+        }
+        return out;
+    }
+
     // NOTE:
     // Current CPU backend only supports contiguous tensors.
     // Once TensorIterator is implemented,
     // remove these contiguous() calls.
     Tensor Dispatcher::add(const Tensor& a, const Tensor& b) {
         const Shape out_shape = compute_broadcast_shape(a.shape(), b.shape());
+        const DType out_dtype = promote_types(a.dtype(), b.dtype());
         Tensor lhs = ensure_contiguous(a.broadcast_to_view(out_shape));
         Tensor rhs = ensure_contiguous(b.broadcast_to_view(out_shape));
-        Tensor out(out_shape, a.dtype(), a.device());
-        if (a.device().is_cpu())
-            CPUBackend::add(lhs.data_ptr(), rhs.data_ptr(), out.data_ptr(), out.numel());
-        else
+
+        if (lhs.dtype() != out_dtype) lhs = cast(lhs, out_dtype);
+        if (rhs.dtype() != out_dtype) rhs = cast(rhs, out_dtype);
+
+        Tensor out(out_shape, out_dtype, a.device());
+        if (a.device().is_cpu()) {
+            HELIX_DISPATCH_ALL_TYPES(out_dtype, "add", [&] {
+                CPUBackend::add(
+                    lhs.data_ptr<scalar_t>(), rhs.data_ptr<scalar_t>(), out.data_ptr<scalar_t>(), out.numel()
+                );
+            });
+        } else {
             throw std::runtime_error("Unsupported device");
+        }
         if (g_graph_builder) {
             g_graph_builder->build(OperationContext{OpCategory::Binary, OpType::Add, out, {a, b}});
         }
@@ -218,81 +407,16 @@ namespace helix {
             throw std::runtime_error("add_: in-place operation on a tensor with overlapping memory is not supported.");
         }
 
+        if (a.dtype() != b.dtype()) {
+            throw std::invalid_argument("add_: inplace addition requires both tensors to have the same dtype.");
+        }
+
         const bool is_aliased = (a.impl()->storage() == b.impl()->storage()) &&
                                 (a.data_ptr() != b.data_ptr() || a.stride() != b.stride() || a.shape() != b.shape());
         Tensor safe_b = is_aliased ? b.clone() : b;
 
         if (a.device().is_cpu()) {
-            if (a.is_contiguous() && safe_b.is_contiguous()) {
-                const size_t total_elements = a.numel();
-                float* a_data = a.data_ptr();
-                const float* b_data = safe_b.data_ptr();
-
-#pragma omp parallel if (total_elements >= OMP_THRESHOLD)
-                {
-#if defined(_OPENMP)
-                    const size_t num_threads = omp_get_num_threads();
-                    const size_t tid = omp_get_thread_num();
-#else
-                    const size_t num_threads = 1;
-                    const size_t tid = 0;
-#endif
-                    const size_t chunk = (total_elements + num_threads - 1) / num_threads;
-                    const size_t start = tid * chunk;
-                    const size_t end = std::min(start + chunk, total_elements);
-
-                    if (start < end) {
-                        CPUBackend::add(a_data + start, b_data + start, a_data + start, end - start);
-                    }
-                }
-            } else if (a.rank() == 2) {
-                const size_t rows = a.shape()[0];
-                const size_t cols = a.shape()[1];
-                const size_t a_stride0 = a.stride()[0];
-                const size_t a_stride1 = a.stride()[1];
-                const size_t b_stride0 = safe_b.stride()[0];
-                const size_t b_stride1 = safe_b.stride()[1];
-                float* a_data = a.data_ptr();
-                const float* b_data = safe_b.data_ptr();
-
-#pragma omp parallel for if (a.numel() >= OMP_THRESHOLD)
-                for (ptrdiff_t r = 0; r < static_cast<ptrdiff_t>(rows); ++r) {
-#pragma omp simd
-                    for (size_t c = 0; c < cols; ++c) {
-                        a_data[r * a_stride0 + c * a_stride1] += b_data[r * b_stride0 + c * b_stride1];
-                    }
-                }
-            } else {
-                float* a_data = a.data_ptr();
-                const float* b_data = safe_b.data_ptr();
-                const size_t total_elements = a.numel();
-
-#pragma omp parallel if (total_elements >= OMP_NON_CONTIGUOUS_THRESHOLD)
-                {
-#if defined(_OPENMP)
-                    const size_t tid = omp_get_thread_num();
-                    const size_t num_threads = omp_get_num_threads();
-#else
-                    const size_t tid = 0;
-                    const size_t num_threads = 1;
-#endif
-                    const size_t chunk = (total_elements + num_threads - 1) / num_threads;
-                    const size_t start = tid * chunk;
-                    const size_t end = std::min(start + chunk, total_elements);
-
-                    if (start < end) {
-                        BinaryNDIterator it(a.shape());
-                        it.init_from_flat(start);
-                        ptrdiff_t offset_a = it.compute_offset(a.stride());
-                        ptrdiff_t offset_b = it.compute_offset(safe_b.stride());
-
-                        for (size_t i = start; i < end; ++i) {
-                            a_data[offset_a] += b_data[offset_b];
-                            it.advance(offset_a, a.stride(), offset_b, safe_b.stride());
-                        }
-                    }
-                }
-            }
+            HELIX_DISPATCH_ALL_TYPES(a.dtype(), "add_", [&] { add_inplace_kernel<scalar_t>(a, safe_b); });
         } else {
             throw std::runtime_error("Unsupported device");
         }
@@ -300,13 +424,22 @@ namespace helix {
 
     Tensor Dispatcher::sub(const Tensor& a, const Tensor& b) {
         const Shape out_shape = compute_broadcast_shape(a.shape(), b.shape());
+        const DType out_dtype = promote_types(a.dtype(), b.dtype());
         Tensor lhs = ensure_contiguous(a.broadcast_to_view(out_shape));
         Tensor rhs = ensure_contiguous(b.broadcast_to_view(out_shape));
-        Tensor out(out_shape, a.dtype(), a.device());
-        if (a.device().is_cpu())
-            CPUBackend::sub(lhs.data_ptr(), rhs.data_ptr(), out.data_ptr(), out.numel());
-        else
+        if (lhs.dtype() != out_dtype) lhs = cast(lhs, out_dtype);
+        if (rhs.dtype() != out_dtype) rhs = cast(rhs, out_dtype);
+
+        Tensor out(out_shape, out_dtype, a.device());
+        if (a.device().is_cpu()) {
+            HELIX_DISPATCH_ALL_TYPES(out_dtype, "sub", [&] {
+                CPUBackend::sub(
+                    lhs.data_ptr<scalar_t>(), rhs.data_ptr<scalar_t>(), out.data_ptr<scalar_t>(), out.numel()
+                );
+            });
+        } else {
             throw std::runtime_error("Unsupported device");
+        }
         if (g_graph_builder) {
             g_graph_builder->build(
                 OperationContext{.category = OpCategory::Binary, .type = OpType::Sub, .out = out, .inputs = {a, b}}
@@ -317,13 +450,22 @@ namespace helix {
 
     Tensor Dispatcher::mul(const Tensor& a, const Tensor& b) {
         const Shape out_shape = compute_broadcast_shape(a.shape(), b.shape());
+        const DType out_dtype = promote_types(a.dtype(), b.dtype());
         Tensor lhs = ensure_contiguous(a.broadcast_to_view(out_shape));
         Tensor rhs = ensure_contiguous(b.broadcast_to_view(out_shape));
-        Tensor out(out_shape, a.dtype(), a.device());
-        if (a.device().is_cpu())
-            CPUBackend::mul(lhs.data_ptr(), rhs.data_ptr(), out.data_ptr(), out.numel());
-        else
+        if (lhs.dtype() != out_dtype) lhs = cast(lhs, out_dtype);
+        if (rhs.dtype() != out_dtype) rhs = cast(rhs, out_dtype);
+
+        Tensor out(out_shape, out_dtype, a.device());
+        if (a.device().is_cpu()) {
+            HELIX_DISPATCH_ALL_TYPES(out_dtype, "mul", [&] {
+                CPUBackend::mul(
+                    lhs.data_ptr<scalar_t>(), rhs.data_ptr<scalar_t>(), out.data_ptr<scalar_t>(), out.numel()
+                );
+            });
+        } else {
             throw std::runtime_error("Unsupported device");
+        }
         if (g_graph_builder) {
             g_graph_builder->build(
                 OperationContext{.category = OpCategory::Binary, .type = OpType::Mul, .out = out, .inputs = {a, b}}
@@ -334,13 +476,22 @@ namespace helix {
 
     Tensor Dispatcher::div(const Tensor& a, const Tensor& b) {
         const Shape out_shape = compute_broadcast_shape(a.shape(), b.shape());
+        const DType out_dtype = promote_to_float(promote_types(a.dtype(), b.dtype()));
         Tensor lhs = ensure_contiguous(a.broadcast_to_view(out_shape));
         Tensor rhs = ensure_contiguous(b.broadcast_to_view(out_shape));
-        Tensor out(out_shape, a.dtype(), a.device());
-        if (a.device().is_cpu())
-            CPUBackend::div(lhs.data_ptr(), rhs.data_ptr(), out.data_ptr(), out.numel());
-        else
+        if (lhs.dtype() != out_dtype) lhs = cast(lhs, out_dtype);
+        if (rhs.dtype() != out_dtype) rhs = cast(rhs, out_dtype);
+
+        Tensor out(out_shape, out_dtype, a.device());
+        if (a.device().is_cpu()) {
+            HELIX_DISPATCH_ALL_TYPES(out_dtype, "div", [&] {
+                CPUBackend::div(
+                    lhs.data_ptr<scalar_t>(), rhs.data_ptr<scalar_t>(), out.data_ptr<scalar_t>(), out.numel()
+                );
+            });
+        } else {
             throw std::runtime_error("Unsupported device");
+        }
         if (g_graph_builder) {
             g_graph_builder->build(
                 OperationContext{.category = OpCategory::Binary, .type = OpType::Div, .out = out, .inputs = {a, b}}
@@ -350,54 +501,79 @@ namespace helix {
     }
 
     Tensor Dispatcher::add_scalar(const Tensor& a, const float scalar) {
-        Tensor lhs = ensure_contiguous(a);
-        Tensor out(a.shape(), a.dtype(), a.device());
-        if (a.device().is_cpu())
-            CPUBackend::add_scalar(lhs.data_ptr(), scalar, out.data_ptr(), out.numel());
-        else
+        const DType out_dtype = promote_types(a.dtype(), DType::Float32);
+        Tensor lhs = ensure_contiguous((a.dtype() == out_dtype) ? a : cast(a, out_dtype));
+        Tensor out(a.shape(), out_dtype, a.device());
+        if (a.device().is_cpu()) {
+            HELIX_DISPATCH_ALL_TYPES(out_dtype, "add_scalar", [&] {
+                CPUBackend::add_scalar(
+                    lhs.data_ptr<scalar_t>(), static_cast<scalar_t>(scalar), out.data_ptr<scalar_t>(), out.numel()
+                );
+            });
+        } else {
             throw std::runtime_error("Unsupported device");
-        // We omit graph builder for scalar ops for now, as they are primarily used in backward passes
-        // where inputs don't require gradients.
+        }
         return out;
     }
 
     Tensor Dispatcher::sub_scalar(const Tensor& a, const float scalar) {
-        Tensor lhs = ensure_contiguous(a);
-        Tensor out(a.shape(), a.dtype(), a.device());
-        if (a.device().is_cpu())
-            CPUBackend::sub_scalar(lhs.data_ptr(), scalar, out.data_ptr(), out.numel());
-        else
+        const DType out_dtype = promote_types(a.dtype(), DType::Float32);
+        Tensor lhs = ensure_contiguous((a.dtype() == out_dtype) ? a : cast(a, out_dtype));
+        Tensor out(a.shape(), out_dtype, a.device());
+        if (a.device().is_cpu()) {
+            HELIX_DISPATCH_ALL_TYPES(out_dtype, "sub_scalar", [&] {
+                CPUBackend::sub_scalar(
+                    lhs.data_ptr<scalar_t>(), static_cast<scalar_t>(scalar), out.data_ptr<scalar_t>(), out.numel()
+                );
+            });
+        } else {
             throw std::runtime_error("Unsupported device");
+        }
         return out;
     }
 
     Tensor Dispatcher::mul_scalar(const Tensor& a, const float scalar) {
-        Tensor lhs = ensure_contiguous(a);
-        Tensor out(a.shape(), a.dtype(), a.device());
-        if (a.device().is_cpu())
-            CPUBackend::mul_scalar(lhs.data_ptr(), scalar, out.data_ptr(), out.numel());
-        else
+        const DType out_dtype = promote_types(a.dtype(), DType::Float32);
+        Tensor lhs = ensure_contiguous((a.dtype() == out_dtype) ? a : cast(a, out_dtype));
+        Tensor out(a.shape(), out_dtype, a.device());
+        if (a.device().is_cpu()) {
+            HELIX_DISPATCH_ALL_TYPES(out_dtype, "mul_scalar", [&] {
+                CPUBackend::mul_scalar(
+                    lhs.data_ptr<scalar_t>(), static_cast<scalar_t>(scalar), out.data_ptr<scalar_t>(), out.numel()
+                );
+            });
+        } else {
             throw std::runtime_error("Unsupported device");
+        }
         return out;
     }
 
     Tensor Dispatcher::div_scalar(const Tensor& a, const float scalar) {
-        Tensor lhs = ensure_contiguous(a);
-        Tensor out(a.shape(), a.dtype(), a.device());
-        if (a.device().is_cpu())
-            CPUBackend::div_scalar(lhs.data_ptr(), scalar, out.data_ptr(), out.numel());
-        else
+        const DType out_dtype = promote_types(a.dtype(), DType::Float32);
+        Tensor lhs = ensure_contiguous((a.dtype() == out_dtype) ? a : cast(a, out_dtype));
+        Tensor out(a.shape(), out_dtype, a.device());
+        if (a.device().is_cpu()) {
+            HELIX_DISPATCH_ALL_TYPES(out_dtype, "div_scalar", [&] {
+                CPUBackend::div_scalar(
+                    lhs.data_ptr<scalar_t>(), static_cast<scalar_t>(scalar), out.data_ptr<scalar_t>(), out.numel()
+                );
+            });
+        } else {
             throw std::runtime_error("Unsupported device");
+        }
         return out;
     }
 
     Tensor Dispatcher::neg(const Tensor& a) {
         Tensor lhs = ensure_contiguous(a);
         Tensor out(a.shape(), a.dtype(), a.device());
-        if (a.device().is_cpu())
-            CPUBackend::neg(lhs.data_ptr(), out.data_ptr(), out.numel());
-        else
+        if (a.device().is_cpu()) {
+            HELIX_DISPATCH_ALL_TYPES(a.dtype(), "neg", [&] {
+                CPUBackend::neg(lhs.data_ptr<scalar_t>(), out.data_ptr<scalar_t>(), out.numel());
+            });
+        } else {
             throw std::runtime_error("Unsupported device");
+        }
         if (g_graph_builder) {
             g_graph_builder->build(
                 OperationContext{.category = OpCategory::Unary, .type = OpType::Neg, .out = out, .inputs = {a}}
@@ -407,12 +583,16 @@ namespace helix {
     }
 
     Tensor Dispatcher::exp(const Tensor& a) {
-        Tensor lhs = ensure_contiguous(a);
-        Tensor out(a.shape(), a.dtype(), a.device());
-        if (a.device().is_cpu())
-            CPUBackend::exp(lhs.data_ptr(), out.data_ptr(), out.numel());
-        else
+        const DType out_dtype = promote_to_float(a.dtype());
+        Tensor lhs = ensure_contiguous((a.dtype() == out_dtype) ? a : cast(a, out_dtype));
+        Tensor out(a.shape(), out_dtype, a.device());
+        if (a.device().is_cpu()) {
+            HELIX_DISPATCH_ALL_TYPES(out_dtype, "exp", [&] {
+                CPUBackend::exp(lhs.data_ptr<scalar_t>(), out.data_ptr<scalar_t>(), out.numel());
+            });
+        } else {
             throw std::runtime_error("Unsupported device");
+        }
         if (g_graph_builder) {
             g_graph_builder->build(
                 OperationContext{.category = OpCategory::Unary, .type = OpType::Exp, .out = out, .inputs = {a}}
@@ -422,12 +602,16 @@ namespace helix {
     }
 
     Tensor Dispatcher::tanh(const Tensor& a) {
-        Tensor lhs = ensure_contiguous(a);
-        Tensor out(a.shape(), a.dtype(), a.device());
-        if (a.device().is_cpu())
-            CPUBackend::tanh(lhs.data_ptr(), out.data_ptr(), out.numel());
-        else
+        const DType out_dtype = promote_to_float(a.dtype());
+        Tensor lhs = ensure_contiguous((a.dtype() == out_dtype) ? a : cast(a, out_dtype));
+        Tensor out(a.shape(), out_dtype, a.device());
+        if (a.device().is_cpu()) {
+            HELIX_DISPATCH_ALL_TYPES(out_dtype, "tanh", [&] {
+                CPUBackend::tanh(lhs.data_ptr<scalar_t>(), out.data_ptr<scalar_t>(), out.numel());
+            });
+        } else {
             throw std::runtime_error("Unsupported device");
+        }
         if (g_graph_builder) {
             g_graph_builder->build(
                 OperationContext{.category = OpCategory::Unary, .type = OpType::Tanh, .out = out, .inputs = {a}}
@@ -437,12 +621,16 @@ namespace helix {
     }
 
     Tensor Dispatcher::log(const Tensor& a) {
-        Tensor lhs = ensure_contiguous(a);
-        Tensor out(a.shape(), a.dtype(), a.device());
-        if (a.device().is_cpu())
-            CPUBackend::log(lhs.data_ptr(), out.data_ptr(), out.numel());
-        else
+        const DType out_dtype = promote_to_float(a.dtype());
+        Tensor lhs = ensure_contiguous((a.dtype() == out_dtype) ? a : cast(a, out_dtype));
+        Tensor out(a.shape(), out_dtype, a.device());
+        if (a.device().is_cpu()) {
+            HELIX_DISPATCH_ALL_TYPES(out_dtype, "log", [&] {
+                CPUBackend::log(lhs.data_ptr<scalar_t>(), out.data_ptr<scalar_t>(), out.numel());
+            });
+        } else {
             throw std::runtime_error("Unsupported device");
+        }
         if (g_graph_builder) {
             g_graph_builder->build(
                 OperationContext{.category = OpCategory::Unary, .type = OpType::Log, .out = out, .inputs = {a}}
@@ -452,12 +640,16 @@ namespace helix {
     }
 
     Tensor Dispatcher::sqrt(const Tensor& a) {
-        Tensor lhs = ensure_contiguous(a);
-        Tensor out(a.shape(), a.dtype(), a.device());
-        if (a.device().is_cpu())
-            CPUBackend::sqrt(lhs.data_ptr(), out.data_ptr(), out.numel());
-        else
+        const DType out_dtype = promote_to_float(a.dtype());
+        Tensor lhs = ensure_contiguous((a.dtype() == out_dtype) ? a : cast(a, out_dtype));
+        Tensor out(a.shape(), out_dtype, a.device());
+        if (a.device().is_cpu()) {
+            HELIX_DISPATCH_ALL_TYPES(out_dtype, "sqrt", [&] {
+                CPUBackend::sqrt(lhs.data_ptr<scalar_t>(), out.data_ptr<scalar_t>(), out.numel());
+            });
+        } else {
             throw std::runtime_error("Unsupported device");
+        }
         if (g_graph_builder) {
             g_graph_builder->build(
                 OperationContext{.category = OpCategory::Unary, .type = OpType::Sqrt, .out = out, .inputs = {a}}
@@ -469,10 +661,13 @@ namespace helix {
     Tensor Dispatcher::relu(const Tensor& a) {
         Tensor lhs = ensure_contiguous(a);
         Tensor out(a.shape(), a.dtype(), a.device());
-        if (a.device().is_cpu())
-            CPUBackend::relu(lhs.data_ptr(), out.data_ptr(), out.numel());
-        else
+        if (a.device().is_cpu()) {
+            HELIX_DISPATCH_ALL_TYPES(a.dtype(), "relu", [&] {
+                CPUBackend::relu(lhs.data_ptr<scalar_t>(), out.data_ptr<scalar_t>(), out.numel());
+            });
+        } else {
             throw std::runtime_error("Unsupported device");
+        }
         if (g_graph_builder) {
             g_graph_builder->build(
                 OperationContext{.category = OpCategory::Unary, .type = OpType::ReLU, .out = out, .inputs = {a}}
@@ -485,20 +680,31 @@ namespace helix {
         Tensor lhs = ensure_contiguous(grad_out);
         Tensor rhs = ensure_contiguous(a);
         Tensor out(grad_out.shape(), grad_out.dtype(), grad_out.device());
-        if (grad_out.device().is_cpu())
-            CPUBackend::relu_backward(lhs.data_ptr(), rhs.data_ptr(), out.data_ptr(), out.numel());
-        else
+        if (grad_out.device().is_cpu()) {
+            HELIX_DISPATCH_ALL_TYPES(grad_out.dtype(), "relu_backward", [&] {
+                CPUBackend::relu_backward(
+                    lhs.data_ptr<scalar_t>(), rhs.data_ptr<scalar_t>(), out.data_ptr<scalar_t>(), out.numel()
+                );
+            });
+        } else {
             throw std::runtime_error("Unsupported device");
+        }
         return out;
     }
 
     Tensor Dispatcher::pow(const Tensor& a, float exponent) {
-        Tensor lhs = ensure_contiguous(a);
-        Tensor out(a.shape(), a.dtype(), a.device());
-        if (a.device().is_cpu())
-            CPUBackend::pow(lhs.data_ptr(), exponent, out.data_ptr(), out.numel());
-        else
+        const DType out_dtype = promote_to_float(a.dtype());
+        Tensor lhs = ensure_contiguous((a.dtype() == out_dtype) ? a : cast(a, out_dtype));
+        Tensor out(a.shape(), out_dtype, a.device());
+        if (a.device().is_cpu()) {
+            HELIX_DISPATCH_ALL_TYPES(out_dtype, "pow", [&] {
+                CPUBackend::pow(
+                    lhs.data_ptr<scalar_t>(), static_cast<scalar_t>(exponent), out.data_ptr<scalar_t>(), out.numel()
+                );
+            });
+        } else {
             throw std::runtime_error("Unsupported device");
+        }
         if (g_graph_builder) {
             OperationContext ctx{.category = OpCategory::Unary, .type = OpType::Pow, .out = out, .inputs = {a}};
             ctx.attributes["exponent"] = exponent;
@@ -515,17 +721,24 @@ namespace helix {
             throw std::invalid_argument("matmul shapes incompatible");
         }
 
+        const DType out_dtype = promote_types(a.dtype(), b.dtype());
         Tensor lhs = ensure_contiguous(a);
-        const Tensor rhs = ensure_contiguous(b);
+        Tensor rhs = ensure_contiguous(b);
+        if (lhs.dtype() != out_dtype) lhs = cast(lhs, out_dtype);
+        if (rhs.dtype() != out_dtype) rhs = cast(rhs, out_dtype);
 
         const size_t M = a.shape()[0];
         const size_t K = a.shape()[1];
         const size_t N = b.shape()[1];
 
-        Tensor out(Shape{M, N}, a.dtype(), a.device());
+        Tensor out(Shape{M, N}, out_dtype, a.device());
 
         if (a.device().is_cpu()) {
-            CPUBackend::matmul(lhs.data_ptr(), rhs.data_ptr(), out.data_ptr(), M, K, N);
+            HELIX_DISPATCH_ALL_TYPES(out_dtype, "matmul", [&] {
+                CPUBackend::matmul(
+                    lhs.data_ptr<scalar_t>(), rhs.data_ptr<scalar_t>(), out.data_ptr<scalar_t>(), M, K, N
+                );
+            });
         } else {
             throw std::runtime_error("Unsupported device");
         }
@@ -544,7 +757,9 @@ namespace helix {
             const Shape out_shape = keepdim ? Shape(std::vector<size_t>(a.rank(), 1)) : Shape();
             Tensor out(out_shape, a.dtype(), a.device());
             if (a.device().is_cpu()) {
-                CPUBackend::sum(lhs.data_ptr(), out.data_ptr(), 1, a.numel(), 1);
+                HELIX_DISPATCH_ALL_TYPES(a.dtype(), "sum", [&] {
+                    CPUBackend::sum(lhs.data_ptr<scalar_t>(), out.data_ptr<scalar_t>(), 1, a.numel(), 1);
+                });
             } else {
                 throw std::runtime_error("Unsupported device");
             }
@@ -578,7 +793,9 @@ namespace helix {
         for (size_t i = dim + 1; i < a.rank(); ++i) inner_size *= a.shape()[i];
 
         if (a.device().is_cpu()) {
-            CPUBackend::sum(lhs.data_ptr(), out.data_ptr(), outer_size, dim_size, inner_size);
+            HELIX_DISPATCH_ALL_TYPES(a.dtype(), "sum", [&] {
+                CPUBackend::sum(lhs.data_ptr<scalar_t>(), out.data_ptr<scalar_t>(), outer_size, dim_size, inner_size);
+            });
         } else {
             throw std::runtime_error("Unsupported device");
         }
@@ -592,13 +809,16 @@ namespace helix {
     }
 
     Tensor Dispatcher::mean(const Tensor& a, std::optional<size_t> axis, bool keepdim) {
-        Tensor lhs = ensure_contiguous(a);
+        const DType out_dtype = promote_to_float(a.dtype());
+        Tensor lhs = ensure_contiguous((a.dtype() == out_dtype) ? a : cast(a, out_dtype));
 
         if (!axis.has_value()) {
             const Shape out_shape = keepdim ? Shape(std::vector<size_t>(a.rank(), 1)) : Shape();
-            Tensor out(out_shape, a.dtype(), a.device());
+            Tensor out(out_shape, out_dtype, a.device());
             if (a.device().is_cpu()) {
-                CPUBackend::mean(lhs.data_ptr(), out.data_ptr(), 1, a.numel(), 1);
+                HELIX_DISPATCH_ALL_TYPES(out_dtype, "mean", [&] {
+                    CPUBackend::mean(lhs.data_ptr<scalar_t>(), out.data_ptr<scalar_t>(), 1, a.numel(), 1);
+                });
             } else {
                 throw std::runtime_error("Unsupported device");
             }
@@ -623,7 +843,7 @@ namespace helix {
             }
         }
         const Shape out_shape(out_dims);
-        Tensor out(out_shape, a.dtype(), a.device());
+        Tensor out(out_shape, out_dtype, a.device());
 
         size_t outer_size = 1;
         for (size_t i = 0; i < dim; ++i) outer_size *= a.shape()[i];
@@ -632,7 +852,9 @@ namespace helix {
         for (size_t i = dim + 1; i < a.rank(); ++i) inner_size *= a.shape()[i];
 
         if (a.device().is_cpu()) {
-            CPUBackend::mean(lhs.data_ptr(), out.data_ptr(), outer_size, dim_size, inner_size);
+            HELIX_DISPATCH_ALL_TYPES(out_dtype, "mean", [&] {
+                CPUBackend::mean(lhs.data_ptr<scalar_t>(), out.data_ptr<scalar_t>(), outer_size, dim_size, inner_size);
+            });
         } else {
             throw std::runtime_error("Unsupported device");
         }
@@ -653,19 +875,29 @@ namespace helix {
             throw std::invalid_argument("cross_entropy shapes incompatible");
         }
 
+        const DType out_dtype = promote_to_float(promote_types(pred.dtype(), target.dtype()));
         Tensor p_contig = ensure_contiguous(pred);
         Tensor t_contig = ensure_contiguous(target);
+        if (p_contig.dtype() != out_dtype) p_contig = cast(p_contig, out_dtype);
+        if (t_contig.dtype() != out_dtype) t_contig = cast(t_contig, out_dtype);
 
         const size_t N = pred.shape()[0];
         const size_t C = pred.shape()[1];
 
-        Tensor out(Shape{}, pred.dtype(), pred.device());                   // scalar loss
-        Tensor log_softmax_out(pred.shape(), pred.dtype(), pred.device());  // [N, C]
+        Tensor out(Shape{}, out_dtype, pred.device());                   // scalar loss
+        Tensor log_softmax_out(pred.shape(), out_dtype, pred.device());  // [N, C]
 
         if (pred.device().is_cpu()) {
-            CPUBackend::cross_entropy(
-                p_contig.data_ptr(), t_contig.data_ptr(), out.data_ptr(), log_softmax_out.data_ptr(), N, C
-            );
+            HELIX_DISPATCH_ALL_TYPES(out_dtype, "cross_entropy", [&] {
+                CPUBackend::cross_entropy(
+                    p_contig.data_ptr<scalar_t>(),
+                    t_contig.data_ptr<scalar_t>(),
+                    out.data_ptr<scalar_t>(),
+                    log_softmax_out.data_ptr<scalar_t>(),
+                    N,
+                    C
+                );
+            });
         } else {
             throw std::runtime_error("Unsupported device");
         }
@@ -690,6 +922,10 @@ namespace helix {
             throw std::invalid_argument("SGD requires parameter and gradient to be on the same device.");
         }
 
+        if (param.dtype() != grad.dtype()) {
+            throw std::invalid_argument("SGD requires param and grad to have the same dtype.");
+        }
+
         if (param.has_internal_overlap()) {
             throw std::runtime_error("sgd: in-place operation on a tensor with overlapping memory is not supported.");
         }
@@ -700,76 +936,7 @@ namespace helix {
         Tensor safe_grad = is_aliased ? grad.clone() : grad;
 
         if (param.device().is_cpu()) {
-            if (param.is_contiguous() && safe_grad.is_contiguous()) {
-                const size_t total_elements = param.numel();
-                float* p_data = param.data_ptr();
-                const float* g_data = safe_grad.data_ptr();
-
-#pragma omp parallel if (total_elements >= OMP_THRESHOLD)
-                {
-#if defined(_OPENMP)
-                    const size_t num_threads = omp_get_num_threads();
-                    const size_t tid = omp_get_thread_num();
-#else
-                    const size_t num_threads = 1;
-                    const size_t tid = 0;
-#endif
-                    const size_t chunk = (total_elements + num_threads - 1) / num_threads;
-                    const size_t start = tid * chunk;
-                    const size_t end = std::min(start + chunk, total_elements);
-
-                    if (start < end) {
-                        CPUBackend::sgd(p_data + start, g_data + start, lr, end - start);
-                    }
-                }
-            } else if (param.rank() == 2) {
-                const size_t rows = param.shape()[0];
-                const size_t cols = param.shape()[1];
-                const size_t p_stride0 = param.stride()[0];
-                const size_t p_stride1 = param.stride()[1];
-                const size_t g_stride0 = safe_grad.stride()[0];
-                const size_t g_stride1 = safe_grad.stride()[1];
-                float* p_data = param.data_ptr();
-                const float* g_data = safe_grad.data_ptr();
-
-#pragma omp parallel for if (param.numel() >= OMP_THRESHOLD)
-                for (ptrdiff_t r = 0; r < static_cast<ptrdiff_t>(rows); ++r) {
-#pragma omp simd
-                    for (size_t c = 0; c < cols; ++c) {
-                        p_data[r * p_stride0 + c * p_stride1] -= lr * g_data[r * g_stride0 + c * g_stride1];
-                    }
-                }
-            } else {
-                float* p_data = param.data_ptr();
-                const float* g_data = safe_grad.data_ptr();
-                const size_t total_elements = param.numel();
-
-#pragma omp parallel if (total_elements >= OMP_NON_CONTIGUOUS_THRESHOLD)
-                {
-#if defined(_OPENMP)
-                    const size_t tid = omp_get_thread_num();
-                    const size_t num_threads = omp_get_num_threads();
-#else
-                    size_t tid = 0;
-                    size_t num_threads = 1;
-#endif
-                    const size_t chunk = (total_elements + num_threads - 1) / num_threads;
-                    const size_t start = tid * chunk;
-                    const size_t end = std::min(start + chunk, total_elements);
-
-                    if (start < end) {
-                        BinaryNDIterator it(param.shape());
-                        it.init_from_flat(start);
-                        ptrdiff_t offset_p = it.compute_offset(param.stride());
-                        ptrdiff_t offset_g = it.compute_offset(safe_grad.stride());
-
-                        for (size_t i = start; i < end; ++i) {
-                            p_data[offset_p] -= lr * g_data[offset_g];
-                            it.advance(offset_p, param.stride(), offset_g, safe_grad.stride());
-                        }
-                    }
-                }
-            }
+            HELIX_DISPATCH_ALL_TYPES(param.dtype(), "sgd", [&] { sgd_inplace_kernel<scalar_t>(param, safe_grad, lr); });
         } else {
             throw std::runtime_error("Unsupported device");
         }

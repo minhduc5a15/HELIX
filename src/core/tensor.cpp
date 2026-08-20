@@ -59,34 +59,31 @@ namespace helix {
     auto Tensor::numel() const -> size_t { return impl_->shape().numel(); }
     auto Tensor::rank() const -> size_t { return impl_->shape().rank(); }
 
-    auto Tensor::data_ptr() -> float* {
-        if (dtype() != DType::Float32) throw std::runtime_error("data_ptr() only supports Float32 for now");
-        return static_cast<float*>(impl_->data());
-    }
-
-    auto Tensor::data_ptr() const -> const float* {
-        if (dtype() != DType::Float32) throw std::runtime_error("data_ptr() only supports Float32 for now");
-        return static_cast<const float*>(impl_->data());
-    }
-
     auto Tensor::item() const -> float {
         if (numel() != 1) {
             throw std::runtime_error("item() can only be called on tensors with 1 element");
         }
-        return data_ptr()[0];
+        float result = 0.0f;
+        HELIX_DISPATCH_ALL_TYPES(dtype(), "item", [&] { result = static_cast<float>(data_ptr<scalar_t>()[0]); });
+        return result;
     }
 
     auto Tensor::version() const -> uint32_t { return impl_->storage()->version(); }
     void Tensor::increment_version() { impl_->storage()->increment_version(); }
 
     auto Tensor::item(const std::vector<size_t>& indices) const -> float {
-        const size_t offset = stride().compute_offset(indices);
-        return data_ptr()[offset];
+        size_t offset = stride().compute_offset(indices);
+        float result = 0.0f;
+        HELIX_DISPATCH_ALL_TYPES(dtype(), "item", [&] { result = static_cast<float>(data_ptr<scalar_t>()[offset]); });
+        return result;
     }
 
     void Tensor::set_item(const std::vector<size_t>& indices, const float value) {
-        const size_t offset = stride().compute_offset(indices);
-        data_ptr()[offset] = value;
+        increment_version();
+        size_t offset = stride().compute_offset(indices);
+        HELIX_DISPATCH_ALL_TYPES(dtype(), "set_item", [&] {
+            data_ptr<scalar_t>()[offset] = static_cast<scalar_t>(value);
+        });
     }
 
     auto Tensor::is_contiguous() const -> bool { return impl_->is_contiguous(); }
@@ -99,10 +96,9 @@ namespace helix {
 
     void Tensor::copy_(const Tensor& src) {
         if (numel() != src.numel()) {
-            throw std::invalid_argument("Tensor sizes do not match for copy_");
+            throw std::invalid_argument("Size mismatch in copy_");
         }
-
-        if (data_ptr() == src.data_ptr() && stride() == src.stride() && shape() == src.shape()) {
+        if (impl_->data() == src.impl()->data() && stride() == src.stride() && shape() == src.shape()) {
             return;
         }
 
@@ -112,14 +108,15 @@ namespace helix {
             );
         }
 
-        const bool is_aliased = (impl_->storage() == src.impl_->storage()) &&
-                                (data_ptr() != src.data_ptr() || stride() != src.stride() || shape() != src.shape());
-        Tensor safe_src = is_aliased ? src.clone() : src;
+        Tensor safe_src = (src.dtype() != dtype()) ? Dispatcher::cast(src, dtype()) : src;
 
-        if (is_contiguous() && safe_src.is_contiguous()) {
-            if (numel() > 0) {
-                std::memcpy(data_ptr(), safe_src.data_ptr(), numel() * sizeof(float));
-            }
+        bool has_overlap =
+            has_internal_overlap() || safe_src.has_internal_overlap() ||
+            (impl_->data() != safe_src.impl()->data() || stride() != safe_src.stride() || shape() != safe_src.shape());
+
+        if (is_contiguous() && safe_src.is_contiguous() && !has_overlap) {
+            // Both are contiguous and no overlap, safe to memcpy
+            std::memcpy(impl_->data(), safe_src.impl()->data(), numel() * dtype_size(dtype()));
         } else if (rank() == 2 && shape() == safe_src.shape()) {
             const size_t rows = shape()[0];
             const size_t cols = shape()[1];
@@ -127,16 +124,29 @@ namespace helix {
             const ptrdiff_t dst_stride1 = stride()[1];
             const ptrdiff_t src_stride0 = safe_src.stride()[0];
             const ptrdiff_t src_stride1 = safe_src.stride()[1];
-            float* dst_data = data_ptr();
-            const float* src_data = safe_src.data_ptr();
+            HELIX_DISPATCH_ALL_TYPES(dtype(), "copy_", [&] {
+                scalar_t* dst_data = data_ptr<scalar_t>();
+                const scalar_t* src_data = safe_src.data_ptr<scalar_t>();
 
-#pragma omp parallel for
-            for (ptrdiff_t r = 0; r < static_cast<ptrdiff_t>(rows); ++r) {
-#pragma omp simd
-                for (size_t c = 0; c < cols; ++c) {
-                    dst_data[r * dst_stride0 + c * dst_stride1] = src_data[r * src_stride0 + c * src_stride1];
+                // Handle single dimension overlapping
+                if (rank() == 1) {
+                    size_t dst_stride = stride()[0];
+                    size_t src_stride = safe_src.stride()[0];
+                    for (size_t i = 0; i < shape()[0]; ++i) {
+                        dst_data[i * dst_stride] = src_data[i * src_stride];
+                    }
+                } else {
+                    // N-dimensional iterator approach
+                    BinaryNDIterator it(shape());
+                    it.init_from_flat(0);
+                    ptrdiff_t offset_dst = it.compute_offset(stride());
+                    ptrdiff_t offset_src = it.compute_offset(safe_src.stride());
+                    for (size_t i = 0; i < shape().numel(); ++i) {
+                        dst_data[offset_dst] = src_data[offset_src];
+                        it.advance(offset_dst, stride(), offset_src, safe_src.stride());
+                    }
                 }
-            }
+            });
         } else {
             float* dst_data = data_ptr();
             const float* src_data = safe_src.data_ptr();
@@ -183,8 +193,9 @@ namespace helix {
         }
 
         if (is_contiguous()) {
-            if (numel() > 0) {
-                std::fill_n(data_ptr(), numel(), 0.0f);
+            if (dtype() == DType::Float32 || dtype() == DType::Int32 || dtype() == DType::Float64 ||
+                dtype() == DType::Int64) {
+                std::memset(impl_->data(), 0, numel() * dtype_size(dtype()));
             }
         } else if (rank() == 2) {
             const size_t rows = shape()[0];
@@ -201,7 +212,6 @@ namespace helix {
                 }
             }
         } else {
-            float* dst_data = data_ptr();
             const size_t total_elements = numel();
 
 #pragma omp parallel
@@ -219,13 +229,23 @@ namespace helix {
 
                 if (start < end) {
                     NDIterator it(shape());
-                    it.init_from_flat(start);
-                    ptrdiff_t offset_dst = it.compute_offset(stride());
-
-                    for (size_t i = start; i < end; ++i) {
-                        dst_data[offset_dst] = 0.0f;
-                        it.advance(offset_dst, stride());
-                    }
+                    HELIX_DISPATCH_ALL_TYPES(dtype(), "zero_", [&] {
+                        scalar_t* dst_data = data_ptr<scalar_t>();
+                        if (rank() == 1) {
+                            size_t dst_stride = stride()[0];
+                            for (size_t i = 0; i < shape()[0]; ++i) {
+                                dst_data[i * dst_stride] = 0;
+                            }
+                        } else {
+                            NDIterator it(shape());
+                            it.init_from_flat(0);
+                            ptrdiff_t offset_dst = it.compute_offset(stride());
+                            for (size_t i = 0; i < shape().numel(); ++i) {
+                                dst_data[offset_dst] = 0;
+                                it.advance(offset_dst, stride());
+                            }
+                        }
+                    });
                 }
             }
         }
@@ -345,6 +365,9 @@ namespace helix {
     }
 
     void Tensor::set_requires_grad(const bool req) const {
+        if (req && (dtype() == DType::Int32 || dtype() == DType::Int64)) {
+            throw std::runtime_error("Only floating point tensors can require gradients");
+        }
         if (req && !requires_grad()) {
             // Lazy allocation: only create if it doesn't exist and req is true
             impl_->set_autograd_meta(get_autograd_provider()->create_meta());

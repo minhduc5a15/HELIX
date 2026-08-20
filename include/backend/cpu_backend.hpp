@@ -10,54 +10,77 @@ namespace helix {
     class CPUBackend {
     public:
         // Core element-wise operations
-        // Assumes all inputs and outputs are contiguous in memory and have the same number of elements.
-        static void add(const float* a, const float* b, float* out, size_t size);
-        static void sub(const float* a, const float* b, float* out, size_t size);
-        static void mul(const float* a, const float* b, float* out, size_t size);
-        static void div(const float* a, const float* b, float* out, size_t size);
+        template <typename T>
+        static void add(const T* a, const T* b, T* out, size_t size);
+
+        template <typename T>
+        static void sub(const T* a, const T* b, T* out, size_t size);
+
+        template <typename T>
+        static void mul(const T* a, const T* b, T* out, size_t size);
+
+        template <typename T>
+        static void div(const T* a, const T* b, T* out, size_t size);
 
         // Scalar element-wise operations
-        static void add_scalar(const float* a, float scalar, float* out, size_t size);
-        static void sub_scalar(const float* a, float scalar, float* out, size_t size);
-        static void mul_scalar(const float* a, float scalar, float* out, size_t size);
-        static void div_scalar(const float* a, float scalar, float* out, size_t size);
+        template <typename T>
+        static void add_scalar(const T* a, T scalar, T* out, size_t size);
+
+        template <typename T>
+        static void sub_scalar(const T* a, T scalar, T* out, size_t size);
+
+        template <typename T>
+        static void mul_scalar(const T* a, T scalar, T* out, size_t size);
+
+        template <typename T>
+        static void div_scalar(const T* a, T scalar, T* out, size_t size);
 
         // Unary operations
-        static void neg(const float* a, float* out, size_t size);
-        static void exp(const float* a, float* out, size_t size);
-        static void tanh(const float* a, float* out, size_t size);
-        static void log(const float* a, float* out, size_t size);
-        static void sqrt(const float* a, float* out, size_t size);
-        static void relu(const float* a, float* out, size_t size);
-        static void relu_backward(const float* grad_out, const float* a, float* grad_in, size_t size);
-        static void pow(const float* a, float exponent, float* out, size_t size);
+        template <typename T>
+        static void neg(const T* a, T* out, size_t size);
+
+        template <typename T>
+        static void exp(const T* a, T* out, size_t size);
+
+        template <typename T>
+        static void tanh(const T* a, T* out, size_t size);
+
+        template <typename T>
+        static void log(const T* a, T* out, size_t size);
+
+        template <typename T>
+        static void sqrt(const T* a, T* out, size_t size);
+
+        template <typename T>
+        static void relu(const T* a, T* out, size_t size);
+
+        template <typename T>
+        static void relu_backward(const T* grad_out, const T* a, T* grad_in, size_t size);
+
+        template <typename T>
+        static void pow(const T* a, T exponent, T* out, size_t size);
 
         // Matrix Multiplication
+        template <typename T>
         static void matmul(
-            const float* a,
-            const float* b,
-            float* out,
-            size_t M,
-            size_t K,
-            size_t N,
-            MatMulStrategy strategy = MatMulStrategy::Auto
+            const T* a, const T* b, T* out, size_t M, size_t K, size_t N, MatMulStrategy strategy = MatMulStrategy::Auto
         );
 
-        // Reduce Operations (using 3D collapse technique)
-        // input is treated as [outer_size, dim_size, inner_size]
-        // output is treated as [outer_size, inner_size]
-        static void sum(const float* input, float* output, size_t outer_size, size_t dim_size, size_t inner_size);
-        static void mean(const float* input, float* output, size_t outer_size, size_t dim_size, size_t inner_size);
+        // Reduce Operations
+        template <typename T>
+        static void sum(const T* input, T* output, size_t outer_size, size_t dim_size, size_t inner_size);
+
+        template <typename T>
+        static void mean(const T* input, T* output, size_t outer_size, size_t dim_size, size_t inner_size);
 
         // Loss Operations
         // Computes CrossEntropy Loss with Log-Sum-Exp Trick.
-        // pred and target are [N, C], loss_out is scalar, log_softmax_out is [N, C]
-        static void cross_entropy(
-            const float* pred, const float* target, float* loss_out, float* log_softmax_out, size_t N, size_t C
-        );
+        template <typename T>
+        static void cross_entropy(const T* pred, const T* target, T* loss_out, T* log_softmax_out, size_t N, size_t C);
 
         // SGD Optimization Kernel
-        static void sgd(float* param, const float* grad, float lr, size_t size);
+        template <typename T>
+        static void sgd(T* param, const T* grad, float lr, size_t size);
     };
 
 }  // namespace helix

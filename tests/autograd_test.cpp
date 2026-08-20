@@ -161,3 +161,28 @@ TEST_F(AutogradTest, BackwardTwiceWithoutRetainGraphThrows) {
         std::runtime_error
     );
 }
+
+TEST_F(AutogradTest, IntegerTensorsCannotRequireGrad) {
+    Tensor a(Shape({2}), DType::Int32);
+    EXPECT_THROW(a.set_requires_grad(true), std::runtime_error);
+
+    Tensor b(Shape({2}), DType::Int64);
+    EXPECT_THROW(b.set_requires_grad(true), std::runtime_error);
+
+    // Float should not throw
+    Tensor c(Shape({2}), DType::Float32);
+    EXPECT_NO_THROW(c.set_requires_grad(true));
+}
+
+TEST_F(AutogradTest, BackwardOnIntegerOutputThrows) {
+    Tensor a({1.0f, 2.0f}, Shape({2}));
+    a.set_requires_grad(true);
+
+    Tensor b = a * 2.0f;
+    // Cast to Int32
+    Tensor c(b.shape(), DType::Int32);
+    // Even if we try to backward manually on an integer output, the framework should either ignore or throw.
+    // In our design, casting breaks the graph since integers don't have grad.
+    // Wait, let's see if backward on C throws. c does not require grad.
+    EXPECT_THROW(c.backward(), std::runtime_error);
+}
