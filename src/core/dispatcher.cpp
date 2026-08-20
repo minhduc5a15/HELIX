@@ -61,7 +61,7 @@ namespace helix {
 #pragma omp parallel for if (a.numel() >= OMP_THRESHOLD)
                 for (ptrdiff_t r = 0; r < static_cast<ptrdiff_t>(rows); ++r) {
 #pragma omp simd
-                    for (size_t c = 0; c < cols; ++c) {
+                    for (ptrdiff_t c = 0; c < static_cast<ptrdiff_t>(cols); ++c) {
                         a_data[r * a_stride0 + c * a_stride1] += b_data[r * b_stride0 + c * b_stride1];
                     }
                 }
@@ -135,7 +135,7 @@ namespace helix {
 #pragma omp parallel for if (param.numel() >= OMP_THRESHOLD)
                 for (ptrdiff_t r = 0; r < static_cast<ptrdiff_t>(rows); ++r) {
 #pragma omp simd
-                    for (size_t c = 0; c < cols; ++c) {
+                    for (ptrdiff_t c = 0; c < static_cast<ptrdiff_t>(cols); ++c) {
                         p_data[r * p_stride0 + c * p_stride1] -=
                             static_cast<scalar_t>(lr) * g_data[r * g_stride0 + c * g_stride1];
                     }
@@ -200,7 +200,7 @@ namespace helix {
 #pragma omp parallel for if (a.numel() >= OMP_THRESHOLD)
             for (ptrdiff_t r = 0; r < static_cast<ptrdiff_t>(rows); ++r) {
 #pragma omp simd
-                for (size_t c = 0; c < cols; ++c) {
+                for (ptrdiff_t c = 0; c < static_cast<ptrdiff_t>(cols); ++c) {
                     dst_data[r * dst_stride0 + c * dst_stride1] = src_data[r * src_stride0 + c * src_stride1];
                 }
             }
