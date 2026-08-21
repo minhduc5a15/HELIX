@@ -12,7 +12,9 @@ namespace helix {
             void stop() { end_time_ = std::chrono::steady_clock::now(); }
 
             double elapsed_ns() const {
-                return std::chrono::duration_cast<std::chrono::nanoseconds>(end_time_ - start_time_).count();
+                return static_cast<double>(
+                    std::chrono::duration_cast<std::chrono::nanoseconds>(end_time_ - start_time_).count()
+                );
             }
 
             double elapsed_us() const { return elapsed_ns() / 1e3; }

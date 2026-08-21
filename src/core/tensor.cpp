@@ -118,12 +118,6 @@ namespace helix {
             // Both are contiguous and no overlap, safe to memcpy
             std::memcpy(impl_->data(), safe_src.impl()->data(), numel() * dtype_size(dtype()));
         } else if (rank() == 2 && shape() == safe_src.shape()) {
-            const size_t rows = shape()[0];
-            const size_t cols = shape()[1];
-            const ptrdiff_t dst_stride0 = stride()[0];
-            const ptrdiff_t dst_stride1 = stride()[1];
-            const ptrdiff_t src_stride0 = safe_src.stride()[0];
-            const ptrdiff_t src_stride1 = safe_src.stride()[1];
             HELIX_DISPATCH_ALL_TYPES(dtype(), "copy_", [&] {
                 scalar_t* dst_data = data_ptr<scalar_t>();
                 const scalar_t* src_data = safe_src.data_ptr<scalar_t>();

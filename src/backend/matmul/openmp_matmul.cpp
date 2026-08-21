@@ -42,7 +42,11 @@ namespace helix {
 #if defined(_OPENMP)
         std::fill_n(out, M * N, 0.0f);
 
+#if defined(_MSC_VER)
+#pragma omp parallel for schedule(dynamic)
+#else
 #pragma omp parallel for collapse(2) schedule(dynamic)
+#endif
         for (int ih = 0; ih < static_cast<int>(M); ih += static_cast<int>(BLOCK)) {
             for (int jh = 0; jh < static_cast<int>(N); jh += static_cast<int>(BLOCK)) {
                 const size_t i_end = std::min(static_cast<size_t>(ih) + BLOCK, M);

@@ -19,9 +19,17 @@ namespace helix {
         template <typename src_t, typename dst_t>
         void cast_kernel(const src_t* src_data, dst_t* dst_data, size_t numel) {
 #pragma omp parallel for if (numel >= OMP_THRESHOLD)
-            for (size_t i = 0; i < numel; ++i) {
+            for (ptrdiff_t i = 0; i < static_cast<ptrdiff_t>(numel); ++i) {
                 dst_data[i] = static_cast<dst_t>(src_data[i]);
             }
+        }
+
+        template <typename src_t>
+        void dispatch_cast_dst(DType new_dtype, const Tensor& lhs, Tensor& out) {
+            HELIX_DISPATCH_ALL_TYPES(new_dtype, "cast_dst", [&] {
+                using dst_t = scalar_t;
+                cast_kernel<src_t, dst_t>(lhs.data_ptr<src_t>(), out.data_ptr<dst_t>(), lhs.numel());
+            });
         }
 
         template <typename scalar_t>
@@ -349,13 +357,7 @@ namespace helix {
         Tensor out(a.shape(), new_dtype, a.device());
         Tensor lhs = ensure_contiguous(a);
 
-        HELIX_DISPATCH_ALL_TYPES(a.dtype(), "cast_src", [&] {
-            using src_t = scalar_t;
-            HELIX_DISPATCH_ALL_TYPES(new_dtype, "cast_dst", [&] {
-                using dst_t = scalar_t;
-                cast_kernel<src_t, dst_t>(lhs.data_ptr<src_t>(), out.data_ptr<dst_t>(), lhs.numel());
-            });
-        });
+        HELIX_DISPATCH_ALL_TYPES(a.dtype(), "cast_src", [&] { dispatch_cast_dst<scalar_t>(new_dtype, lhs, out); });
 
         if (g_graph_builder) {
             std::unordered_map<std::string, std::any> attrs;

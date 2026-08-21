@@ -28,10 +28,14 @@ namespace helix {
         constexpr size_t BLOCK = 64;  // Block size for generic matmul
 
 #if defined(_OPENMP)
+#if defined(_MSC_VER)
+#pragma omp parallel for
+#else
 #pragma omp parallel for collapse(2)
 #endif
-        for (size_t ih = 0; ih < M; ih += BLOCK) {
-            for (size_t jh = 0; jh < N; jh += BLOCK) {
+#endif
+        for (ptrdiff_t ih = 0; ih < static_cast<ptrdiff_t>(M); ih += BLOCK) {
+            for (ptrdiff_t jh = 0; jh < static_cast<ptrdiff_t>(N); jh += BLOCK) {
                 const size_t i_end = std::min(ih + BLOCK, M);
                 const size_t j_end = std::min(jh + BLOCK, N);
                 for (size_t kh = 0; kh < K; kh += BLOCK) {
