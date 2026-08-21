@@ -11,7 +11,10 @@ namespace helix {
     // Core holds an opaque pointer to this class.
     class AutogradMeta {
     public:
-        AutogradMeta(bool requires_grad = false) : requires_grad_(requires_grad), has_grad_(false) {}
+        AutogradMeta(DType dtype, bool requires_grad = false)
+            : dtype_(dtype), requires_grad_(requires_grad), has_grad_(false) {}
+
+        DType dtype() const { return dtype_; }
 
         bool requires_grad() const { return requires_grad_; }
         void set_requires_grad(bool req) { requires_grad_ = req; }
@@ -32,6 +35,7 @@ namespace helix {
         void set_grad_accumulator(std::shared_ptr<Node> acc) { grad_accumulator_ = std::move(acc); }
 
     private:
+        DType dtype_;
         bool requires_grad_;
         bool has_grad_;
         Tensor grad_;

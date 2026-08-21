@@ -6,7 +6,7 @@ namespace helix {
 
     Linear::Linear(size_t in_features, size_t out_features)
         : weight_(Tensor::randn({in_features, out_features}) / std::sqrt(static_cast<float>(in_features))),
-          bias_(Tensor::zeros({out_features})) {
+          bias_(Tensor::zeros({out_features}, weight_.dtype(), weight_.device())) {
         weight_.set_requires_grad(true);
         bias_.set_requires_grad(true);
     }

@@ -1,5 +1,6 @@
 #include "autograd/engine.hpp"
 
+#include <iostream>
 #include <queue>
 #include <stdexcept>
 #include <unordered_map>
@@ -21,18 +22,26 @@ namespace helix {
                 if (!meta->has_grad()) {
                     // Safe-guard: The parameter's gradient must be a safe, unique, and dense tensor
                     // so that future in-place optimizer operations (like .zero_() or .add_()) succeed.
-                    if (grad_outputs[0].has_internal_overlap() || grad_outputs[0].is_shared() ||
-                        !grad_outputs[0].is_contiguous()) {
-                        meta->set_grad(grad_outputs[0].clone());
+                    Tensor initial_grad = grad_outputs[0];
+                    if (initial_grad.dtype() != meta->dtype()) {
+                        initial_grad = Dispatcher::cast(initial_grad, meta->dtype());
+                    }
+                    if (initial_grad.has_internal_overlap() || initial_grad.is_shared() ||
+                        !initial_grad.is_contiguous()) {
+                        meta->set_grad(initial_grad.clone());
                     } else {
-                        meta->set_grad(grad_outputs[0]);
+                        meta->set_grad(initial_grad);
                     }
                 } else {
-                    if (!meta->grad().is_shared() && meta->grad().shape() == grad_outputs[0].shape() &&
+                    Tensor grad_to_add = grad_outputs[0];
+                    if (grad_to_add.dtype() != meta->dtype()) {
+                        grad_to_add = Dispatcher::cast(grad_to_add, meta->dtype());
+                    }
+                    if (!meta->grad().is_shared() && meta->grad().shape() == grad_to_add.shape() &&
                         !meta->grad().has_internal_overlap()) {
-                        meta->grad().add_(grad_outputs[0]);
+                        meta->grad().add_(grad_to_add);
                     } else {
-                        meta->set_grad(meta->grad() + grad_outputs[0]);
+                        meta->set_grad(meta->grad() + grad_to_add);
                     }
                 }
             }
@@ -44,8 +53,8 @@ namespace helix {
     };
 
     // AutogradEngineProvider Implementation
-    std::shared_ptr<AutogradMeta> AutogradEngineProvider::create_meta() {
-        auto meta = std::make_shared<AutogradMeta>(true);
+    std::shared_ptr<AutogradMeta> AutogradEngineProvider::create_meta(DType dtype) {
+        auto meta = std::make_shared<AutogradMeta>(dtype, true);
         meta->set_grad_accumulator(std::make_shared<AccumulateGrad>(meta));
         return meta;
     }
@@ -169,12 +178,16 @@ namespace helix {
                         node_gradients[next] = {input_grads[i]};
                     } else {
                         // Inplace gradient accumulation if safe
+                        Tensor grad_to_add = input_grads[i];
+                        if (grad_to_add.dtype() != node_gradients[next][0].dtype()) {
+                            grad_to_add = Dispatcher::cast(grad_to_add, node_gradients[next][0].dtype());
+                        }
                         if (!node_gradients[next][0].is_shared() &&
-                            node_gradients[next][0].shape() == input_grads[i].shape() &&
+                            node_gradients[next][0].shape() == grad_to_add.shape() &&
                             !node_gradients[next][0].has_internal_overlap()) {
-                            node_gradients[next][0].add_(input_grads[i]);
+                            node_gradients[next][0].add_(grad_to_add);
                         } else {
-                            node_gradients[next][0] = node_gradients[next][0] + input_grads[i];
+                            node_gradients[next][0] = node_gradients[next][0] + grad_to_add;
                         }
                     }
 

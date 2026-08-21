@@ -28,11 +28,22 @@ namespace helix {
     }
 
     // Factory Methods
-    auto Tensor::empty(const Shape& shape) -> Tensor { return TensorFactory::empty(shape); }
-    auto Tensor::zeros(const Shape& shape) -> Tensor { return TensorFactory::zeros(shape); }
-    auto Tensor::ones(const Shape& shape) -> Tensor { return TensorFactory::ones(shape); }
-    auto Tensor::full(const Shape& shape, const float value) -> Tensor { return TensorFactory::full(shape, value); }
-    auto Tensor::randn(const Shape& shape) -> Tensor { return TensorFactory::randn(shape); }
+    auto Tensor::empty(const Shape& shape, std::optional<DType> dtype, std::optional<Device> device) -> Tensor {
+        return TensorFactory::empty(shape, dtype, device);
+    }
+    auto Tensor::zeros(const Shape& shape, std::optional<DType> dtype, std::optional<Device> device) -> Tensor {
+        return TensorFactory::zeros(shape, dtype, device);
+    }
+    auto Tensor::ones(const Shape& shape, std::optional<DType> dtype, std::optional<Device> device) -> Tensor {
+        return TensorFactory::ones(shape, dtype, device);
+    }
+    auto Tensor::full(const Shape& shape, const float value, std::optional<DType> dtype, std::optional<Device> device)
+        -> Tensor {
+        return TensorFactory::full(shape, value, dtype, device);
+    }
+    auto Tensor::randn(const Shape& shape, std::optional<DType> dtype, std::optional<Device> device) -> Tensor {
+        return TensorFactory::randn(shape, dtype, device);
+    }
 
     Tensor::Tensor() : impl_(std::make_shared<TensorImpl>(Shape{}, DType::Float32, Device(DeviceType::CPU))) {}
 
@@ -364,7 +375,7 @@ namespace helix {
         }
         if (req && !requires_grad()) {
             // Lazy allocation: only create if it doesn't exist and req is true
-            impl_->set_autograd_meta(get_autograd_provider()->create_meta());
+            impl_->set_autograd_meta(get_autograd_provider()->create_meta(dtype()));
         } else if (!req && requires_grad()) {
             // If setting to false, free the meta
             impl_->set_autograd_meta(nullptr);

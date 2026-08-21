@@ -176,7 +176,7 @@ namespace helix {
     }
 
     std::vector<Tensor> SliceBackward::backward(const std::vector<Tensor>& grad_outputs) {
-        Tensor grad_full = Tensor::zeros(input_shape_);
+        Tensor grad_full = Tensor::zeros(input_shape_, grad_outputs[0].dtype(), grad_outputs[0].device());
         grad_full.slice(dim_, start_, end_).add_(grad_outputs[0]);
         return {grad_full};
     }

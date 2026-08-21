@@ -1,6 +1,9 @@
 #pragma once
 
 #include <memory>
+#include <vector>
+
+#include "core/dtype.hpp"
 
 namespace helix {
 
@@ -15,7 +18,7 @@ namespace helix {
     class AutogradProvider {
     public:
         virtual ~AutogradProvider() = default;
-        virtual std::shared_ptr<AutogradMeta> create_meta() = 0;
+        virtual std::shared_ptr<AutogradMeta> create_meta(DType dtype) = 0;
         virtual void backward(Tensor& tensor, const std::vector<Tensor>& grad_outputs, bool retain_graph) = 0;
         virtual Tensor& get_grad(const Tensor& tensor) = 0;
         virtual const Tensor& get_grad(const Tensor& tensor) const = 0;

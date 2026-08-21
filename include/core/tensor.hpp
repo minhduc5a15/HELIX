@@ -23,21 +23,27 @@ namespace helix {
          * @param shape The dimensions of the new Tensor.
          * @return A new Tensor instance.
          */
-        static auto empty(const Shape& shape) -> Tensor;
+        static auto empty(
+            const Shape& shape, std::optional<DType> dtype = std::nullopt, std::optional<Device> device = std::nullopt
+        ) -> Tensor;
 
         /**
          * @brief Creates a Tensor filled with zeros.
          * @param shape The dimensions of the new Tensor.
          * @return A new Tensor instance.
          */
-        static auto zeros(const Shape& shape) -> Tensor;
+        static auto zeros(
+            const Shape& shape, std::optional<DType> dtype = std::nullopt, std::optional<Device> device = std::nullopt
+        ) -> Tensor;
 
         /**
          * @brief Creates a Tensor filled with ones.
          * @param shape The dimensions of the new Tensor.
          * @return A new Tensor instance.
          */
-        static auto ones(const Shape& shape) -> Tensor;
+        static auto ones(
+            const Shape& shape, std::optional<DType> dtype = std::nullopt, std::optional<Device> device = std::nullopt
+        ) -> Tensor;
 
         /**
          * @brief Creates a Tensor filled with a specific value.
@@ -45,14 +51,21 @@ namespace helix {
          * @param value The value to fill the Tensor with.
          * @return A new Tensor instance.
          */
-        static auto full(const Shape& shape, float value) -> Tensor;
+        static auto full(
+            const Shape& shape,
+            float value,
+            std::optional<DType> dtype = std::nullopt,
+            std::optional<Device> device = std::nullopt
+        ) -> Tensor;
 
         /**
          * @brief Creates a Tensor with values drawn from a standard normal distribution.
          * @param shape The dimensions of the new Tensor.
          * @return A new Tensor instance.
          */
-        static auto randn(const Shape& shape) -> Tensor;
+        static auto randn(
+            const Shape& shape, std::optional<DType> dtype = std::nullopt, std::optional<Device> device = std::nullopt
+        ) -> Tensor;
 
         /**
          * @brief Constructs an empty (null) Tensor.
