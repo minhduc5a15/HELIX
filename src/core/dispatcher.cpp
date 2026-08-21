@@ -188,12 +188,11 @@ namespace helix {
 
     GraphBuilderInterface* Dispatcher::get_graph_builder() { return g_graph_builder; }
 
-    Tensor Dispatcher::clone(const Tensor& a) {
-        Tensor new_tensor(a.shape(), a.dtype(), a.device());
-
+    template <typename scalar_t>
+    void clone_impl(const Tensor& a, Tensor& new_tensor) {
         if (a.is_contiguous()) {
             if (a.numel() > 0) {
-                std::memcpy(new_tensor.data_ptr(), a.data_ptr(), a.numel() * sizeof(float));
+                std::memcpy(new_tensor.data_ptr<scalar_t>(), a.data_ptr<scalar_t>(), a.numel() * sizeof(scalar_t));
             }
         } else if (a.rank() == 2) {
             const size_t rows = a.shape()[0];
@@ -202,8 +201,8 @@ namespace helix {
             const ptrdiff_t src_stride1 = a.stride()[1];
             const ptrdiff_t dst_stride0 = new_tensor.stride()[0];
             const ptrdiff_t dst_stride1 = new_tensor.stride()[1];
-            float* dst_data = new_tensor.data_ptr();
-            const float* src_data = a.data_ptr();
+            scalar_t* dst_data = new_tensor.data_ptr<scalar_t>();
+            const scalar_t* src_data = a.data_ptr<scalar_t>();
 
 #pragma omp parallel for if (a.numel() >= OMP_THRESHOLD)
             for (ptrdiff_t r = 0; r < static_cast<ptrdiff_t>(rows); ++r) {
@@ -213,8 +212,8 @@ namespace helix {
                 }
             }
         } else {
-            float* dst_data = new_tensor.data_ptr();
-            const float* src_data = a.data_ptr();
+            scalar_t* dst_data = new_tensor.data_ptr<scalar_t>();
+            const scalar_t* src_data = a.data_ptr<scalar_t>();
             const size_t total_elements = a.numel();
 
 #pragma omp parallel if (total_elements >= OMP_NON_CONTIGUOUS_THRESHOLD)
@@ -243,6 +242,12 @@ namespace helix {
                 }
             }
         }
+    }
+
+    Tensor Dispatcher::clone(const Tensor& a) {
+        Tensor new_tensor(a.shape(), a.dtype(), a.device());
+
+        HELIX_DISPATCH_ALL_TYPES(a.dtype(), "clone", [&] { clone_impl<scalar_t>(a, new_tensor); });
 
         if (g_graph_builder) {
             std::unordered_map<std::string, std::any> attributes;

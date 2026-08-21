@@ -136,8 +136,12 @@ namespace helix {
             if (target.numel() != 1) {
                 throw std::runtime_error("grad can be implicitly created only for scalar outputs");
             }
-            std::vector<float> data = {1.0f};
-            node_gradients[root.get()] = {Tensor(data, target.shape())};
+            Tensor grad_out(target.shape(), target.dtype(), target.device());
+            HELIX_DISPATCH_ALL_TYPES(target.dtype(), "backward_init", [&] {
+                auto* ptr = grad_out.data_ptr<scalar_t>();
+                ptr[0] = static_cast<scalar_t>(1.0);
+            });
+            node_gradients[root.get()] = {grad_out};
         } else {
             node_gradients[root.get()] = grad_outputs;
         }

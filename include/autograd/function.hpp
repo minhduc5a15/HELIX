@@ -174,6 +174,15 @@ namespace helix {
         SavedTensor saved_target_;
     };
 
+    class CastBackward : public Node {
+    public:
+        CastBackward(DType original_dtype) : original_dtype_(original_dtype) {}
+        std::vector<Tensor> backward(const std::vector<Tensor>& grad_outputs) override;
+
+    private:
+        DType original_dtype_;
+    };
+
     class CloneBackward : public Node {
     public:
         CloneBackward() = default;

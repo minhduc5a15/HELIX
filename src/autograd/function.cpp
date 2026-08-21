@@ -165,6 +165,10 @@ namespace helix {
         return {grad, Tensor()};  // Only returning grad w.r.t pred, target doesn't need grad
     }
 
+    std::vector<Tensor> CastBackward::backward(const std::vector<Tensor>& grad_outputs) {
+        return {Dispatcher::cast(grad_outputs[0], original_dtype_)};
+    }
+
     std::vector<Tensor> CloneBackward::backward(const std::vector<Tensor>& grad_outputs) { return {grad_outputs[0]}; }
 
     std::vector<Tensor> ViewBackward::backward(const std::vector<Tensor>& grad_outputs) {

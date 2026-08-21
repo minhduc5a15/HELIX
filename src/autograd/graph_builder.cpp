@@ -107,6 +107,9 @@ namespace helix {
                 node = std::make_shared<BroadcastToBackward>(input_shape);
                 break;
             }
+            case OpType::Cast:
+                node = std::make_shared<CastBackward>(ctx.inputs[0].get().dtype());
+                break;
             default:
                 // Unsupported ops will be ignored.
                 // In a complete framework, these would also require backward nodes.
