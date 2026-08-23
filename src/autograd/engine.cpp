@@ -78,6 +78,12 @@ namespace helix {
         return meta && meta->has_grad();
     }
 
+    bool AutogradEngineProvider::is_leaf(const Tensor& tensor) const {
+        if (!tensor.requires_grad()) return true;
+        auto meta = static_cast<AutogradMeta*>(tensor.impl()->autograd_meta());
+        return meta && meta->grad_fn() == nullptr;
+    }
+
     struct NoGradGuard {
         NoGradGuard() {
             prev_builder_ = Dispatcher::get_graph_builder();

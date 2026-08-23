@@ -23,6 +23,7 @@ namespace helix {
         virtual Tensor& get_grad(const Tensor& tensor) = 0;
         virtual const Tensor& get_grad(const Tensor& tensor) const = 0;
         virtual bool has_grad(const Tensor& tensor) const = 0;
+        virtual bool is_leaf(const Tensor& tensor) const = 0;
     };
 
     void register_autograd_provider(AutogradProvider* provider);

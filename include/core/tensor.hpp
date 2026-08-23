@@ -261,6 +261,7 @@ namespace helix {
          */
         [[nodiscard]] auto requires_grad() const -> bool;
         void set_requires_grad(bool req) const;
+        [[nodiscard]] auto is_leaf() const -> bool;
         [[nodiscard]] auto has_grad() const -> bool;
         auto grad() -> Tensor&;
         [[nodiscard]] auto grad() const -> const Tensor&;

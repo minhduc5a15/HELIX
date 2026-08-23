@@ -23,14 +23,29 @@ TEST_F(AutogradTest, InplaceOperationBreaksGraph) {
     // Using mul creates a SavedTensor for 'a' and 'b' in MulBackward
     Tensor c = a * b;  // c = 1
 
-    // In-place modification on a!
+    // In-place modification on a leaf tensor requiring grad should throw immediately
     Tensor d = Tensor::ones(Shape({2, 2}));
-    a.add_(d);  // a becomes 2, version increments!
+    EXPECT_THROW(a.add_(d), std::runtime_error);
+}
 
-    Tensor loss = c.sum();
+TEST_F(AutogradTest, InplaceOperationOnNonLeafThrows) {
+    Tensor a = Tensor::ones(Shape({2, 2}));
+    a.set_requires_grad(true);
+    Tensor b = a * 2.0f;  // b is a non-leaf tensor requiring grad
 
-    // Backward should throw because MulBackward tries to unpack 'a'
-    EXPECT_THROW(loss.backward(), std::runtime_error);
+    Tensor c = Tensor::ones(Shape({2, 2}));
+
+    // In-place on non-leaf requiring grad should throw until properly supported
+    EXPECT_THROW(b.add_(c), std::runtime_error);
+}
+
+TEST_F(AutogradTest, InplaceOperationOnNoGradSucceeds) {
+    Tensor a = Tensor::ones(Shape({2, 2}));  // no grad
+    Tensor b = Tensor::ones(Shape({2, 2}));  // no grad
+
+    // In-place on no-grad should succeed silently
+    EXPECT_NO_THROW(a.add_(b));
+    EXPECT_EQ(a.data_ptr<float>()[0], 2.0f);
 }
 
 TEST_F(AutogradTest, StandardTrainingLoopNoFalsePositive) {

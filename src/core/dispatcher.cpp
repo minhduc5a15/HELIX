@@ -402,6 +402,17 @@ namespace helix {
     }
 
     void Dispatcher::add_(Tensor& a, const Tensor& b) {
+        if (g_graph_builder && a.requires_grad()) {
+            if (a.is_leaf()) {
+                throw std::runtime_error("a leaf Tensor that requires grad is being used in an in-place operation.");
+            } else {
+                throw std::runtime_error(
+                    "in-place operations on non-leaf tensors that require grad are currently not supported in HELIX "
+                    "Autograd."
+                );
+            }
+        }
+
         if (a.shape() != b.shape()) {
             throw std::invalid_argument("Inplace addition requires matching shapes without broadcasting.");
         }

@@ -382,6 +382,13 @@ namespace helix {
         }
     }
 
+    auto Tensor::is_leaf() const -> bool {
+        if (!requires_grad()) return true;
+        auto* provider = get_autograd_provider();
+        if (!provider) return true;
+        return provider->is_leaf(*this);
+    }
+
     auto Tensor::grad() -> Tensor& {
         if (!requires_grad()) throw std::runtime_error("Tensor does not require grad");
         return get_autograd_provider()->get_grad(*this);

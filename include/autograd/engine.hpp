@@ -19,6 +19,7 @@ namespace helix {
         Tensor& get_grad(const Tensor& tensor) override;
         const Tensor& get_grad(const Tensor& tensor) const override;
         bool has_grad(const Tensor& tensor) const override;
+        bool is_leaf(const Tensor& tensor) const override;
 
     private:
         BackwardEngine engine_;
