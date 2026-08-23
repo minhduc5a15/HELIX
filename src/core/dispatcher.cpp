@@ -520,6 +520,17 @@ namespace helix {
         } else {
             throw std::runtime_error("Unsupported device");
         }
+        if (g_graph_builder) {
+            std::unordered_map<std::string, std::any> attrs;
+            attrs["scalar"] = scalar;
+            g_graph_builder->build(OperationContext{
+                .category = OpCategory::Unary,
+                .type = OpType::AddScalar,
+                .out = out,
+                .inputs = {a},
+                .attributes = std::move(attrs)
+            });
+        }
         return out;
     }
 
@@ -535,6 +546,17 @@ namespace helix {
             });
         } else {
             throw std::runtime_error("Unsupported device");
+        }
+        if (g_graph_builder) {
+            std::unordered_map<std::string, std::any> attrs;
+            attrs["scalar"] = scalar;
+            g_graph_builder->build(OperationContext{
+                .category = OpCategory::Unary,
+                .type = OpType::SubScalar,
+                .out = out,
+                .inputs = {a},
+                .attributes = std::move(attrs)
+            });
         }
         return out;
     }
@@ -552,6 +574,17 @@ namespace helix {
         } else {
             throw std::runtime_error("Unsupported device");
         }
+        if (g_graph_builder) {
+            std::unordered_map<std::string, std::any> attrs;
+            attrs["scalar"] = scalar;
+            g_graph_builder->build(OperationContext{
+                .category = OpCategory::Unary,
+                .type = OpType::MulScalar,
+                .out = out,
+                .inputs = {a},
+                .attributes = std::move(attrs)
+            });
+        }
         return out;
     }
 
@@ -567,6 +600,17 @@ namespace helix {
             });
         } else {
             throw std::runtime_error("Unsupported device");
+        }
+        if (g_graph_builder) {
+            std::unordered_map<std::string, std::any> attrs;
+            attrs["scalar"] = scalar;
+            g_graph_builder->build(OperationContext{
+                .category = OpCategory::Unary,
+                .type = OpType::DivScalar,
+                .out = out,
+                .inputs = {a},
+                .attributes = std::move(attrs)
+            });
         }
         return out;
     }

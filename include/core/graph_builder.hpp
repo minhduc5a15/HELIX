@@ -35,7 +35,11 @@ namespace helix {
         Pow,
         ReLU,
         CrossEntropy,
-        Cast
+        Cast,
+        AddScalar,
+        SubScalar,
+        MulScalar,
+        DivScalar
     };
 
     struct OperationContext {

@@ -59,6 +59,22 @@ namespace helix {
         return {grad_a, grad_b};
     }
 
+    std::vector<Tensor> AddScalarBackward::backward(const std::vector<Tensor>& grad_outputs) {
+        return {grad_outputs[0]};
+    }
+
+    std::vector<Tensor> SubScalarBackward::backward(const std::vector<Tensor>& grad_outputs) {
+        return {grad_outputs[0]};
+    }
+
+    std::vector<Tensor> MulScalarBackward::backward(const std::vector<Tensor>& grad_outputs) {
+        return {grad_outputs[0] * scalar_};
+    }
+
+    std::vector<Tensor> DivScalarBackward::backward(const std::vector<Tensor>& grad_outputs) {
+        return {grad_outputs[0] / scalar_};
+    }
+
     std::vector<Tensor> MatMulBackward::backward(const std::vector<Tensor>& grad_outputs) {
         // d(A@B)/dA = grad_output @ B^T
         // d(A@B)/dB = A^T @ grad_output

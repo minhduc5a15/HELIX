@@ -39,6 +39,18 @@ namespace helix {
             case OpType::MatMul:
                 node = std::make_shared<MatMulBackward>(ctx.inputs[0].get(), ctx.inputs[1].get());
                 break;
+            case OpType::AddScalar:
+                node = std::make_shared<AddScalarBackward>();
+                break;
+            case OpType::SubScalar:
+                node = std::make_shared<SubScalarBackward>();
+                break;
+            case OpType::MulScalar:
+                node = std::make_shared<MulScalarBackward>(std::any_cast<float>(ctx.attributes.at("scalar")));
+                break;
+            case OpType::DivScalar:
+                node = std::make_shared<DivScalarBackward>(std::any_cast<float>(ctx.attributes.at("scalar")));
+                break;
             case OpType::Neg:
                 node = std::make_shared<NegBackward>();
                 break;

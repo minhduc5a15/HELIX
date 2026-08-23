@@ -68,6 +68,36 @@ namespace helix {
         SavedTensor saved_b_;
     };
 
+    class AddScalarBackward : public Node {
+    public:
+        AddScalarBackward() = default;
+        std::vector<Tensor> backward(const std::vector<Tensor>& grad_outputs) override;
+    };
+
+    class SubScalarBackward : public Node {
+    public:
+        SubScalarBackward() = default;
+        std::vector<Tensor> backward(const std::vector<Tensor>& grad_outputs) override;
+    };
+
+    class MulScalarBackward : public Node {
+    public:
+        MulScalarBackward(float scalar) : scalar_(scalar) {}
+        std::vector<Tensor> backward(const std::vector<Tensor>& grad_outputs) override;
+
+    private:
+        float scalar_;
+    };
+
+    class DivScalarBackward : public Node {
+    public:
+        DivScalarBackward(float scalar) : scalar_(scalar) {}
+        std::vector<Tensor> backward(const std::vector<Tensor>& grad_outputs) override;
+
+    private:
+        float scalar_;
+    };
+
     class MatMulBackward : public Node {
     public:
         MatMulBackward(const Tensor& a, const Tensor& b) : saved_a_(a), saved_b_(b) {}
