@@ -739,11 +739,20 @@ namespace helix {
     }
 
     Tensor Dispatcher::relu_backward(const Tensor& grad_out, const Tensor& a) {
+        if (grad_out.shape() != a.shape()) {
+            throw std::invalid_argument("Shape mismatch in relu_backward");
+        }
+        if (grad_out.device() != a.device()) {
+            throw std::invalid_argument("Device mismatch in relu_backward");
+        }
+
+        const DType target_dtype = grad_out.dtype();
         Tensor lhs = ensure_contiguous(grad_out);
-        Tensor rhs = ensure_contiguous(a);
-        Tensor out(grad_out.shape(), grad_out.dtype(), grad_out.device());
+        Tensor rhs = ensure_contiguous((a.dtype() == target_dtype) ? a : cast(a, target_dtype));
+        Tensor out(grad_out.shape(), target_dtype, grad_out.device());
+
         if (grad_out.device().is_cpu()) {
-            HELIX_DISPATCH_ALL_TYPES(grad_out.dtype(), "relu_backward", [&] {
+            HELIX_DISPATCH_ALL_TYPES(target_dtype, "relu_backward", [&] {
                 CPUBackend::relu_backward(
                     lhs.data_ptr<scalar_t>(), rhs.data_ptr<scalar_t>(), out.data_ptr<scalar_t>(), out.numel()
                 );
@@ -751,6 +760,7 @@ namespace helix {
         } else {
             throw std::runtime_error("Unsupported device");
         }
+
         return out;
     }
 

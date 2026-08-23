@@ -435,3 +435,29 @@ TEST_F(AutogradMultiDTypeTest, Optimizer_ZeroGrad_MultipleSteps) {
         EXPECT_DOUBLE_EQ(grad[1], 0.0);
     }
 }
+TEST_F(AutogradMultiDTypeTest, ReLUBackward_DTypeMismatch_EdgeCase) {
+    // Tests Bug 7: ReLUBackward should correctly cast its inputs if the incoming
+    // grad_out has a different dtype (e.g. Float64 grad_out into Float32 ReLU).
+    Tensor a = Tensor::ones(Shape({2}), DType::Float32);
+    a.data_ptr<float>()[0] = -2.0f;
+    a.data_ptr<float>()[1] = 2.0f;
+    a.set_requires_grad(true);
+
+    Tensor b = a.relu();
+
+    // Create a Float64 explicit gradient
+    Tensor grad_out = Tensor::ones(Shape({2}), DType::Float64);
+    grad_out.data_ptr<double>()[0] = 10.0;
+    grad_out.data_ptr<double>()[1] = 10.0;
+
+    // This should NOT throw data_ptr<T> mismatched dtype anymore!
+    EXPECT_NO_THROW(b.backward({grad_out}));
+
+    EXPECT_TRUE(a.has_grad());
+    if (a.has_grad()) {
+        // AccumulateGrad explicitly casts the incoming gradient back to the leaf tensor's dtype
+        EXPECT_EQ(a.grad().dtype(), DType::Float32);
+        EXPECT_FLOAT_EQ(a.grad().data_ptr<float>()[0], 0.0f);
+        EXPECT_FLOAT_EQ(a.grad().data_ptr<float>()[1], 10.0f);
+    }
+}
