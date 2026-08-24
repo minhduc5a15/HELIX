@@ -159,9 +159,8 @@ namespace helix {
 
         Tensor safe_src = (src.dtype() != dtype()) ? Dispatcher::cast(src, dtype()) : src;
 
-        bool has_overlap =
-            has_internal_overlap() || safe_src.has_internal_overlap() ||
-            (impl_->data() != safe_src.impl()->data() || stride() != safe_src.stride() || shape() != safe_src.shape());
+        bool is_aliased = (impl_->storage() == safe_src.impl()->storage());
+        bool has_overlap = has_internal_overlap() || safe_src.has_internal_overlap() || is_aliased;
 
         if (is_contiguous() && safe_src.is_contiguous() && !has_overlap) {
             // Both are contiguous and no overlap, safe to memcpy
