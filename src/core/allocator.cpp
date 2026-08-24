@@ -75,8 +75,13 @@ namespace helix {
         ~ThreadCacheWrapper() {
             tls_teardown_initiated = true;
             if (tls_cache_ptr != nullptr) {  // Check if a ThreadCache was actually created for this thread.
+                // Because MemoryPool is a leaked heap singleton, it will NEVER be destroyed
+                // during program exit. This means get_instance() is always 100% safe to call
+                // from detached threads during thread teardown, effectively preventing UAF.
                 MemoryPool& pool = MemoryPool::get_instance();
 
+                // Note: The global_bins_ lock might be contended during process exit if many
+                // detached threads exit simultaneously, but it guarantees memory safety.
                 // Step 1: Remove the current thread's cache from the global list of all caches.
                 // This prevents `reset()` from trying to access a destructing cache.
                 {
@@ -336,9 +341,15 @@ namespace helix {
      * @return A reference to the single MemoryPool instance.
      */
     auto MemoryPool::get_instance() -> MemoryPool& {
-        // Meyers' singleton: thread-safe initialization on first call.
-        static MemoryPool instance;
-        return instance;
+        // Heap Singleton: thread-safe initialization on first call.
+        // We intentionally LEAK the instance by allocating it dynamically.
+        // This prevents the object from being destroyed at process exit,
+        // which completely eliminates Use-After-Free (UAF) crashes when detached
+        // background threads try to return memory during teardown.
+        // Valgrind and LeakSanitizer consider this memory "still reachable",
+        // bypassing spurious "definitely lost" reports.
+        static MemoryPool* instance = new MemoryPool();
+        return *instance;
     }
 
     /**
