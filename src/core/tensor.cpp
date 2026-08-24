@@ -274,26 +274,32 @@ namespace helix {
     }
 
     auto Tensor::has_internal_overlap() const -> bool {
+        // No element, no drama.
         if (rank() == 0 || numel() <= 1) return false;
 
         std::vector<std::pair<size_t, size_t>> stride_shape;
         for (size_t i = 0; i < rank(); ++i) {
             if (shape()[i] > 1) {
-                if (stride()[i] == 0) return true;
+                if (stride()[i] == 0) return true;  // sharing is not caring here
                 stride_shape.push_back({static_cast<size_t>(std::abs(stride()[i])), shape()[i]});
             }
         }
-
         if (stride_shape.empty()) return false;
 
-        std::ranges::sort(stride_shape, [](const auto& a, const auto& b) { return a.first < b.first; });
+        std::ranges::sort(stride_shape, [](auto& a, auto& b) { return a.first < b.first; });
 
         for (size_t i = 0; i < stride_shape.size() - 1; ++i) {
+            // Conservative? Yes. Paranoid? Maybe. Safe? Absolutely.
+            // This may return true for perfectly innocent tensors (false positive).
+            // But we'd rather clone a few extra times than corrupt memory silently.
+            // Life is too short for exact integer linear programming here.
+            // (And PyTorch does it too, so if we're wrong, we're in good company.)
             if (stride_shape[i + 1].first < stride_shape[i].first * stride_shape[i].second) {
                 return true;
             }
         }
 
+        // We're pretty sure there's no overlap. If there is, well, it's not our fault.
         return false;
     }
 

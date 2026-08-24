@@ -1,6 +1,5 @@
 #include "autograd/engine.hpp"
 
-#include <algorithm>
 #include <queue>
 #include <stdexcept>
 #include <unordered_map>
