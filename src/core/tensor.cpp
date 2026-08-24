@@ -105,6 +105,44 @@ namespace helix {
 
     auto Tensor::clone() const -> Tensor { return Dispatcher::clone(*this); }
 
+    namespace {
+        template <typename scalar_t>
+        void copy_fallback_kernel(
+            scalar_t* dst_data, const scalar_t* src_data, const Tensor& dst, const Tensor& safe_src
+        ) {
+            const size_t total_elements = dst.numel();
+
+#pragma omp parallel
+            {
+#if defined(_OPENMP)
+                const size_t tid = omp_get_thread_num();
+                const size_t num_threads = omp_get_num_threads();
+#else
+                const size_t tid = 0;
+                const size_t num_threads = 1;
+#endif
+                const size_t chunk = (total_elements + num_threads - 1) / num_threads;
+                const size_t start = tid * chunk;
+                const size_t end = std::min(start + chunk, total_elements);
+
+                if (start < end) {
+                    NDIterator it_src(safe_src.shape());
+                    NDIterator it_dst(dst.shape());
+                    it_src.init_from_flat(start);
+                    it_dst.init_from_flat(start);
+                    ptrdiff_t offset_src = it_src.compute_offset(safe_src.stride());
+                    ptrdiff_t offset_dst = it_dst.compute_offset(dst.stride());
+
+                    for (size_t i = start; i < end; ++i) {
+                        dst_data[offset_dst] = src_data[offset_src];
+                        it_src.advance(offset_src, safe_src.stride());
+                        it_dst.advance(offset_dst, dst.stride());
+                    }
+                }
+            }
+        }
+    }  // namespace
+
     void Tensor::copy_(const Tensor& src) {
         if (numel() != src.numel()) {
             throw std::invalid_argument("Size mismatch in copy_");
@@ -128,7 +166,7 @@ namespace helix {
         if (is_contiguous() && safe_src.is_contiguous() && !has_overlap) {
             // Both are contiguous and no overlap, safe to memcpy
             std::memcpy(impl_->data(), safe_src.impl()->data(), numel() * dtype_size(dtype()));
-        } else if (rank() == 2 && shape() == safe_src.shape()) {
+        } else if (shape() == safe_src.shape()) {
             HELIX_DISPATCH_ALL_TYPES(dtype(), "copy_", [&] {
                 scalar_t* dst_data = data_ptr<scalar_t>();
                 const scalar_t* src_data = safe_src.data_ptr<scalar_t>();
@@ -153,38 +191,11 @@ namespace helix {
                 }
             });
         } else {
-            float* dst_data = data_ptr();
-            const float* src_data = safe_src.data_ptr();
-            const size_t total_elements = numel();
-
-#pragma omp parallel
-            {
-#if defined(_OPENMP)
-                const size_t tid = omp_get_thread_num();
-                const size_t num_threads = omp_get_num_threads();
-#else
-                const size_t tid = 0;
-                const size_t num_threads = 1;
-#endif
-                const size_t chunk = (total_elements + num_threads - 1) / num_threads;
-                const size_t start = tid * chunk;
-                const size_t end = std::min(start + chunk, total_elements);
-
-                if (start < end) {
-                    NDIterator it_src(safe_src.shape());
-                    NDIterator it_dst(shape());
-                    it_src.init_from_flat(start);
-                    it_dst.init_from_flat(start);
-                    ptrdiff_t offset_src = it_src.compute_offset(safe_src.stride());
-                    ptrdiff_t offset_dst = it_dst.compute_offset(stride());
-
-                    for (size_t i = start; i < end; ++i) {
-                        dst_data[offset_dst] = src_data[offset_src];
-                        it_src.advance(offset_src, safe_src.stride());
-                        it_dst.advance(offset_dst, stride());
-                    }
-                }
-            }
+            HELIX_DISPATCH_ALL_TYPES(dtype(), "copy_", [&] {
+                scalar_t* dst_data = data_ptr<scalar_t>();
+                const scalar_t* src_data = safe_src.data_ptr<scalar_t>();
+                copy_fallback_kernel<scalar_t>(dst_data, src_data, *this, safe_src);
+            });
         }
 
         increment_version();
