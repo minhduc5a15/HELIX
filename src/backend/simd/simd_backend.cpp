@@ -3,6 +3,12 @@
 #include <algorithm>
 #if defined(__AVX2__)
 #include <immintrin.h>
+
+inline __m256i get_tail_mask(size_t remain) {
+    __m256i vindex = _mm256_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7);
+    __m256i vremain = _mm256_set1_epi32(remain);
+    return _mm256_cmpgt_epi32(vremain, vindex);
+}
 #endif
 
 namespace helix {
@@ -24,6 +30,14 @@ namespace helix {
             const __m256 vout = _mm256_add_ps(va, vb);
             _mm256_storeu_ps(out + i, vout);
         }
+        if (i < size) {
+            __m256i vmask = get_tail_mask(size - i);
+            const __m256 va = _mm256_maskload_ps(a + i, vmask);
+            const __m256 vb = _mm256_maskload_ps(b + i, vmask);
+            const __m256 vout = _mm256_add_ps(va, vb);
+            _mm256_maskstore_ps(out + i, vmask, vout);
+            i = size;
+        }
 #endif
         for (; i < size; ++i) out[i] = a[i] + b[i];
     }
@@ -36,6 +50,14 @@ namespace helix {
             const __m256 vb = _mm256_loadu_ps(b + i);
             const __m256 vout = _mm256_sub_ps(va, vb);
             _mm256_storeu_ps(out + i, vout);
+        }
+        if (i < size) {
+            __m256i vmask = get_tail_mask(size - i);
+            const __m256 va = _mm256_maskload_ps(a + i, vmask);
+            const __m256 vb = _mm256_maskload_ps(b + i, vmask);
+            const __m256 vout = _mm256_sub_ps(va, vb);
+            _mm256_maskstore_ps(out + i, vmask, vout);
+            i = size;
         }
 #endif
         for (; i < size; ++i) out[i] = a[i] - b[i];
@@ -50,6 +72,14 @@ namespace helix {
             const __m256 vout = _mm256_mul_ps(va, vb);
             _mm256_storeu_ps(out + i, vout);
         }
+        if (i < size) {
+            __m256i vmask = get_tail_mask(size - i);
+            const __m256 va = _mm256_maskload_ps(a + i, vmask);
+            const __m256 vb = _mm256_maskload_ps(b + i, vmask);
+            const __m256 vout = _mm256_mul_ps(va, vb);
+            _mm256_maskstore_ps(out + i, vmask, vout);
+            i = size;
+        }
 #endif
         for (; i < size; ++i) out[i] = a[i] * b[i];
     }
@@ -62,6 +92,14 @@ namespace helix {
             const __m256 vb = _mm256_loadu_ps(b + i);
             const __m256 vout = _mm256_div_ps(va, vb);
             _mm256_storeu_ps(out + i, vout);
+        }
+        if (i < size) {
+            __m256i vmask = get_tail_mask(size - i);
+            const __m256 va = _mm256_maskload_ps(a + i, vmask);
+            const __m256 vb = _mm256_maskload_ps(b + i, vmask);
+            const __m256 vout = _mm256_div_ps(va, vb);
+            _mm256_maskstore_ps(out + i, vmask, vout);
+            i = size;
         }
 #endif
         for (; i < size; ++i) out[i] = a[i] / b[i];
@@ -76,6 +114,13 @@ namespace helix {
             const __m256 vout = _mm256_add_ps(va, vscalar);
             _mm256_storeu_ps(out + i, vout);
         }
+        if (i < size) {
+            __m256i vmask = get_tail_mask(size - i);
+            const __m256 va = _mm256_maskload_ps(a + i, vmask);
+            const __m256 vout = _mm256_add_ps(va, vscalar);
+            _mm256_maskstore_ps(out + i, vmask, vout);
+            i = size;
+        }
 #endif
         for (; i < size; ++i) out[i] = a[i] + scalar;
     }
@@ -88,6 +133,13 @@ namespace helix {
             const __m256 va = _mm256_loadu_ps(a + i);
             const __m256 vout = _mm256_sub_ps(va, vscalar);
             _mm256_storeu_ps(out + i, vout);
+        }
+        if (i < size) {
+            __m256i vmask = get_tail_mask(size - i);
+            const __m256 va = _mm256_maskload_ps(a + i, vmask);
+            const __m256 vout = _mm256_sub_ps(va, vscalar);
+            _mm256_maskstore_ps(out + i, vmask, vout);
+            i = size;
         }
 #endif
         for (; i < size; ++i) out[i] = a[i] - scalar;
@@ -102,6 +154,13 @@ namespace helix {
             const __m256 vout = _mm256_mul_ps(va, vscalar);
             _mm256_storeu_ps(out + i, vout);
         }
+        if (i < size) {
+            __m256i vmask = get_tail_mask(size - i);
+            const __m256 va = _mm256_maskload_ps(a + i, vmask);
+            const __m256 vout = _mm256_mul_ps(va, vscalar);
+            _mm256_maskstore_ps(out + i, vmask, vout);
+            i = size;
+        }
 #endif
         for (; i < size; ++i) out[i] = a[i] * scalar;
     }
@@ -114,6 +173,13 @@ namespace helix {
             const __m256 va = _mm256_loadu_ps(a + i);
             const __m256 vout = _mm256_div_ps(va, vscalar);
             _mm256_storeu_ps(out + i, vout);
+        }
+        if (i < size) {
+            __m256i vmask = get_tail_mask(size - i);
+            const __m256 va = _mm256_maskload_ps(a + i, vmask);
+            const __m256 vout = _mm256_div_ps(va, vscalar);
+            _mm256_maskstore_ps(out + i, vmask, vout);
+            i = size;
         }
 #endif
         for (; i < size; ++i) out[i] = a[i] / scalar;
@@ -128,6 +194,13 @@ namespace helix {
             const __m256 vout = _mm256_sub_ps(vzero, va);
             _mm256_storeu_ps(out + i, vout);
         }
+        if (i < size) {
+            __m256i vmask = get_tail_mask(size - i);
+            const __m256 va = _mm256_maskload_ps(a + i, vmask);
+            const __m256 vout = _mm256_sub_ps(vzero, va);
+            _mm256_maskstore_ps(out + i, vmask, vout);
+            i = size;
+        }
 #endif
         for (; i < size; ++i) out[i] = -a[i];
     }
@@ -140,6 +213,13 @@ namespace helix {
             const __m256 va = _mm256_loadu_ps(a + i);
             const __m256 vout = _mm256_max_ps(vzero, va);
             _mm256_storeu_ps(out + i, vout);
+        }
+        if (i < size) {
+            __m256i vmask = get_tail_mask(size - i);
+            const __m256 va = _mm256_maskload_ps(a + i, vmask);
+            const __m256 vout = _mm256_max_ps(vzero, va);
+            _mm256_maskstore_ps(out + i, vmask, vout);
+            i = size;
         }
 #endif
         for (; i < size; ++i) out[i] = std::max(0.0f, a[i]);

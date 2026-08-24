@@ -1,5 +1,6 @@
 #include "autograd/engine.hpp"
 
+#include <algorithm>
 #include <queue>
 #include <stdexcept>
 #include <unordered_map>
@@ -167,7 +168,13 @@ namespace helix {
             Node* curr = ready_queue.front();
             ready_queue.pop();
 
-            auto current_grads = node_gradients[curr];
+            auto node_handle = node_gradients.extract(curr);
+
+            if (node_handle.empty()) {
+                throw std::runtime_error("No gradients found for node during backward pass.");
+            }
+
+            auto current_grads = std::move(node_handle.mapped());
             auto input_grads = curr->backward(current_grads);
 
             const auto& next_edges = curr->next_edges();
@@ -179,25 +186,26 @@ namespace helix {
                 if (next_edges[i]) {
                     Node* next = next_edges[i].get();
 
-                    if (!node_gradients.contains(next)) {
-                        node_gradients[next] = {input_grads[i]};
+                    auto [it_next, inserted] = node_gradients.try_emplace(next);
+
+                    if (inserted) {
+                        it_next->second.push_back(std::move(input_grads[i]));
                     } else {
-                        // Inplace gradient accumulation if safe
-                        Tensor grad_to_add = input_grads[i];
-                        if (grad_to_add.dtype() != node_gradients[next][0].dtype()) {
-                            grad_to_add = Dispatcher::cast(grad_to_add, node_gradients[next][0].dtype());
+                        auto& target_grad = it_next->second[0];
+                        Tensor grad_to_add = std::move(input_grads[i]);
+                        if (grad_to_add.dtype() != target_grad.dtype()) {
+                            grad_to_add = Dispatcher::cast(grad_to_add, target_grad.dtype());
                         }
-                        if (!node_gradients[next][0].is_shared() &&
-                            node_gradients[next][0].shape() == grad_to_add.shape() &&
-                            !node_gradients[next][0].has_internal_overlap()) {
-                            node_gradients[next][0].add_(grad_to_add);
+
+                        if (!target_grad.is_shared() && target_grad.shape() == grad_to_add.shape() &&
+                            !target_grad.has_internal_overlap()) {
+                            target_grad.add_(grad_to_add);
                         } else {
-                            node_gradients[next][0] = node_gradients[next][0] + grad_to_add;
+                            target_grad = target_grad + grad_to_add;
                         }
                     }
 
-                    in_degrees[next]--;
-                    if (in_degrees[next] == 0) {
+                    if (--in_degrees[next] == 0) {
                         ready_queue.push(next);
                     }
                 }
