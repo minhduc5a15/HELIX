@@ -1,8 +1,49 @@
 #include <gtest/gtest.h>
 
+#include <atomic>
+
 #include "core/tensor.hpp"
+#include "core/tensor_iterator.hpp"
 
 using namespace helix;
+
+TEST(OpsTest, TensorIteratorCoalescesContiguousDimensions) {
+    Tensor output(Shape{2, 3, 4});
+    Tensor input(Shape{2, 3, 4});
+    TensorIterator iterator(output, {&input});
+
+    EXPECT_EQ(iterator.rank(), 1);
+    EXPECT_EQ(iterator.numel(), 24);
+    EXPECT_TRUE(iterator.is_contiguous());
+}
+
+TEST(OpsTest, TensorIteratorParallelBroadcastTraversal) {
+    Tensor output(Shape{2, 3});
+    Tensor input({10.0f, 20.0f, 30.0f}, Shape{3});
+    TensorIterator iterator(output, {&input});
+    std::atomic<size_t> visits = 0;
+
+    iterator.for_each_parallel(
+        [&](const size_t flat_index, const auto& offsets) {
+            output.data_ptr()[flat_index] = input.data_ptr()[offsets[1]];
+            visits.fetch_add(1, std::memory_order_relaxed);
+        },
+        1
+    );
+
+    EXPECT_EQ(visits, 6);
+    EXPECT_FLOAT_EQ(output.item({0, 0}), 10.0f);
+    EXPECT_FLOAT_EQ(output.item({0, 2}), 30.0f);
+    EXPECT_FLOAT_EQ(output.item({1, 0}), 10.0f);
+    EXPECT_FLOAT_EQ(output.item({1, 2}), 30.0f);
+}
+
+TEST(OpsTest, TensorIteratorRejectsZeroGrainSize) {
+    Tensor output(Shape{2});
+    TensorIterator iterator(output, {});
+
+    EXPECT_THROW(iterator.for_each_parallel([](const size_t, const auto&) {}, 0), std::invalid_argument);
+}
 
 TEST(OpsTest, BasicAdd) {
     Tensor a({1.0f, 2.0f, 3.0f}, Shape{3});
@@ -40,6 +81,23 @@ TEST(OpsTest, TransposedAdd) {
     EXPECT_FLOAT_EQ(c.item({0, 1}), 23.0f);
     EXPECT_FLOAT_EQ(c.item({1, 0}), 32.0f);
     EXPECT_FLOAT_EQ(c.item({1, 1}), 44.0f);
+}
+
+TEST(OpsTest, BroadcastBinaryOpsUseStridedIterator) {
+    Tensor a({2, 4, 6, 8}, Shape{2, 2});
+    Tensor b({1, 2}, Shape{2});
+
+    Tensor transposed = a.transpose(0, 1);
+    Tensor subtracted = transposed - b;
+    Tensor multiplied = transposed * b;
+    Tensor divided = transposed / b;
+
+    EXPECT_FLOAT_EQ(subtracted.item({0, 0}), 1.0f);
+    EXPECT_FLOAT_EQ(subtracted.item({1, 1}), 6.0f);
+    EXPECT_FLOAT_EQ(multiplied.item({0, 1}), 12.0f);
+    EXPECT_FLOAT_EQ(multiplied.item({1, 0}), 4.0f);
+    EXPECT_FLOAT_EQ(divided.item({0, 1}), 3.0f);
+    EXPECT_FLOAT_EQ(divided.item({1, 1}), 4.0f);
 }
 
 TEST(OpsTest, UnaryNeg) {

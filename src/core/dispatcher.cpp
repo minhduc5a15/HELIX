@@ -13,9 +13,34 @@
 #include "core/graph_builder.hpp"
 #include "core/nd_iterator.hpp"
 #include "core/tensor.hpp"
+#include "core/tensor_iterator.hpp"
 
 namespace helix {
     namespace {
+        template <typename scalar_t, typename Operation>
+        void run_binary_kernel(
+            const Tensor& lhs,
+            const Tensor& rhs,
+            Tensor& out,
+            void (*contiguous_kernel)(const scalar_t*, const scalar_t*, scalar_t*, size_t),
+            Operation&& operation
+        ) {
+            TensorIterator iterator(out, {&lhs, &rhs});
+            if (iterator.is_contiguous()) {
+                contiguous_kernel(
+                    lhs.data_ptr<scalar_t>(), rhs.data_ptr<scalar_t>(), out.data_ptr<scalar_t>(), out.numel()
+                );
+                return;
+            }
+
+            scalar_t* output_data = out.data_ptr<scalar_t>();
+            const scalar_t* lhs_data = lhs.data_ptr<scalar_t>();
+            const scalar_t* rhs_data = rhs.data_ptr<scalar_t>();
+            iterator.for_each_parallel([&](const size_t flat_index, const auto& offsets) {
+                output_data[flat_index] = operation(lhs_data[offsets[1]], rhs_data[offsets[2]]);
+            });
+        }
+
         template <typename src_t, typename dst_t>
         void cast_kernel(const src_t* src_data, dst_t* dst_data, size_t numel) {
 #pragma omp parallel for if (numel >= OMP_THRESHOLD)
@@ -372,15 +397,11 @@ namespace helix {
         return out;
     }
 
-    // NOTE:
-    // Current CPU backend only supports contiguous tensors.
-    // Once TensorIterator is implemented,
-    // remove these contiguous() calls.
     Tensor Dispatcher::add(const Tensor& a, const Tensor& b) {
         const Shape out_shape = compute_broadcast_shape(a.shape(), b.shape());
         const DType out_dtype = promote_types(a.dtype(), b.dtype());
-        Tensor lhs = ensure_contiguous(a.broadcast_to_view(out_shape));
-        Tensor rhs = ensure_contiguous(b.broadcast_to_view(out_shape));
+        Tensor lhs = a.broadcast_to_view(out_shape);
+        Tensor rhs = b.broadcast_to_view(out_shape);
 
         if (lhs.dtype() != out_dtype) lhs = cast(lhs, out_dtype);
         if (rhs.dtype() != out_dtype) rhs = cast(rhs, out_dtype);
@@ -388,9 +409,9 @@ namespace helix {
         Tensor out(out_shape, out_dtype, a.device());
         if (a.device().is_cpu()) {
             HELIX_DISPATCH_ALL_TYPES(out_dtype, "add", [&] {
-                CPUBackend::add(
-                    lhs.data_ptr<scalar_t>(), rhs.data_ptr<scalar_t>(), out.data_ptr<scalar_t>(), out.numel()
-                );
+                run_binary_kernel<scalar_t>(lhs, rhs, out, CPUBackend::add<scalar_t>, [](scalar_t lhs, scalar_t rhs) {
+                    return lhs + rhs;
+                });
             });
         } else {
             throw std::runtime_error("Unsupported device");
@@ -443,17 +464,17 @@ namespace helix {
     Tensor Dispatcher::sub(const Tensor& a, const Tensor& b) {
         const Shape out_shape = compute_broadcast_shape(a.shape(), b.shape());
         const DType out_dtype = promote_types(a.dtype(), b.dtype());
-        Tensor lhs = ensure_contiguous(a.broadcast_to_view(out_shape));
-        Tensor rhs = ensure_contiguous(b.broadcast_to_view(out_shape));
+        Tensor lhs = a.broadcast_to_view(out_shape);
+        Tensor rhs = b.broadcast_to_view(out_shape);
         if (lhs.dtype() != out_dtype) lhs = cast(lhs, out_dtype);
         if (rhs.dtype() != out_dtype) rhs = cast(rhs, out_dtype);
 
         Tensor out(out_shape, out_dtype, a.device());
         if (a.device().is_cpu()) {
             HELIX_DISPATCH_ALL_TYPES(out_dtype, "sub", [&] {
-                CPUBackend::sub(
-                    lhs.data_ptr<scalar_t>(), rhs.data_ptr<scalar_t>(), out.data_ptr<scalar_t>(), out.numel()
-                );
+                run_binary_kernel<scalar_t>(lhs, rhs, out, CPUBackend::sub<scalar_t>, [](scalar_t lhs, scalar_t rhs) {
+                    return lhs - rhs;
+                });
             });
         } else {
             throw std::runtime_error("Unsupported device");
@@ -469,17 +490,17 @@ namespace helix {
     Tensor Dispatcher::mul(const Tensor& a, const Tensor& b) {
         const Shape out_shape = compute_broadcast_shape(a.shape(), b.shape());
         const DType out_dtype = promote_types(a.dtype(), b.dtype());
-        Tensor lhs = ensure_contiguous(a.broadcast_to_view(out_shape));
-        Tensor rhs = ensure_contiguous(b.broadcast_to_view(out_shape));
+        Tensor lhs = a.broadcast_to_view(out_shape);
+        Tensor rhs = b.broadcast_to_view(out_shape);
         if (lhs.dtype() != out_dtype) lhs = cast(lhs, out_dtype);
         if (rhs.dtype() != out_dtype) rhs = cast(rhs, out_dtype);
 
         Tensor out(out_shape, out_dtype, a.device());
         if (a.device().is_cpu()) {
             HELIX_DISPATCH_ALL_TYPES(out_dtype, "mul", [&] {
-                CPUBackend::mul(
-                    lhs.data_ptr<scalar_t>(), rhs.data_ptr<scalar_t>(), out.data_ptr<scalar_t>(), out.numel()
-                );
+                run_binary_kernel<scalar_t>(lhs, rhs, out, CPUBackend::mul<scalar_t>, [](scalar_t lhs, scalar_t rhs) {
+                    return lhs * rhs;
+                });
             });
         } else {
             throw std::runtime_error("Unsupported device");
@@ -495,17 +516,17 @@ namespace helix {
     Tensor Dispatcher::div(const Tensor& a, const Tensor& b) {
         const Shape out_shape = compute_broadcast_shape(a.shape(), b.shape());
         const DType out_dtype = promote_to_float(promote_types(a.dtype(), b.dtype()));
-        Tensor lhs = ensure_contiguous(a.broadcast_to_view(out_shape));
-        Tensor rhs = ensure_contiguous(b.broadcast_to_view(out_shape));
+        Tensor lhs = a.broadcast_to_view(out_shape);
+        Tensor rhs = b.broadcast_to_view(out_shape);
         if (lhs.dtype() != out_dtype) lhs = cast(lhs, out_dtype);
         if (rhs.dtype() != out_dtype) rhs = cast(rhs, out_dtype);
 
         Tensor out(out_shape, out_dtype, a.device());
         if (a.device().is_cpu()) {
             HELIX_DISPATCH_ALL_TYPES(out_dtype, "div", [&] {
-                CPUBackend::div(
-                    lhs.data_ptr<scalar_t>(), rhs.data_ptr<scalar_t>(), out.data_ptr<scalar_t>(), out.numel()
-                );
+                run_binary_kernel<scalar_t>(lhs, rhs, out, CPUBackend::div<scalar_t>, [](scalar_t lhs, scalar_t rhs) {
+                    return lhs / rhs;
+                });
             });
         } else {
             throw std::runtime_error("Unsupported device");
