@@ -44,7 +44,7 @@ Tensor read_mnist_images(const std::string& path) {
     float* tensor_data = images.data_ptr();
 
     for (size_t i = 0; i < raw_data.size(); ++i) {
-        tensor_data[i] = static_cast<float>(raw_data[i]) / 255.0f;
+        tensor_data[i] = (static_cast<float>(raw_data[i]) / 255.0f - 0.1307f) / 0.3081f;
     }
 
     return images;
@@ -114,21 +114,22 @@ int main() {
     std::cout << "Train data: " << X_train.shape()[0] << " samples" << std::endl;
     std::cout << "Test data: " << X_test.shape()[0] << " samples" << std::endl;
 
-    // Define model: 784 -> 128 -> ReLU -> 10
-    Sequential model(Linear(784, 128), ReLU(), Linear(128, 10));
+    // Define model: 784 -> 256 -> ReLU -> 128 -> ReLU -> 10
+    Sequential model(Linear(784, 256), ReLU(), Linear(256, 128), ReLU(), Linear(128, 10));
 
     // Hyperparameters
     size_t num_epochs = 10;
     size_t batch_size = 64;
     float learning_rate = 0.05f;
 
-    SGD optimizer(model.parameters(), learning_rate);
     size_t num_train_samples = X_train.shape()[0];
     size_t num_batches = num_train_samples / batch_size;
 
     std::cout << "\nStarting training..." << std::endl;
 
     for (size_t epoch = 0; epoch < num_epochs; ++epoch) {
+        SGD optimizer(model.parameters(), learning_rate);
+
         auto start_time = std::chrono::high_resolution_clock::now();
         float total_loss = 0.0f;
         size_t correct_preds = 0;
@@ -177,6 +178,9 @@ int main() {
                   << std::setprecision(4) << avg_loss << " - " << "Acc: " << std::fixed << std::setprecision(2)
                   << accuracy << "% - " << "Time: " << std::fixed << std::setprecision(2) << duration.count() << "s"
                   << std::endl;
+
+        // StepLR: Decay learning rate
+        learning_rate *= 0.9f;
     }
 
     std::cout << "\nEvaluating on test set..." << std::endl;

@@ -46,3 +46,12 @@ gtest_discover_tests(test_graph_leak)
 add_executable(test_detached_thread_uaf test_detached_thread_uaf.cpp)
 target_link_libraries(test_detached_thread_uaf PRIVATE helix GTest::gtest_main)
 gtest_discover_tests(test_detached_thread_uaf)
+
+add_executable(stress_extreme_shapes stress_extreme_shapes.cpp)
+target_link_libraries(stress_extreme_shapes PRIVATE helix GTest::gtest_main)
+gtest_discover_tests(stress_extreme_shapes)
+
+add_executable(stress_multithread_openmp stress_multithread_openmp.cpp)
+target_link_libraries(stress_multithread_openmp PRIVATE helix GTest::gtest_main)
+gtest_discover_tests(stress_multithread_openmp)
+
