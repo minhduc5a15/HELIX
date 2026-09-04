@@ -98,10 +98,10 @@ namespace helix {
             const size_t total_elements = numel();
             if (grain_size == 0) throw std::invalid_argument("TensorIterator grain size must be positive");
             if (total_elements == 0) return;
-            const size_t chunk_count = total_elements / grain_size + (total_elements % grain_size != 0);
+            const ptrdiff_t chunk_count = total_elements / grain_size + (total_elements % grain_size != 0);
 
 #pragma omp parallel for schedule(static) if (total_elements > grain_size)
-            for (size_t chunk_index = 0; chunk_index < chunk_count; ++chunk_index) {
+            for (ptrdiff_t chunk_index = 0; chunk_index < chunk_count; ++chunk_index) {
                 const size_t start = chunk_index * grain_size;
                 const size_t end = start + std::min(grain_size, total_elements - start);
                 OffsetArray offsets{};
