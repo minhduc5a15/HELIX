@@ -38,6 +38,25 @@ TEST(OpsTest, TensorIteratorParallelBroadcastTraversal) {
     EXPECT_FLOAT_EQ(output.item({1, 2}), 30.0f);
 }
 
+TEST(OpsTest, TensorIteratorWritesToTransposedOutputOffsets) {
+    Tensor storage = Tensor::zeros(Shape{2, 3});
+    Tensor output = storage.transpose(0, 1);
+    Tensor input({1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f}, Shape{3, 2});
+    TensorIterator iterator(output, {&input});
+
+    EXPECT_EQ(output.stride(), Stride(std::vector<ptrdiff_t>{1, 3}));
+    iterator.for_each([&](const size_t, const auto& offsets) {
+        output.data_ptr()[offsets[0]] = input.data_ptr()[offsets[1]];
+    });
+
+    EXPECT_FLOAT_EQ(storage.item({0, 0}), 1.0f);
+    EXPECT_FLOAT_EQ(storage.item({0, 1}), 3.0f);
+    EXPECT_FLOAT_EQ(storage.item({0, 2}), 5.0f);
+    EXPECT_FLOAT_EQ(storage.item({1, 0}), 2.0f);
+    EXPECT_FLOAT_EQ(storage.item({1, 1}), 4.0f);
+    EXPECT_FLOAT_EQ(storage.item({1, 2}), 6.0f);
+}
+
 TEST(OpsTest, TensorIteratorRejectsZeroGrainSize) {
     Tensor output(Shape{2});
     TensorIterator iterator(output, {});
@@ -54,6 +73,68 @@ TEST(OpsTest, BasicAdd) {
     EXPECT_FLOAT_EQ(c.item({0}), 5.0f);
     EXPECT_FLOAT_EQ(c.item({1}), 7.0f);
     EXPECT_FLOAT_EQ(c.item({2}), 9.0f);
+}
+
+TEST(OpsTest, ContiguousHighRankAddBypassesFixedRankIterator) {
+    const Shape high_rank_shape{2, 2, 2, 2, 2, 2, 2, 2, 2};
+    Tensor lhs = Tensor::ones(high_rank_shape);
+    Tensor rhs = Tensor::full(high_rank_shape, 2.0f);
+
+    Tensor result = lhs + rhs;
+
+    ASSERT_EQ(result.shape(), high_rank_shape);
+    for (size_t index = 0; index < result.numel(); ++index) {
+        EXPECT_FLOAT_EQ(result.data_ptr()[index], 3.0f);
+    }
+}
+
+TEST(OpsTest, ContiguousHighRankSubBypassesFixedRankIterator) {
+    const Shape high_rank_shape{2, 2, 2, 2, 2, 2, 2, 2, 2};
+    Tensor lhs = Tensor::full(high_rank_shape, 3.0f);
+    Tensor rhs = Tensor::ones(high_rank_shape);
+
+    Tensor result = lhs - rhs;
+
+    ASSERT_EQ(result.shape(), high_rank_shape);
+    for (size_t index = 0; index < result.numel(); ++index) {
+        EXPECT_FLOAT_EQ(result.data_ptr()[index], 2.0f);
+    }
+}
+
+TEST(OpsTest, ContiguousHighRankMulBypassesFixedRankIterator) {
+    const Shape high_rank_shape{2, 2, 2, 2, 2, 2, 2, 2, 2};
+    Tensor lhs = Tensor::full(high_rank_shape, 3.0f);
+    Tensor rhs = Tensor::full(high_rank_shape, 2.0f);
+
+    Tensor result = lhs * rhs;
+
+    ASSERT_EQ(result.shape(), high_rank_shape);
+    for (size_t index = 0; index < result.numel(); ++index) {
+        EXPECT_FLOAT_EQ(result.data_ptr()[index], 6.0f);
+    }
+}
+
+TEST(OpsTest, ContiguousHighRankDivBypassesFixedRankIterator) {
+    const Shape high_rank_shape{2, 2, 2, 2, 2, 2, 2, 2, 2};
+    Tensor lhs = Tensor::full(high_rank_shape, 6.0f);
+    Tensor rhs = Tensor::full(high_rank_shape, 2.0f);
+
+    Tensor result = lhs / rhs;
+
+    ASSERT_EQ(result.shape(), high_rank_shape);
+    for (size_t index = 0; index < result.numel(); ++index) {
+        EXPECT_FLOAT_EQ(result.data_ptr()[index], 3.0f);
+    }
+}
+
+TEST(OpsTest, ZeroSizedBroadcastProducesEmptyTensor) {
+    Tensor empty_batch = Tensor::zeros(Shape{2, 0, 3});
+    Tensor channel_values = Tensor::ones(Shape{3});
+
+    Tensor result = empty_batch + channel_values;
+
+    EXPECT_EQ(result.shape(), Shape({2, 0, 3}));
+    EXPECT_EQ(result.numel(), 0);
 }
 
 TEST(OpsTest, BroadcastAdd) {

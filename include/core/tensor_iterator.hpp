@@ -1,7 +1,7 @@
 #pragma once
 
-#include <array>
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <initializer_list>
 #include <stdexcept>

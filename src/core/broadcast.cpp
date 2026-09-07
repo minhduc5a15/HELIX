@@ -21,7 +21,9 @@ namespace helix {
                 throw std::invalid_argument("Shapes are not broadcastable");
             }
 
-            out_dims[max_rank - 1 - i] = std::max(dim_a, dim_b);
+            // Selecting the non-unit extent is significant for empty dimensions:
+            // broadcasting 0 with 1 produces 0, not max(0, 1) == 1.
+            out_dims[max_rank - 1 - i] = (dim_a == 1) ? dim_b : dim_a;
         }
 
         return Shape(out_dims);

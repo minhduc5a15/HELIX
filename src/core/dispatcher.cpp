@@ -25,6 +25,17 @@ namespace helix {
             void (*contiguous_kernel)(const scalar_t*, const scalar_t*, scalar_t*, size_t),
             Operation&& operation
         ) {
+            // Keep the common dense path independent of TensorIterator's fixed-rank
+            // traversal state. Besides avoiding iterator setup, this preserves support
+            // for contiguous tensors whose rank exceeds MAX_TENSOR_ITERATOR_DIMS.
+            if (lhs.is_contiguous() && rhs.is_contiguous() && out.is_contiguous() && lhs.shape() == out.shape() &&
+                rhs.shape() == out.shape()) {
+                contiguous_kernel(
+                    lhs.data_ptr<scalar_t>(), rhs.data_ptr<scalar_t>(), out.data_ptr<scalar_t>(), out.numel()
+                );
+                return;
+            }
+
             TensorIterator iterator(out, {&lhs, &rhs});
             if (iterator.is_contiguous()) {
                 contiguous_kernel(
@@ -36,8 +47,8 @@ namespace helix {
             scalar_t* output_data = out.data_ptr<scalar_t>();
             const scalar_t* lhs_data = lhs.data_ptr<scalar_t>();
             const scalar_t* rhs_data = rhs.data_ptr<scalar_t>();
-            iterator.for_each_parallel([&](const size_t flat_index, const auto& offsets) {
-                output_data[flat_index] = operation(lhs_data[offsets[1]], rhs_data[offsets[2]]);
+            iterator.for_each_parallel([&](const size_t, const auto& offsets) {
+                output_data[offsets[0]] = operation(lhs_data[offsets[1]], rhs_data[offsets[2]]);
             });
         }
 
