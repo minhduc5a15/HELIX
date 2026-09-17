@@ -1,163 +1,142 @@
-# HELIX: Deep Learning Framework in Modern C++
+# HELIX
 
-HELIX is a Deep Learning Framework built entirely from scratch in C++20. The project's goal is to research and master the core technologies underneath massive frameworks like PyTorch or TensorFlow, including: Tensor Runtime, Reverse-mode Automatic Differentiation (Autograd), and computational optimization (SIMD/OpenMP).
+HELIX is a small deep learning framework implemented in C++20. It is intended for studying tensor runtimes, reverse-mode automatic differentiation, CPU kernels, and neural-network training without depending on an existing tensor library.
 
-## 🌟 Key Features
+The current implementation is CPU-only. It can train multilayer perceptrons and includes an MNIST example, but it is not a replacement for a production framework such as PyTorch or TensorFlow.
 
-- **Tensor Runtime**: Supports n-dimensional arrays, Zero-memory Broadcasting, View Operations (`reshape`, `transpose`) with $O(1)$ latency, and a **Chunked Iterator** for SIMD/OpenMP optimized element-wise iteration.
-- **Dynamic Autograd**: Dynamic Computational Graph (Define-by-Run). Automatically analyzes Topology, guards against stride overlaps, and computes gradients with In-place Accumulation to optimize RAM.
-- **Neural Network Core**: Clean and extensible API. Supports `Module`, `Linear`, `Sequential`, Activation functions (`ReLU`, `Sigmoid`), Optimizers (`SGD`), and Loss functions (`MSE`, `CrossEntropyLoss`).
-- **High-Performance Backends**:
-  - `Naive`: Absolute baseline for correctness.
-  - `Blocked`: Memory Access Pattern optimization (Cache Tiling).
-  - `SIMD AVX2`: Hardware instruction-level optimization (`4x16` Outer Product via 256-bit YMM).
-  - `OpenMP`: Multi-threading level optimization.
-  - `AutoTuner`: JIT Hardware Profiler (Lazy Eval & Explicit Init) to auto-detect the optimal OpenMP Threading threshold.
+## Implemented features
 
----
+- N-dimensional tensors with shapes, strides, broadcasting, slicing, transposition, reshaping, and cloning.
+- `Float32`, `Float64`, `Int32`, and `Int64` dtypes with type promotion.
+- Dynamic reverse-mode autograd for tensor arithmetic, reductions, matrix multiplication, supported view operations, and the provided losses.
+- `Linear`, `ReLU`, and `Sequential` neural-network components.
+- Mean squared error and numerically stable cross entropy with one-hot targets.
+- SGD and gradient clearing.
+- CPU matrix multiplication backends: naive, blocked, AVX2/FMA, and OpenMP.
+- Runtime calibration for choosing between the single-threaded AVX2 and OpenMP float matrix-multiplication paths.
+- Unit, gradient, integration, and stress tests, plus standalone benchmark programs.
 
-## 🏛 Overall Architecture
+## Current scope and limitations
 
-HELIX's architecture is divided into 4 independent layers to ensure Scalability and Maintainability.
+- Computation is implemented only for `DeviceType::CPU`. `DeviceType::CUDA` is declared as API metadata, but no CUDA allocator or kernels exist.
+- `matmul` accepts two 2D tensors; batched matrix multiplication is not implemented.
+- `cross_entropy_loss` expects predictions and one-hot targets with the same `[batch, classes]` shape.
+- Integer tensors cannot require gradients.
+- Autograd must be initialized by calling `init_autograd()` before creating tensors or modules that require gradients.
+- In-place addition on tensors tracked by autograd is rejected. In-place operations on internally overlapping views are also rejected.
+- Model serialization, convolution, normalization, dropout, embeddings, and GPU execution are not implemented.
 
-```mermaid
-graph TD
-    A[Neural Network Layer] -->|Forward / Backward| B(Autograd Engine)
-    B -->|Tensor Operations| C(Tensor Runtime)
-    C -->|Op Dispatching| J{AutoTuner Profiler}
-    J -->|Cache Threshold| D{Dispatcher}
-    
-    D -->|Fallback| E[Naive/Blocked Backend]
-    D -->|SIMD Intrinsics| G[AVX2 Backend]
-    D -->|Multi-threading| H[OpenMP Backend]
-```
+See [Architecture](docs/architecture.md) for the runtime design and [Developer Guide](docs/developer_guide.md) for extension points.
 
-To better understand **Why** we decided on this design (Why use a Dispatcher? Why use Dynamic Graphs instead of Static?), read the [Design Decisions](docs/design_decisions.md) and [Architecture](docs/architecture.md) documents.
+## Requirements
 
----
-
-## Quick Start
-
-### System Requirements
-
-- C++20 Compiler (GCC 10+, Clang 11+).
 - CMake 3.25 or newer.
-- (Optional) AVX2 supported CPU to utilize the SIMD Backend.
+- A C++20 compiler.
+- Ninja for the checked-in CMake preset.
+- OpenMP is optional. CMake uses it when a compatible implementation is found.
+- On x86-64, the default build currently compiles with AVX2 and FMA flags. The resulting binary therefore requires a compatible CPU.
 
-For a fresh Ubuntu installation, you can install all required dependencies with:
+On Ubuntu, the usual development packages can be installed with:
 
 ```bash
-sudo apt update && sudo apt install -y build-essential cmake ninja-build clang libomp-dev git unzip
+sudo apt update
+sudo apt install -y build-essential cmake ninja-build
 ```
 
-### Build
+Install Clang and `libomp-dev` as well when using the ThreadSanitizer configuration.
 
-The project comes with an automation script to simplify the build process:
+## Build and test
 
 ```bash
-# Clone repository
 git clone https://github.com/minhduc5a15/HELIX.git
 cd HELIX
 
-# Build with Release mode and architecture optimization (Native)
 ./build.sh --release
-
-# Run all Unit Tests
 ./run_tests.sh
 ```
 
----
+`build.sh` configures and builds into `build/`. Useful variants are:
 
-## 💡 Minimal Working Example
+```bash
+./build.sh --clean --debug
+./build.sh --clean --release
+./build.sh --clean --tsan
+```
 
-To build and train a Neural Network model, HELIX's API is designed to closely resemble PyTorch to provide maximum familiarity.
+The TSan option requires Clang. The test script forwards additional arguments to CTest, for example:
+
+```bash
+./run_tests.sh -R Autograd
+```
+
+## Minimal training example
 
 ```cpp
+#include <vector>
+
 #include "helix.hpp"
+
 using namespace helix;
 
 int main() {
-    // 1. Initialize Neural Network model
-    auto model = nn::Sequential({
-        std::make_shared<nn::Linear>(2, 16),
-        std::make_shared<nn::ReLU>(),
-        std::make_shared<nn::Linear>(16, 1)
-    });
+    init_autograd();
 
-    // 2. Define Optimizer
-    optim::SGD optimizer(model->parameters(), 0.01);
+    const Tensor inputs(
+        std::vector<float>{0.0F, 0.0F, 0.0F, 1.0F, 1.0F, 0.0F, 1.0F, 1.0F},
+        Shape{4, 2}
+    );
+    const Tensor targets(std::vector<float>{0.0F, 1.0F, 1.0F, 0.0F}, Shape{4, 1});
 
-    // 3. Prepare Data (Inputs) and Labels (Targets)
-    auto inputs = Tensor({{0, 0}, {0, 1}, {1, 0}, {1, 1}}, Shape{4, 2});
-    auto targets = Tensor({{0}, {1}, {1}, {0}}, Shape{4, 1});
+    Sequential model(Linear(2, 4), ReLU(), Linear(4, 1));
+    SGD optimizer(model.parameters(), 0.1F);
 
-    // 4. Training Loop
     for (int epoch = 0; epoch < 1000; ++epoch) {
-        optimizer.zero_grad();                 // Clear previous gradients
-
-        auto outputs = model->forward(inputs); // Forward Pass
-        auto loss = mse_loss(outputs, targets); // Compute Loss
-
-        loss.backward();                     // Backpropagation (Backward Pass)
-        optimizer.step();                    // Update weights
+        optimizer.zero_grad();
+        Tensor prediction = model(inputs);
+        Tensor loss = mse_loss(prediction, targets);
+        loss.backward();
+        optimizer.step();
     }
-
-    return 0;
 }
 ```
 
-### End-to-End Image Classification (MNIST)
-
-HELIX is capable of training realistic datasets like MNIST using its high-performance CPU backend and CrossEntropyLoss. You can run the provided example to see it in action (reaches ~97% accuracy in < 60 seconds):
+The repository builds equivalent runnable examples under `build/examples/`:
 
 ```bash
-# 1. Download and extract the MNIST dataset (requires wget and gzip)
+./build/examples/xor_mlp
+./build/examples/linear_regression
+./build/examples/logic_gates
+```
+
+## MNIST example
+
+The MNIST example trains a `784 -> 256 -> 128 -> 10` multilayer perceptron with ReLU activations and one-hot cross entropy.
+
+```bash
 bash scripts/download_mnist.sh
-
-# 2. Build the MNIST example
-./build.sh
-
-# 3. Run the training loop
-./out/build/HELIX/examples/mnist
+./build.sh --release
+./build/examples/mnist
 ```
 
----
+The example reads files from `data/mnist/`, trains for ten epochs with batches of 64, and reports measured loss, accuracy, and epoch time. Results depend on the compiler, CPU, OpenMP runtime, and random initialization.
 
-## 📊 Performance (Benchmark)
+## Benchmarks
 
-HELIX comes with a Benchmark system to measure the limits of Tensor algorithms.
-For the **Matrix Multiplication (1024x1024)** operation, the SIMD (AVX2) and OpenMP Backends show incredible superiority over traditional algorithms:
+Build and execute all benchmark programs with:
 
-![Benchmark Chart](docs/benchmark_chart.png)
-
-```text
-Naive (1.22 GFLOPS)
-██
-
-Blocked (13.19 GFLOPS)
-██▎
-
-AVX2 (35.17 GFLOPS)
-█████████████████████████
-
-OpenMP (93.52 GFLOPS)
-█████████████████████████████████████████████████████████████████
+```bash
+./build.sh --release
+./run_benchmark.sh
 ```
 
-👉 See the full bottleneck analysis report at [Benchmark Report](docs/benchmark_report.md).
+The matrix-multiplication benchmark writes `output/matmul_benchmark.csv`. Benchmark results are machine-specific; the repository does not treat a single recorded GFLOPS value as a portable performance guarantee. See [Benchmark Guide](docs/benchmark_report.md) for the measurement method and interpretation notes.
 
----
+## Documentation
 
-## 📚 Additional Documentation
+- [Architecture](docs/architecture.md)
+- [Design Decisions](docs/design_decisions.md)
+- [Developer Guide](docs/developer_guide.md)
+- [Benchmark Guide](docs/benchmark_report.md)
+- [Coding Convention](docs/coding_convention.md)
 
-Please browse the `docs/` directory to read in-depth documents for developers:
-
-- [Architecture Guide](docs/architecture.md): System diagram.
-- [Design Decisions](docs/design_decisions.md): Core design decisions.
-- [Developer Guide](docs/developer_guide.md): Guide to extending HELIX (Adding NN Layers, Activation Functions, Backends).
-- [API Reference](docs/api_output/html/index.html): API documentation generated by Doxygen (Requires Doxygen configuration).
-- [Coding Convention](docs/coding_convention.md): Source code standards for submitting Pull Requests.
-
----
-
-> _"What I cannot create, I do not understand." - Richard Feynman_
+The public include entry point is [`include/helix.hpp`](include/helix.hpp). All user-facing tensor, neural-network, loss, and optimizer types currently live directly in the `helix` namespace.

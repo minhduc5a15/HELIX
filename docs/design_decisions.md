@@ -1,51 +1,67 @@
 # Design Decisions
 
-This document records the core design decisions of HELIX and **why** they were chosen. This is the most important document for a Developer to understand the technical philosophy of the project.
+This document explains decisions embodied in the current implementation. Performance statements are limited to mechanisms visible in the code; machine-specific measurements belong in the benchmark output.
 
----
+## Dispatcher between Tensor and kernels
 
-### 1. Why use a Dispatcher instead of Hard-coding in Tensor?
+`Tensor` exposes the user-facing API, while `Dispatcher` handles broadcasting, dtype promotion, layout preparation, kernel selection, and graph-recording callbacks.
 
-Instead of placing the logic to add two Tensors directly into the `Tensor` class, we separated it into `Dispatcher` -> `Backend`.
+This keeps operation policy out of the value-like Tensor handle and gives eager execution and autograd one common path. It also provides a place for future device routing, although only CPU execution is implemented today.
 
-- **Reason:** Scalability. As HELIX grows and supports GPUs (CUDA, Vulkan), the `Tensor` class would bloat uncontrollably if it had to encapsulate both CPU and GPU logic. The `Dispatcher` keeps the `Tensor Runtime` architecture completely independent of the underlying physical hardware.
+## Dynamic computation graph
 
-### 2. Why choose a Dynamic Computational Graph (Define-by-Run)?
+HELIX builds the autograd graph as operations execute. This matches ordinary C++ control flow: loops and branches determine the graph produced by that run.
 
-HELIX learns from PyTorch's Autograd architecture (Dynamic Graph) rather than TensorFlow 1.x (Static Graph).
+Each differentiable forward operation records a `Node` only when at least one input requires gradients. Backward uses a topological schedule so a shared ancestor receives all branch contributions before its backward function executes.
 
-- **Reason:** Flexibility and Debuggability. The graph is generated at C++ code execution time, allowing users the freedom to use host language `for` loops and `if/else` statements. Developer Experience (DX) is crucial for a Framework.
+## Saved values share storage and carry a version
 
-### 3. Why optimize Cache Blocking first, then AVX2?
+Backward formulas need some forward values. Copying every saved tensor would be expensive, while retaining the original tensor with its complete autograd metadata could create ownership cycles.
 
-During the development of the MatMul (Matrix Multiplication) Backend, the optimization roadmap was sequentially: Naive -> Blocked -> AVX2 -> OpenMP.
+`SavedTensor` therefore stores a detached tensor that shares storage and records the storage version. An in-place mutation increments that version, and unpacking the saved value during backward then raises an error instead of silently using changed data.
 
-- **Reason:** The Cache Memory Access Pattern accounts for 80% of matrix computation performance. AVX2 is only effective when data is loaded continuously. Implementing Cache Blocking helps verify if there are Cache Misses, creating a clean data loading pipeline for the Hardware Prefetcher before launching AVX2 Vector instructions.
+## Weak ownership for leaf gradient accumulation
 
-### 4. Why does the AVX2 Micro-kernel use a `4x16` Outer Product structure?
+An `AccumulateGrad` node can outlive the leaf tensor whose gradient it would update. It stores a `weak_ptr<AutogradMeta>` so it can detect that the leaf metadata has expired without keeping a reference cycle alive or dereferencing freed memory.
 
-- **Reason:** Initially, an `8x1` Inner Product micro-kernel was used. However, it suffered from severe Read-Modify-Write (RMW) overhead in the innermost loop (`+=`), causing massive L1 Cache traffic and pipeline stalls. By switching to a `4x16` Outer Product pattern, we can hold the entire `4x16` block of Matrix C inside 8 YMM registers (256-bit). This completely eliminates intermediate memory writes to RAM until the entire K-loop finishes, pushing the CPU to 90+ GFLOPS.
+## Conditional in-place gradient accumulation
 
-### 5. Why was the Transpose of Matrix B (`B_T`) removed in the Dispatcher?
+Gradients from multiple graph branches must be summed. The engine and `AccumulateGrad` use `add_` only when the destination gradient is unshared, shape-compatible, non-overlapping, and of the required dtype. Otherwise they allocate a safe out-of-place sum or clone.
 
-- **Reason:** Previously, `B` was transposed to `rhs_t` to ensure contiguous memory access. However, this caused unnecessary Memory Allocation overhead and latency. With the new `4x16` Outer Product AVX2 micro-kernel, we can broadcast elements of `A` and load contiguous rows of `B` directly using `_mm256_loadu_ps` without any transposition. This saves memory and speeds up the pipeline.
+This optimization reduces allocations when ownership and layout make mutation safe. It does not guarantee that every backward accumulation is allocation-free.
 
-### 6. Why does Autograd compute In-place Gradients (`add_`)?
+## Shared storage for views
 
-- **Reason:** In a large Deep Learning model, the Gradient of a Layer can receive derivatives from many branches in the computation graph (e.g., Residual Connections). If a new Tensor is created every time a Gradient is accumulated, the system would collapse due to Memory Allocation Overhead. Using `add_` (adding directly to old memory) completely eliminates the Memory Overhead of the Backward pass.
+`view`, `slice`, `transpose`, and `broadcast_to` represent layout changes with shape, stride, and storage-offset metadata. Their backward nodes implement the corresponding inverse or reduction behavior.
 
-### 7. Why use a Thread-Local Memory Pool instead of a global `std::mutex`?
+`reshape` is zero-copy only for contiguous input. For non-contiguous input it clones before creating the requested view. Broadcast views use zero strides and are rejected as destinations for supported in-place mutations because multiple logical indices can refer to one storage element.
 
-- **Reason:** When OpenMP threads were introduced for Matrix Multiplication, a central `global_free_blocks_` allocator protected by a `std::mutex` caused severe Lock Contention, degrading multi-threaded performance. By giving each thread its own lock-free `LocalPool` via `thread_local`, allocations became O(1) without any synchronization overhead. The `reset()` mechanism safely tracks thread IDs to prevent Memory Leaks.
+## TensorIterator for general binary traversal
 
-### 8. Why use a JIT Profiler (AutoTuner) for Dispatching instead of a hardcoded threshold?
+Contiguous binary operations use a direct dense kernel. Other binary layouts use `TensorIterator`, which computes broadcast strides, coalesces compatible dimensions, and traverses fixed-size chunks in parallel when the workload is large enough.
 
-- **Reason:** OpenMP multi-threading only outperforms Single-Core AVX2 when the matrix is large enough to amortize thread spin-up overhead. However, this threshold varies wildly across hardware architectures (e.g., Intel vs AMD vs ARM) depending on Core Count and Cache Topology. Hardcoding a threshold like `128x128` caused catastrophic slowdowns on small matrices. The `AutoTuner` solves this by benchmarking the CPU at runtime (Hybrid Lazy Evaluation) and dynamically computing the exact FLOP threshold where OpenMP becomes profitable.
+Legacy `NDIterator` helpers remain in use for several copy, zeroing, in-place, and optimizer paths. The project has not replaced every strided traversal with `TensorIterator`.
 
-### 9. Why replace NDIterator with Chunked Iterator for Element-wise operations?
+## Cache blocking before SIMD and threading
 
-- **Reason:** The original `NDIterator` computed flat offsets element-by-element using N-dimensional modulo arithmetic. This scalar loop structure destroyed compiler auto-vectorization (AVX/SSE) and became a major bottleneck. The `Chunked Iterator` dynamically scans tensor metadata to find the deepest contiguous dimension (`chunk_dim`). It then extracts 1D segments (`chunk_size`) that can be perfectly unrolled and vectorized using `#pragma omp simd`, unlocking SIMD performance and achieving zero-overhead memory bloat on non-contiguous in-place operations.
+The matrix-multiplication backends preserve separate naive, blocked, AVX2, and OpenMP strategies. The naive kernel is a correctness and measurement baseline. Blocking improves locality and also provides a portable fallback for types without a specialized SIMD kernel.
 
-### 10. Why does Autograd use `std::weak_ptr` in `AccumulateGrad`?
+The float AVX2 implementation uses a 4-by-16 outer-product micro-kernel. Eight YMM accumulators keep a 4-by-16 output tile in registers across the K loop, and smaller kernels or scalar loops handle tails. Matrix B remains in row-major order; the kernel loads contiguous segments from its rows rather than materializing a transposed copy.
 
-- **Reason:** In the dynamic computational graph, an `AccumulateGrad` node represents a leaf tensor that needs gradients. If this leaf tensor is destroyed before `.backward()` is called, the graph would traverse into freed memory, causing a fatal Use-After-Free (UAF) corruption. By holding a `std::weak_ptr` to the `AutogradMeta` instead of a raw pointer, `AccumulateGrad` can safely check if the memory is still alive (`lock()`). If it fails, it gracefully drops the gradient, guaranteeing memory safety without creating cyclic references that cause leaks.
+## Runtime threshold calibration for OpenMP matmul
+
+OpenMP startup and synchronization can cost more than they save for small matrices. A single hardcoded threshold would behave differently across CPUs and OpenMP runtimes.
+
+`AutoTuner` compares the float AVX2 and OpenMP kernels at square sizes 512 and, when useful, 256. It chooses one of three volume thresholds: `256^3`, `512^3`, or `1024^3`. The value is cached in `.helix_autotune` and loaded on later runs from the same working directory.
+
+This is a small runtime calibration, not an exhaustive search for an exact crossover point. It calibrates only automatic float matrix-multiplication dispatch.
+
+## Thread-local allocation caches with synchronized global bins
+
+The allocator rounds allocations to 32-byte boundaries and keeps freed blocks by size. The common local-cache path does not need a global lock. Global bins use mutexes for refill batches and blocks returned across thread boundaries.
+
+An epoch lets `reset()` request lazy cleanup of active thread caches without directly freeing blocks owned by running threads. The singleton itself intentionally remains alive until process termination so thread-local destructors cannot access a destroyed pool during shutdown.
+
+## CPU-only execution boundary
+
+`DeviceType` includes `CUDA`, but the runtime has no CUDA allocator, transfers, or kernels. Keeping the enum allows the API to express a future direction; it does not constitute backend support. Current execution paths are written for CPU kernels, and new operations must validate device combinations explicitly.

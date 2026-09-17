@@ -1,50 +1,68 @@
 # Coding Convention
 
-HELIX uses the C++20 standard. To keep the project consistent and maintainable, all code contributions (Pull Requests) must adhere to the following guidelines.
+HELIX is compiled as C++20 and formatted with the checked-in `.clang-format`. This document records conventions visible in the current codebase and requirements that keep new code compatible with it.
 
-## 1. Naming Convention
+## Naming
 
-- **Class / Struct**: PascalCase (e.g., `Tensor`, `AddNode`, `Sequential`).
-- **Function / Method**: snake_case (e.g., `backward()`, `register_parameter()`, `forward()`).
-- **Variable**: snake_case (e.g., `input_tensor`, `learning_rate`).
-- **Constant / Macro / Enum values**: UPPER_SNAKE_CASE (e.g., `HELIX_USE_FMA`, `BLOCK_SIZE`).
-- **Private Data Members**: Must have an underscore suffix `_` (e.g., `shape_`, `stride_`, `grad_fn_`).
-- **Namespace**: All source code belongs to the `namespace helix`. Sub-namespaces are `core`, `autograd`, `backend`, `nn`, `optim`.
+- Classes and structs use `PascalCase`: `Tensor`, `TensorIterator`, `BackwardEngine`.
+- Functions, methods, and variables use `snake_case`: `compute_broadcast_shape`, `learning_rate`.
+- Private data members use a trailing underscore: `shape_`, `grad_fn_`.
+- Compile-time constants use either a descriptive `kPascalCase` local name or the existing uppercase style used by subsystem-wide constants. Match the surrounding file.
+- Public framework APIs live in `namespace helix`. Benchmark support code lives in `namespace helix::benchmark`. Directory names such as `core/`, `nn/`, and `optim/` do not imply matching C++ namespaces.
 
-## 2. File Layout
+## Formatting and includes
 
-A standard `.cpp` or `.hpp` file should be organized with Includes in the following order:
+Run the repository formatter when changing C++ sources:
 
-```cpp
-// 1. The corresponding Header for this .cpp file (If it's a .cpp file)
-#include "my_header.hpp"
-
-// 2. C++ Standard Library (Sorted alphabetically)
-#include <iostream>
-#include <memory>
-#include <vector>
-
-// 3. Third-party Libraries
-// (None currently in HELIX)
-
-// 4. Other HELIX Headers
-#include "core/tensor.hpp"
-#include "autograd/node.hpp"
+```bash
+clang-format -i path/to/changed_file.cpp path/to/changed_file.hpp
 ```
 
-## 3. Const Correctness
+For a `.cpp` file, include its corresponding project header first when one exists, followed by standard-library headers, platform or third-party headers, and other HELIX headers. Let `clang-format` preserve the final ordering and layout.
 
-- Any variable that does not change its value must be marked as `const`.
-- Any member function (Method) that does not modify the object's state (e.g., getters like `shape()`, `stride()`, and especially the `forward()` function of a Neural Network class if it doesn't store internal state) must end with `const`.
-- Pass large objects (e.g., `std::vector`, `std::string`) by Const Reference `const T&`. For `std::shared_ptr<Tensor>`, if ownership is not transferred, pass-by-value is acceptable as the pointer copy cost is extremely cheap.
+Use `#pragma once` in headers, as existing headers do.
 
-## 4. Pointers and Memory Management
+## Interfaces and ownership
 
-- **ABSOLUTELY NO** raw pointers (`new` or `delete`) for resources living outside the function scope.
-- All Tensor and Autograd Node objects are managed using `std::shared_ptr`.
-- When needing to prevent Circular Dependency in the Autograd Graph, use `std::weak_ptr` or non-owning raw pointers if the lifecycle is guaranteed.
+- Pass read-only tensors and other nontrivial objects by `const&` unless a copy is intentional.
+- Use `std::move` when transferring ownership into a member or container.
+- Use `std::shared_ptr` where ownership is shared, such as `TensorImpl`, `Storage`, module objects held by `Sequential`, and autograd nodes.
+- Use `std::weak_ptr` to break ownership cycles or observe an object that may expire, as `AccumulateGrad` does for leaf metadata.
+- Raw pointers are appropriate for non-owning kernel buffers and explicitly non-owning registries. Make ownership and lifetime visible in the surrounding interface.
+- Resource-owning code should use RAII. Any deliberate process-lifetime allocation must explain the teardown constraint that requires it.
 
-## 5. Comments and Code Documentation
+## Const correctness and types
 
-- **Public APIs**: Must have standard Doxygen comments describing `@brief`, `@param`, `@return`.
-- **In-code Comments**: Only comment to explain **WHY** you wrote this code, rather than describing **WHAT** it does. (e.g., Don't write `// Iterate through matrix`, write `// Iterate column-wise to utilize Hardware Prefetcher and avoid Cache Misses`).
+- Mark local values `const` when they are not reassigned and doing so keeps the code readable.
+- Mark member functions `const` when they do not modify logical object state.
+- Use `size_t` for shapes and element counts. Use `ptrdiff_t` for strides, offsets, and OpenMP loop variables that may need signed arithmetic.
+- Do not assume tensor data is `float`. Dispatch on `DType` and use `data_ptr<T>()` unless an API is intentionally restricted to `Float32`.
+- Check shape, dtype, layout, device, and overlap assumptions before entering a low-level kernel.
+
+## Errors
+
+Use exceptions consistently with the existing API:
+
+- `std::invalid_argument` for incompatible values such as shapes or dtypes;
+- `std::out_of_range` for invalid axes or indices;
+- `std::runtime_error` for unsupported execution paths or invalid runtime state;
+- `std::overflow_error` when shape arithmetic cannot be represented.
+
+Error messages should name the failed operation and the violated condition.
+
+## Comments and documentation
+
+Comments should explain invariants, ownership, numerical reasoning, or a non-obvious performance decision. Avoid claims about speed or memory behavior unless a benchmark or test in the repository supports them.
+
+Document public APIs when adding them. Keep examples compilable against the current interface, and state limitations such as supported rank, dtype, target representation, or device.
+
+## Verification
+
+Build with warnings enabled and run the relevant tests. For changes to shared runtime code, run the complete suite:
+
+```bash
+./build.sh --debug
+./run_tests.sh
+```
+
+Use numerical gradient checks for new differentiable operations. Use benchmarks to measure performance changes, but do not turn a machine-specific result into a general performance guarantee.

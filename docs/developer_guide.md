@@ -1,94 +1,143 @@
 # Developer Guide
 
-This document is intended for developers who wish to extend HELIX by adding new Layers, Optimizers, Backends, or Tensor Operations.
+This guide describes the extension mechanisms present in the current codebase. Public tensor, neural-network, loss, and optimizer APIs live directly in `namespace helix`. Benchmark helpers use `namespace helix::benchmark`.
 
----
+## Build and verification
 
-## 1. Adding a New Neural Network Layer
+Configure, build, and run the complete registered test suite with:
 
-All Layers in HELIX inherit from the base class `helix::nn::Module`.
-To add a new Layer (e.g., `Sigmoid` or `Conv2d`), you need to:
+```bash
+./build.sh --debug
+./run_tests.sh
+```
 
-1. **Inherit from Module**: Create a new class inheriting from `helix::nn::Module`.
-2. **Declare Weights (if any)**: Register weight Tensors (e.g., `weight`, `bias`) using the `register_parameter()` method. This allows the system to automatically recognize parameters to push to the Optimizer.
-3. **Override the `forward()` method**: Define the computation logic for the Forward Pass. Autograd will automatically handle the Backward pass.
+For a clean optimized build:
 
-**Example of a Custom Layer (Without weights):**
+```bash
+./build.sh --clean --release
+```
+
+The root CMake project builds the static `helix` library, tests, stress tests, benchmarks, and examples. New implementation files must also be added to the `helix` source list in the root `CMakeLists.txt`.
+
+Autograd tests and programs must call `init_autograd()` before setting `requires_grad` or constructing parameterized modules.
+
+## Adding a module
+
+Derive from `helix::Module` and implement:
 
 ```cpp
-namespace helix::nn {
-class Sigmoid : public Module {
+Tensor forward(const Tensor& input) override;
+```
+
+A stateless module can be composed entirely from existing Tensor operations:
+
+```cpp
+#include "helix.hpp"
+
+namespace helix {
+
+class Tanh : public Module {
 public:
-    std::shared_ptr<core::Tensor> forward(std::shared_ptr<core::Tensor> input) override {
-        // Reuse Tensor operations to implement Sigmoid: 1 / (1 + exp(-x))
-        auto neg_x = core::Tensor::neg(input);
-        auto exp_x = core::Tensor::exp(neg_x);
-        auto one = std::make_shared<core::Tensor>(1.0f);
-        auto sum = core::Tensor::add(one, exp_x);
-        return core::Tensor::div(one, sum);
+    Tensor forward(const Tensor& input) override {
+        return input.tanh();
     }
 };
-}
+
+}  // namespace helix
 ```
 
----
+Autograd records the operations used inside `forward`; a separate module-specific backward class is unnecessary when existing differentiable Tensor operations are sufficient.
 
-## 2. Adding a New Loss Function
-
-By design, Loss functions **DO NOT** inherit from `Module`. This is because `Module::forward()` is strictly designed for single-input operations, whereas Loss functions inherently require two inputs (`predictions` and `targets`).
-Instead, Loss functions are implemented as **Free Functions**.
-
-1. **Declare the Function**: Add the declaration in `include/nn/loss.hpp`. Example: `Tensor mse_loss(const Tensor& pred, const Tensor& target);`
-2. **Define the Computation**: In `src/nn/loss.cpp`, define the computation graph.
-3. **Autograd Hooking**: Create a class inheriting from `autograd::Node` for the backward pass of the loss (e.g., `MSELossBackward`), and link it to the resulting scalar `Tensor` via `set_grad_fn()`.
-
-**Example (MSE Loss):**
+A module with trainable tensors must store those tensors, call `set_requires_grad(true)` during construction, and override `named_parameters()`:
 
 ```cpp
-Tensor mse_loss(const Tensor& pred, const Tensor& target) {
-    auto diff = Tensor::sub(pred, target);
-    auto sq = Tensor::pow(diff, 2.0f);
-    auto sum = Tensor::sum(sq);
-    auto mean = Tensor::div_scalar(sum, static_cast<float>(pred.size()));
-    
-    // Attach custom backward node to `mean` Tensor here...
-    return mean;
+std::vector<std::pair<std::string, Tensor>> named_parameters() override {
+    return {{"weight", weight_}, {"bias", bias_}};
 }
 ```
 
----
+`Module::parameters()` derives its result from `named_parameters()`. There is no `register_parameter()` API in the current implementation.
 
-## 3. Adding a Tensor Operation
+`Sequential` accepts either a vector of `shared_ptr<Module>` or concrete module objects through its variadic constructor. Parameter names are prefixed with their layer index, such as `0.weight`.
 
-Adding an operation directly on a Tensor is more complex because it requires interacting with both Autograd and the Dispatcher.
+## Adding a loss
 
-**Step 1: Backend Kernel**
-Create an execution function (running a for loop) in `src/backend/kernels/ops.cpp`.
+Losses are free functions declared in `include/nn/loss.hpp` and defined in `src/nn/loss.cpp`.
 
-**Step 2: Dispatcher**
-Add a caller function to the `Dispatcher` (`src/core/dispatcher.cpp`). Here you define which Backend configuration will handle this task.
+When a loss can be expressed with existing differentiable Tensor operations, compose those operations and allow the graph builder to record them. The current mean squared error follows this pattern:
 
-**Step 3: Autograd Node**
-Create a class inheriting from `autograd::Node` (in `src/autograd/function.cpp`).
-Override the `apply()` method to compute the derivative (Backward) for your operation.
+```cpp
+Tensor mse_loss(const Tensor& prediction, const Tensor& target) {
+    const Tensor difference = prediction - target;
+    return (difference * difference).mean();
+}
+```
 
-**Step 4: Attach to Tensor API**
-Add an interface function to `include/core/tensor.hpp`.
-In this function:
+For a fused loss kernel, follow the cross-entropy implementation:
 
-- Create an `output` Tensor.
-- Call the `Dispatcher` to run the Kernel.
-- Generate an Autograd Node (if `requires_grad`) and establish a parent-child link (`grad_fn`).
+1. declare the public free function;
+2. add a Dispatcher entry and backend kernel;
+3. add an `OpType` and populate its `OperationContext`;
+4. implement a `Node::backward` subclass;
+5. construct that node in `AutogradGraphBuilder`;
+6. test the value, invalid inputs, non-contiguous inputs where supported, and numerical gradients.
 
----
+The graph builder links one edge per forward input. A backward node must therefore return the same number of gradient entries as it has edges. Use an empty `Tensor` for an input whose edge exists but whose gradient is intentionally unused, as cross entropy does for its target.
 
-## 4. Adding a New Backend (e.g., Vulkan / CUDA)
->
-> **Note:** Backends like CUDA, Vulkan, or Metal are only used to illustrate how to extend HELIX's architecture in the future. The current version of the framework has not implemented these backends.
+## Adding a Tensor operation
 
-HELIX is designed with a clear separation between Backend and Dispatcher.
+A differentiable Tensor operation normally touches these locations:
 
-1. Create a separate implementation directory/files (e.g., `src/backend/cuda/`).
-2. Write Kernel sets (MatMul, Ops, Reduce) utilizing the technology of that Backend.
-3. Open `src/core/dispatcher.cpp` and add priority logic to select the new Backend if the hardware device supports it.
-4. Ensure the CMake structure (`CMakeLists.txt`) only compiles that Backend when the corresponding system flag is enabled (e.g., `-DUSE_CUDA=ON`).
+1. public declaration and forwarding method in `include/core/tensor.hpp`;
+2. backend declaration in `include/backend/cpu_backend.hpp` when a separate kernel is needed;
+3. kernel implementation under `src/backend/`;
+4. Dispatcher declaration and implementation;
+5. `OpType` in `include/core/graph_builder.hpp`;
+6. backward node declaration in `include/autograd/function.hpp` and definition in `src/autograd/function.cpp`;
+7. node creation in `src/autograd/graph_builder.cpp`;
+8. unit tests and, for differentiable floating-point operations, a numerical gradient check.
+
+Dispatcher implementations must preserve and validate the following properties where relevant:
+
+- shape and broadcasting rules;
+- dtype promotion;
+- device agreement;
+- contiguous versus strided access;
+- aliasing and internal overlap for mutation;
+- graph construction using the original logical inputs rather than temporary broadcast or cast tensors.
+
+Backward implementations should use `SavedTensor` for forward values needed during differentiation. It detects later in-place changes through the shared storage version counter and avoids retaining the forward autograd history.
+
+Do not call the graph builder directly from `Tensor`. Forward through the Dispatcher so eager execution and graph recording follow the same path.
+
+## Adding an optimizer
+
+Derive from `Optimizer`, implement `step()`, and operate on `params_`. The existing SGD implementation validates gradient presence, shape, dtype, and device before delegating mutation to `Dispatcher::sgd`.
+
+`Optimizer::zero_grad()` clears an existing gradient in place when safe. It does not create a gradient for a parameter that has not participated in backward.
+
+## Adding a backend
+
+The current implementation has only CPU storage and CPU execution. `DeviceType::CUDA` is a declaration, not a working backend.
+
+A functional new device backend requires more than adding a kernel directory. At minimum it needs:
+
+- device-specific storage allocation and deallocation;
+- explicit transfer semantics;
+- Dispatcher validation and routing for every supported operation;
+- kernels for the advertised operation set;
+- autograd behavior across supported device operations;
+- CMake feature detection and conditional compilation;
+- cross-device error handling and backend-specific tests.
+
+Until those pieces exist, documentation and examples should continue to describe HELIX as CPU-only.
+
+## Testing expectations
+
+Add focused tests beside the affected subsystem:
+
+- `tests/` for unit, integration, convergence, and gradient checks;
+- `stress/` for lifetime, aliasing, extreme-shape, and concurrency behavior;
+- `benchmark/` only when measuring performance rather than correctness.
+
+Run the entire test suite after changes that affect Tensor layout, allocation, Dispatcher behavior, or autograd, because those subsystems share storage and traversal code.
