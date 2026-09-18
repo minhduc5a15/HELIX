@@ -1,6 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <atomic>
+#include <thread>
+
+#include "autograd/autograd_meta.hpp"
 #include "autograd/engine.hpp"
+#include "core/dispatcher.hpp"
 #include "core/tensor.hpp"
 
 using namespace helix;
@@ -12,6 +17,31 @@ protected:
         init_autograd();
     }
 };
+
+TEST(AutogradInitializationTest, ThreadSeesBuilderInitializedAfterFirstAccess) {
+    std::atomic<bool> first_access_done{false};
+    std::atomic<bool> initialized{false};
+    bool has_grad = false;
+
+    std::thread worker([&] {
+        {
+            no_grad guard;
+            EXPECT_EQ(Dispatcher::get_graph_builder(), nullptr);
+        }
+        first_access_done.store(true);
+        while (!initialized.load()) std::this_thread::yield();
+
+        Tensor a({1.0f}, Shape{1});
+        a.set_requires_grad(true);
+        has_grad = (a * 2.0f).requires_grad();
+    });
+
+    while (!first_access_done.load()) std::this_thread::yield();
+    init_autograd();
+    initialized.store(true);
+    worker.join();
+    EXPECT_TRUE(has_grad);
+}
 
 TEST_F(AutogradTest, SimpleAddMul) {
     Tensor a({2.0f}, Shape{1});
@@ -185,4 +215,103 @@ TEST_F(AutogradTest, BackwardOnIntegerOutputThrows) {
     // In our design, casting breaks the graph since integers don't have grad.
     // Wait, let's see if backward on C throws. c does not require grad.
     EXPECT_THROW(c.backward(), std::runtime_error);
+}
+
+TEST_F(AutogradTest, NoGrad_BasicScope) {
+    Tensor a({2.0f}, Shape{1});
+    Tensor b({3.0f}, Shape{1});
+    a.set_requires_grad(true);
+    b.set_requires_grad(true);
+
+    Tensor c;
+    {
+        no_grad guard;
+        c = a + b * a;
+        EXPECT_FALSE(c.requires_grad());
+        EXPECT_EQ(c.impl()->autograd_meta(), nullptr);
+    }
+
+    // Outside no_grad, autograd should track operations again
+    Tensor d = a + b;
+    EXPECT_TRUE(d.requires_grad());
+    EXPECT_NE(d.impl()->autograd_meta(), nullptr);
+    EXPECT_NE(d.impl()->autograd_meta()->grad_fn(), nullptr);
+}
+
+TEST_F(AutogradTest, NoGrad_NestedScope) {
+    Tensor a({2.0f}, Shape{1});
+    a.set_requires_grad(true);
+
+    {
+        no_grad outer;
+        Tensor b = a * 2.0f;
+        EXPECT_FALSE(b.requires_grad());
+
+        {
+            no_grad inner;
+            Tensor c = a * 3.0f;
+            EXPECT_FALSE(c.requires_grad());
+        }
+
+        // Still in outer scope: must remain disabled
+        Tensor d = a * 4.0f;
+        EXPECT_FALSE(d.requires_grad());
+    }
+
+    // Now outside both: must be re-enabled
+    Tensor e = a * 5.0f;
+    EXPECT_TRUE(e.requires_grad());
+}
+
+TEST_F(AutogradTest, NoGrad_ExceptionSafety) {
+    Tensor a({2.0f}, Shape{1});
+    a.set_requires_grad(true);
+
+    try {
+        no_grad guard;
+        Tensor b = a * 2.0f;
+        EXPECT_FALSE(b.requires_grad());
+        throw std::runtime_error("simulated exception");
+    } catch (const std::runtime_error&) {
+        // Exception caught, verify guard dtor properly restored builder
+    }
+
+    Tensor c = a * 3.0f;
+    EXPECT_TRUE(c.requires_grad());
+}
+
+TEST_F(AutogradTest, NoGrad_MultiThreadIsolation) {
+    Tensor a({2.0f}, Shape{1});
+    a.set_requires_grad(true);
+
+    std::atomic<bool> thread2_ready{false};
+    std::atomic<bool> thread2_done{false};
+    bool thread2_has_grad = false;
+
+    // Spawn thread 2 which computes with autograd while thread 1 is in no_grad
+    std::thread t2([&]() {
+        Tensor x({3.0f}, Shape{1});
+        x.set_requires_grad(true);
+        while (!thread2_ready.load()) {
+            std::this_thread::yield();
+        }
+        Tensor y = x * 2.0f;
+        thread2_has_grad = y.requires_grad();
+        thread2_done.store(true);
+    });
+
+    {
+        no_grad guard;
+        thread2_ready.store(true);
+        while (!thread2_done.load()) {
+            std::this_thread::yield();
+        }
+        // Thread 1 must have autograd disabled
+        Tensor b = a * 2.0f;
+        EXPECT_FALSE(b.requires_grad());
+    }
+
+    t2.join();
+    // Thread 2 must NOT have been disabled by Thread 1's no_grad
+    EXPECT_TRUE(thread2_has_grad);
 }

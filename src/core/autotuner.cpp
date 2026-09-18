@@ -22,8 +22,10 @@ namespace helix {
     bool AutoTuner::load_from_cache() {
         std::ifstream file(get_cache_filepath());
         if (file.is_open()) {
-            if (file >> omp_threshold_) {
-                is_calibrated_ = true;
+            size_t val = 0;
+            if (file >> val) {
+                omp_threshold_.store(val, std::memory_order_relaxed);
+                is_calibrated_.store(true, std::memory_order_release);
                 return true;
             }
         }
@@ -33,7 +35,7 @@ namespace helix {
     void AutoTuner::save_to_cache() {
         std::ofstream file(get_cache_filepath());
         if (file.is_open()) {
-            file << omp_threshold_;
+            file << omp_threshold_.load(std::memory_order_relaxed);
         }
     }
 
@@ -61,7 +63,8 @@ namespace helix {
     }
 
     void AutoTuner::calibrate() {
-        if (is_calibrated_) return;
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (is_calibrated_.load(std::memory_order_relaxed)) return;
 
         // Try to load from cache first. If found, skip profiling (ideal for Production restarts).
         if (load_from_cache()) {
@@ -77,33 +80,34 @@ namespace helix {
         if (t_avx2_large <= t_omp_large) {
             // AVX2 still wins at 512^3 (possibly due to high OpenMP overhead or low core count)
             // Set threshold to a very high level (1024^3).
-            omp_threshold_ = 1024ULL * 1024ULL * 1024ULL;
+            omp_threshold_.store(1024ULL * 1024ULL * 1024ULL, std::memory_order_relaxed);
         } else {
             // At 512, OpenMP wins. Test 256x256 to find the break-even point.
             const double t_avx2_mid = measure_matmul_time(256, 256, 256, helix::avx2_micro_matmul);
             const double t_omp_mid = measure_matmul_time(256, 256, 256, helix::openmp_matmul);
 
             if (t_omp_mid < t_avx2_mid) {
-                omp_threshold_ = 256ULL * 256ULL * 256ULL;
+                omp_threshold_.store(256ULL * 256ULL * 256ULL, std::memory_order_relaxed);
             } else {
-                omp_threshold_ = 512ULL * 512ULL * 512ULL;
+                omp_threshold_.store(512ULL * 512ULL * 512ULL, std::memory_order_relaxed);
             }
         }
 
-        is_calibrated_ = true;
+        is_calibrated_.store(true, std::memory_order_release);
         save_to_cache();
     }
 
     void AutoTuner::reset_for_testing() {
-        is_calibrated_ = false;
-        omp_threshold_ = 512ULL * 512ULL * 512ULL;
+        std::lock_guard<std::mutex> lock(mutex_);
+        is_calibrated_.store(false, std::memory_order_release);
+        omp_threshold_.store(512ULL * 512ULL * 512ULL, std::memory_order_relaxed);
     }
 
     size_t AutoTuner::get_omp_threshold() {
-        if (!is_calibrated_) {
+        if (!is_calibrated_.load(std::memory_order_acquire)) {
             calibrate();  // Lazy Evaluation
         }
-        return omp_threshold_;
+        return omp_threshold_.load(std::memory_order_relaxed);
     }
 
     void init_autotuner() { AutoTuner::get_instance().calibrate(); }

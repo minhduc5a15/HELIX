@@ -281,6 +281,7 @@ namespace helix {
 
         [[nodiscard]] auto sum(std::optional<size_t> axis = std::nullopt, bool keepdim = false) const -> Tensor;
         [[nodiscard]] auto mean(std::optional<size_t> axis = std::nullopt, bool keepdim = false) const -> Tensor;
+        [[nodiscard]] auto argmax(size_t dim) const -> Tensor;
 
         /**
          * @brief Creates a deep copy of the tensor, including its memory.

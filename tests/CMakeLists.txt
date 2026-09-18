@@ -91,3 +91,8 @@ gtest_discover_tests(autotuner_test)
 add_executable(naive_cross_validation_test naive_cross_validation_test.cpp)
 target_link_libraries(naive_cross_validation_test PRIVATE helix GTest::gtest_main)
 gtest_discover_tests(naive_cross_validation_test)
+
+add_executable(audit_remediation_test audit_remediation_test.cpp)
+target_link_libraries(audit_remediation_test PRIVATE helix GTest::gtest_main)
+gtest_discover_tests(audit_remediation_test)
+

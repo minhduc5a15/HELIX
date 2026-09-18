@@ -15,6 +15,8 @@ namespace helix {
     public:
         static void register_graph_builder(GraphBuilderInterface* builder);
         static GraphBuilderInterface* get_graph_builder();
+        static std::optional<GraphBuilderInterface*> get_thread_graph_builder_override();
+        static void set_thread_graph_builder_override(std::optional<GraphBuilderInterface*> builder);
 
         // Ensure the tensor is contiguous. If not, returns a contiguous clone.
         static Tensor ensure_contiguous(const Tensor& t);
@@ -25,6 +27,7 @@ namespace helix {
         static Tensor slice(const Tensor& a, size_t dim, size_t start, size_t end);
         static Tensor transpose(const Tensor& a, size_t dim0, size_t dim1);
         static Tensor broadcast_to(const Tensor& a, Shape new_shape);
+        static Tensor cat(const std::vector<Tensor>& tensors, size_t dim);
 
         // Type Conversion
         static Tensor cast(const Tensor& a, DType new_dtype);
@@ -54,6 +57,7 @@ namespace helix {
 
         static Tensor sum(const Tensor& a, std::optional<size_t> axis = std::nullopt, bool keepdim = false);
         static Tensor mean(const Tensor& a, std::optional<size_t> axis = std::nullopt, bool keepdim = false);
+        static Tensor argmax(const Tensor& a, size_t dim);
 
         static Tensor cross_entropy(const Tensor& pred, const Tensor& target);
 

@@ -89,15 +89,29 @@ namespace helix {
                     pool.all_caches_.erase(tls_cache_ptr);
                 }
 
-                // Step 2: Push any remaining blocks from the thread-local cache back to the global bins.
-                // This makes the memory available for other threads or future allocations.
+                // Step 2: Push remaining valid blocks from the thread-local cache back to the global bins,
+                // but ONLY if the cache epoch is not stale (i.e. reset() was not called since cache creation/clear).
+                const uint64_t global_epoch = pool.current_epoch_.load(std::memory_order_relaxed);
+                const bool is_stale = (tls_cache_ptr->epoch < global_epoch);
+
                 for (auto& [size, blocks] : tls_cache_ptr->blocks) {
                     if (blocks.empty()) {
                         continue;  // Skip if no blocks of this size.
                     }
-                    GlobalBin* bin = pool.get_global_bin(size);
-                    std::lock_guard<std::mutex> bin_lock(bin->mutex);  // Protects access to the GlobalBin.
-                    bin->blocks.insert(bin->blocks.end(), blocks.begin(), blocks.end());
+                    if (is_stale) {
+                        // Stale epoch blocks must be freed directly to the OS to respect reset()
+                        for (void* ptr : blocks) {
+#if defined(_WIN32)
+                            _aligned_free(ptr);
+#else
+                            std::free(ptr);
+#endif
+                        }
+                    } else {
+                        GlobalBin* bin = pool.get_global_bin(size);
+                        std::lock_guard<std::mutex> bin_lock(bin->mutex);  // Protects access to the GlobalBin.
+                        bin->blocks.insert(bin->blocks.end(), blocks.begin(), blocks.end());
+                    }
                 }
 
                 // Step 3: Deallocate the ThreadCache object itself.
@@ -184,6 +198,7 @@ namespace helix {
             if (!local_list.empty()) {
                 void* ptr = local_list.back();  // Take the last available block.
                 local_list.pop_back();          // Remove it from the list.
+                g_total_allocated.fetch_add(alloc_size, std::memory_order_relaxed);
                 return ptr;
             }
         }
@@ -210,6 +225,7 @@ namespace helix {
                 // Erase the transferred blocks from the global bin.
                 bin->blocks.erase(transfer_start, bin->blocks.end());
 
+                g_total_allocated.fetch_add(alloc_size, std::memory_order_relaxed);
                 return ptr;
             }
         }

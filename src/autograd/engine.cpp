@@ -1,5 +1,6 @@
 #include "autograd/engine.hpp"
 
+#include <memory>
 #include <queue>
 #include <stdexcept>
 #include <unordered_map>
@@ -83,16 +84,11 @@ namespace helix {
         return meta && meta->grad_fn() == nullptr;
     }
 
-    struct NoGradGuard {
-        NoGradGuard() {
-            prev_builder_ = Dispatcher::get_graph_builder();
-            Dispatcher::register_graph_builder(nullptr);
-        }
-        ~NoGradGuard() { Dispatcher::register_graph_builder(prev_builder_); }
+    no_grad::no_grad() : prev_builder_override_(Dispatcher::get_thread_graph_builder_override()) {
+        Dispatcher::set_thread_graph_builder_override(nullptr);
+    }
 
-    private:
-        GraphBuilderInterface* prev_builder_;
-    };
+    no_grad::~no_grad() noexcept { Dispatcher::set_thread_graph_builder_override(prev_builder_override_); }
 
     // BackwardEngine Implementation
     void BackwardEngine::run(Tensor& target, const std::vector<Tensor>& grad_outputs, bool retain_graph) {
@@ -101,7 +97,7 @@ namespace helix {
             throw std::runtime_error("Cannot run backward on this tensor.");
         }
 
-        NoGradGuard guard;
+        no_grad guard;
 
         auto root = meta->grad_fn() ? meta->grad_fn() : meta->grad_accumulator();
 
@@ -162,10 +158,12 @@ namespace helix {
 
         std::queue<Node*> ready_queue;
         ready_queue.push(root.get());
+        size_t processed_nodes = 0;
 
         while (!ready_queue.empty()) {
             Node* curr = ready_queue.front();
             ready_queue.pop();
+            ++processed_nodes;
 
             auto node_handle = node_gradients.extract(curr);
 
@@ -211,6 +209,10 @@ namespace helix {
             }
         }
 
+        if (processed_nodes != visited.size()) {
+            throw std::runtime_error("RuntimeError: Cycle detected in autograd computation graph.");
+        }
+
         if (!retain_graph) {
             for (auto& node_ptr : nodes_to_process) {
                 node_ptr->clear_next_edges();
@@ -218,18 +220,18 @@ namespace helix {
         }
     }
 
-    // Initialization hook
-    static AutogradEngineProvider* g_provider = nullptr;
-    static AutogradGraphBuilder* g_builder = nullptr;
+    // Initialization hook using unique_ptr for clean lifecycle management
+    static std::unique_ptr<AutogradEngineProvider> g_provider;
+    static std::unique_ptr<AutogradGraphBuilder> g_builder;
 
     void init_autograd() {
         if (!g_provider) {
-            g_provider = new AutogradEngineProvider();
-            register_autograd_provider(g_provider);
+            g_provider = std::make_unique<AutogradEngineProvider>();
+            register_autograd_provider(g_provider.get());
         }
         if (!g_builder) {
-            g_builder = new AutogradGraphBuilder();
-            Dispatcher::register_graph_builder(g_builder);
+            g_builder = std::make_unique<AutogradGraphBuilder>();
+            Dispatcher::register_graph_builder(g_builder.get());
         }
     }
 

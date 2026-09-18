@@ -48,6 +48,26 @@ namespace helix {
         }
     }
 
+    template <typename T>
+    void CPUBackend::argmax(
+        const T* input, int64_t* output, const size_t outer_size, const size_t dim_size, const size_t inner_size
+    ) {
+        for (size_t i = 0; i < outer_size; ++i) {
+            for (size_t k = 0; k < inner_size; ++k) {
+                T max_val = input[i * (dim_size * inner_size) + k];
+                int64_t max_idx = 0;
+                for (size_t j = 1; j < dim_size; ++j) {
+                    T val = input[i * (dim_size * inner_size) + j * inner_size + k];
+                    if (val > max_val) {
+                        max_val = val;
+                        max_idx = static_cast<int64_t>(j);
+                    }
+                }
+                output[i * inner_size + k] = max_idx;
+            }
+        }
+    }
+
     template void CPUBackend::sum<float>(const float*, float*, size_t, size_t, size_t);
     template void CPUBackend::mean<float>(const float*, float*, size_t, size_t, size_t);
     template void CPUBackend::sum<double>(const double*, double*, size_t, size_t, size_t);
@@ -56,5 +76,9 @@ namespace helix {
     template void CPUBackend::mean<int32_t>(const int32_t*, int32_t*, size_t, size_t, size_t);
     template void CPUBackend::sum<int64_t>(const int64_t*, int64_t*, size_t, size_t, size_t);
     template void CPUBackend::mean<int64_t>(const int64_t*, int64_t*, size_t, size_t, size_t);
+    template void CPUBackend::argmax<float>(const float*, int64_t*, size_t, size_t, size_t);
+    template void CPUBackend::argmax<double>(const double*, int64_t*, size_t, size_t, size_t);
+    template void CPUBackend::argmax<int32_t>(const int32_t*, int64_t*, size_t, size_t, size_t);
+    template void CPUBackend::argmax<int64_t>(const int64_t*, int64_t*, size_t, size_t, size_t);
 
 }  // namespace helix

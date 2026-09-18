@@ -6,9 +6,11 @@ The current implementation is CPU-only. It can train multilayer perceptrons and 
 
 ## Implemented features
 
-- N-dimensional tensors with shapes, strides, broadcasting, slicing, transposition, reshaping, and cloning.
+- N-dimensional tensors with shapes, strides, broadcasting, slicing, transposition, reshaping, cloning, and concatenation (`helix::cat`).
 - `Float32`, `Float64`, `Int32`, and `Int64` dtypes with type promotion.
-- Dynamic reverse-mode autograd for tensor arithmetic, reductions, matrix multiplication, supported view operations, and the provided losses.
+- Reductions including sum, mean, and index reduction (`Tensor::argmax`).
+- Dynamic reverse-mode autograd for tensor arithmetic, reductions, matrix multiplication, supported view operations, concatenation, and the provided losses.
+- RAII-based autograd control (`helix::no_grad`) with thread-local graph suppression for zero-overhead evaluation and inference.
 - `Linear`, `ReLU`, and `Sequential` neural-network components.
 - Mean squared error and numerically stable cross entropy with one-hot targets.
 - SGD and gradient clearing.
@@ -96,6 +98,13 @@ int main() {
         Tensor loss = mse_loss(prediction, targets);
         loss.backward();
         optimizer.step();
+    }
+
+    // Evaluation without autograd overhead
+    {
+        no_grad guard;
+        Tensor prediction = model(inputs);
+        Tensor classes = prediction.argmax(1);
     }
 }
 ```

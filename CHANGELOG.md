@@ -6,6 +6,9 @@ This file records notable user-visible and developer-facing changes to HELIX. It
 
 ### Added
 
+- Added `no_grad` RAII scope guard with thread-local autograd suppression, exception safety, and support for nested scopes.
+- Added `Tensor::argmax(size_t dim)` returning an `Int64` index tensor along a dimension (scalar for rank-1 tensors) supporting all dtypes and strided layouts.
+- Added `helix::cat` along any dimension with layout validation, overflow checks, fast contiguous block copying, and dynamic reverse-mode autograd (`CatBackward`).
 - Added `tanh` to the Tensor API, CPU kernels, autograd graph builder, backward functions, and gradient tests.
 - Added autograd support for `clone`, `view`, `slice`, `transpose`, and `broadcast_to`.
 - Added operational support for `Float32`, `Float64`, `Int32`, and `Int64` across tensor factories, element-wise operations, reductions, matrix multiplication, and dtype promotion. Autograd remains restricted to floating-point tensors.
@@ -25,7 +28,7 @@ This file records notable user-visible and developer-facing changes to HELIX. It
 - Changed stride and iterator offset arithmetic to signed `ptrdiff_t` where negative strides must be represented.
 - Optimized non-contiguous clone, copy, zeroing, in-place addition, and SGD traversal, including specialized 2D paths.
 - Optimized AVX2 scalar tails, contiguous copies, and OpenMP matrix-multiplication initialization and loop bounds.
-- Expanded the MNIST example to a `784 -> 256 -> 128 -> 10` network, batch size 64, and ten training epochs.
+- Expanded the MNIST example to a `784 -> 256 -> 128 -> 10` network, batch size 64, and ten training epochs, utilizing `Tensor::argmax` for accuracy and `no_grad` for test evaluation.
 - Standardized local build output under `build/`.
 - Updated README and all Markdown documents under `docs/` to match the current API, implemented backends, iterator architecture, and benchmark methodology.
 
@@ -40,6 +43,17 @@ This file records notable user-visible and developer-facing changes to HELIX. It
 - Fixed `copy_` behavior for dtype conversion, aliasing, self-copy, zero-sized tensors, and differently shaped tensors with the same element count.
 - Fixed OpenMP signed-loop compatibility issues on MSVC and related macOS/Windows build problems.
 - Fixed `TensorIterator` rank handling, broadcast coalescing, scalar broadcast, high-rank contiguous fast paths, and zero-sized tensor traversal.
+- Fixed allocator memory accounting underflow on thread cache and global bin allocation hits.
+- Fixed stale epoch block resurrection in `ThreadCacheWrapper` teardown after `MemoryPool::reset()`.
+- Fixed broken row-load SIMD dot product in `avx2_dot_matmul` by delegating to `avx2_micro_matmul`.
+- Fixed division-by-zero crashes in `NDIterator` and `BinaryNDIterator` when indexing zero-sized tensors.
+- Fixed signed stride truncation and unsigned overflow on negative strides in 2D in-place `add_` and `sgd` kernels.
+- Fixed data races in `AutoTuner::calibrate` and `AutoTuner::get_omp_threshold` using double-checked atomic synchronization.
+- Fixed thread safety race in `TensorFactory::randn` by using a `thread_local` Mersenne Twister engine.
+- Added cycle detection in `BackwardEngine::run` to reject cyclic computation graphs with a runtime exception.
+- Added coordinate bounds validation in `Tensor::item` and `Tensor::set_item`.
+- Added dimension validation in `Dispatcher::cross_entropy` to reject empty batch or class dimensions.
+- Fixed singleton memory leak on module unload in `AutogradEngineProvider` and `AutogradGraphBuilderProvider`.
 
 ### Removed
 

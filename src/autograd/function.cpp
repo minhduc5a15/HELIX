@@ -205,4 +205,22 @@ namespace helix {
         return {sum_to_shape(grad_outputs[0], input_shape_)};
     }
 
+    std::vector<Tensor> CatBackward::backward(const std::vector<Tensor>& grad_outputs) {
+        std::vector<Tensor> grads;
+        grads.reserve(split_sizes_.size());
+        size_t offset = 0;
+        for (size_t size : split_sizes_) {
+            if (size == 0) {
+                auto dims = grad_outputs[0].shape().vec();
+                dims[dim_] = 0;
+                grads.emplace_back(Shape(std::move(dims)), grad_outputs[0].dtype(), grad_outputs[0].device());
+                continue;
+            }
+            Tensor slice_grad = grad_outputs[0].slice(dim_, offset, offset + size).clone();
+            grads.push_back(std::move(slice_grad));
+            offset += size;
+        }
+        return grads;
+    }
+
 }  // namespace helix

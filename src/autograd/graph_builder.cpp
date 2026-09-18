@@ -122,6 +122,12 @@ namespace helix {
             case OpType::Cast:
                 node = std::make_shared<CastBackward>(ctx.inputs[0].get().dtype());
                 break;
+            case OpType::Cat: {
+                auto dim = std::any_cast<size_t>(ctx.attributes.at("dim"));
+                auto split_sizes = std::any_cast<std::vector<size_t>>(ctx.attributes.at("split_sizes"));
+                node = std::make_shared<CatBackward>(dim, std::move(split_sizes));
+                break;
+            }
             default:
                 // Unsupported ops will be ignored.
                 // In a complete framework, these would also require backward nodes.

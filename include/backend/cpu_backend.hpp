@@ -73,6 +73,9 @@ namespace helix {
         template <typename T>
         static void mean(const T* input, T* output, size_t outer_size, size_t dim_size, size_t inner_size);
 
+        template <typename T>
+        static void argmax(const T* input, int64_t* output, size_t outer_size, size_t dim_size, size_t inner_size);
+
         // Loss Operations
         // Computes CrossEntropy Loss with Log-Sum-Exp Trick.
         template <typename T>

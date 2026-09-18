@@ -1,5 +1,7 @@
 #pragma once
+#include <atomic>
 #include <cstddef>
+#include <mutex>
 #include <string>
 
 namespace helix {
@@ -21,8 +23,9 @@ namespace helix {
     private:
         AutoTuner();  // Singleton
 
-        bool is_calibrated_;
-        size_t omp_threshold_;  // Unit: FLOPs (total compute volume M*N*K)
+        std::atomic<bool> is_calibrated_{false};
+        std::atomic<size_t> omp_threshold_{512ULL * 512ULL * 512ULL};  // Unit: FLOPs (total compute volume M*N*K)
+        std::mutex mutex_;
 
         // Cache file path.
         std::string get_cache_filepath() const;

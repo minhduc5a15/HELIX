@@ -260,4 +260,14 @@ namespace helix {
         Shape input_shape_;
     };
 
+    class CatBackward : public Node {
+    public:
+        CatBackward(size_t dim, std::vector<size_t> split_sizes) : dim_(dim), split_sizes_(std::move(split_sizes)) {}
+        std::vector<Tensor> backward(const std::vector<Tensor>& grad_outputs) override;
+
+    private:
+        size_t dim_;
+        std::vector<size_t> split_sizes_;
+    };
+
 }  // namespace helix

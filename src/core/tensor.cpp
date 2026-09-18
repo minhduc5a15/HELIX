@@ -83,15 +83,31 @@ namespace helix {
     void Tensor::increment_version() { impl_->storage()->increment_version(); }
 
     auto Tensor::item(const std::vector<size_t>& indices) const -> float {
-        size_t offset = stride().compute_offset(indices);
+        if (indices.size() != rank()) {
+            throw std::invalid_argument("Indices rank must match tensor rank");
+        }
+        for (size_t i = 0; i < rank(); ++i) {
+            if (indices[i] >= shape()[i]) {
+                throw std::out_of_range("Tensor index out of range for dimension " + std::to_string(i));
+            }
+        }
+        ptrdiff_t offset = stride().compute_offset(indices);
         float result = 0.0f;
         HELIX_DISPATCH_ALL_TYPES(dtype(), "item", [&] { result = static_cast<float>(data_ptr<scalar_t>()[offset]); });
         return result;
     }
 
     void Tensor::set_item(const std::vector<size_t>& indices, const float value) {
+        if (indices.size() != rank()) {
+            throw std::invalid_argument("Indices rank must match tensor rank");
+        }
+        for (size_t i = 0; i < rank(); ++i) {
+            if (indices[i] >= shape()[i]) {
+                throw std::out_of_range("Tensor index out of range for dimension " + std::to_string(i));
+            }
+        }
         increment_version();
-        size_t offset = stride().compute_offset(indices);
+        ptrdiff_t offset = stride().compute_offset(indices);
         HELIX_DISPATCH_ALL_TYPES(dtype(), "set_item", [&] {
             data_ptr<scalar_t>()[offset] = static_cast<scalar_t>(value);
         });
@@ -148,6 +164,10 @@ namespace helix {
             throw std::invalid_argument("Size mismatch in copy_");
         }
         if (impl_->data() == src.impl()->data() && stride() == src.stride() && shape() == src.shape()) {
+            return;
+        }
+
+        if (numel() == 0 || src.numel() == 0) {
             return;
         }
 
@@ -376,6 +396,7 @@ namespace helix {
     auto Tensor::mean(const std::optional<size_t> axis, const bool keepdim) const -> Tensor {
         return Dispatcher::mean(*this, axis, keepdim);
     }
+    auto Tensor::argmax(size_t dim) const -> Tensor { return Dispatcher::argmax(*this, dim); }
 
     // Autograd API implementations
     auto Tensor::requires_grad() const -> bool { return impl_->autograd_meta() != nullptr; }

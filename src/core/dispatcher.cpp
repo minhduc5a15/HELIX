@@ -6,6 +6,7 @@
 #include <omp.h>
 #endif
 #include <algorithm>
+#include <atomic>
 #include <stdexcept>
 
 #include "backend/cpu_backend.hpp"
@@ -95,10 +96,10 @@ namespace helix {
             } else if (a.rank() == 2) {
                 const size_t rows = a.shape()[0];
                 const size_t cols = a.shape()[1];
-                const size_t a_stride0 = a.stride()[0];
-                const size_t a_stride1 = a.stride()[1];
-                const size_t b_stride0 = safe_b.stride()[0];
-                const size_t b_stride1 = safe_b.stride()[1];
+                const ptrdiff_t a_stride0 = a.stride()[0];
+                const ptrdiff_t a_stride1 = a.stride()[1];
+                const ptrdiff_t b_stride0 = safe_b.stride()[0];
+                const ptrdiff_t b_stride1 = safe_b.stride()[1];
                 scalar_t* a_data = a.data_ptr<scalar_t>();
                 const scalar_t* b_data = safe_b.data_ptr<scalar_t>();
 
@@ -169,10 +170,10 @@ namespace helix {
             } else if (param.rank() == 2) {
                 const size_t rows = param.shape()[0];
                 const size_t cols = param.shape()[1];
-                const size_t p_stride0 = param.stride()[0];
-                const size_t p_stride1 = param.stride()[1];
-                const size_t g_stride0 = safe_grad.stride()[0];
-                const size_t g_stride1 = safe_grad.stride()[1];
+                const ptrdiff_t p_stride0 = param.stride()[0];
+                const ptrdiff_t p_stride1 = param.stride()[1];
+                const ptrdiff_t g_stride0 = safe_grad.stride()[0];
+                const ptrdiff_t g_stride1 = safe_grad.stride()[1];
                 scalar_t* p_data = param.data_ptr<scalar_t>();
                 const scalar_t* g_data = safe_grad.data_ptr<scalar_t>();
 
@@ -218,11 +219,30 @@ namespace helix {
         }
     }  // namespace
 
-    static GraphBuilderInterface* g_graph_builder = nullptr;
+    static std::atomic<GraphBuilderInterface*> g_global_graph_builder{nullptr};
+    static thread_local std::optional<GraphBuilderInterface*> tls_graph_builder_override;
 
-    void Dispatcher::register_graph_builder(GraphBuilderInterface* builder) { g_graph_builder = builder; }
+    void Dispatcher::register_graph_builder(GraphBuilderInterface* builder) {
+        if (builder != nullptr) {
+            g_global_graph_builder.store(builder, std::memory_order_release);
+        }
+        tls_graph_builder_override = builder;
+    }
 
-    GraphBuilderInterface* Dispatcher::get_graph_builder() { return g_graph_builder; }
+    GraphBuilderInterface* Dispatcher::get_graph_builder() {
+        if (tls_graph_builder_override.has_value()) return *tls_graph_builder_override;
+        return g_global_graph_builder.load(std::memory_order_acquire);
+    }
+
+    std::optional<GraphBuilderInterface*> Dispatcher::get_thread_graph_builder_override() {
+        return tls_graph_builder_override;
+    }
+
+    void Dispatcher::set_thread_graph_builder_override(std::optional<GraphBuilderInterface*> builder) {
+        tls_graph_builder_override = builder;
+    }
+
+#define g_graph_builder (Dispatcher::get_graph_builder())
 
     template <typename scalar_t>
     void clone_impl(const Tensor& a, Tensor& new_tensor) {
@@ -388,6 +408,176 @@ namespace helix {
                 OperationContext{OpCategory::View, OpType::BroadcastTo, out, {a}, std::move(attributes)}
             );
         }
+        return out;
+    }
+
+    Tensor Dispatcher::cat(const std::vector<Tensor>& tensors, size_t dim) {
+        if (tensors.empty()) {
+            throw std::invalid_argument("cat expects a non-empty list of tensors");
+        }
+
+        const size_t rank = tensors[0].rank();
+        if (dim >= rank) {
+            throw std::out_of_range("cat dimension out of range");
+        }
+
+        const DType dtype = tensors[0].dtype();
+        const Device device = tensors[0].device();
+        const Shape& first_shape = tensors[0].shape();
+
+        size_t cat_dim_size = 0;
+        for (const auto& t : tensors) {
+            if (t.rank() != rank) {
+                throw std::invalid_argument("cat tensors must all have the same rank");
+            }
+            if (t.dtype() != dtype) {
+                throw std::invalid_argument("cat tensors must have the same dtype");
+            }
+            if (t.device() != device) {
+                throw std::invalid_argument("cat tensors must be on the same device");
+            }
+            for (size_t d = 0; d < rank; ++d) {
+                if (d != dim && t.shape()[d] != first_shape[d]) {
+                    throw std::invalid_argument(
+                        "cat tensors must have matching shapes along non-concatenated dimensions"
+                    );
+                }
+            }
+            if (add_overflow(cat_dim_size, t.shape()[dim], &cat_dim_size)) {
+                throw std::overflow_error("cat dimension size exceeds maximum size_t");
+            }
+        }
+
+        std::vector<size_t> out_dims = first_shape.vec();
+        out_dims[dim] = cat_dim_size;
+        const Shape out_shape(std::move(out_dims));
+
+        Tensor out(out_shape, dtype, device);
+
+        if (out.numel() > 0) {
+            size_t outer_size = 1;
+            for (size_t d = 0; d < dim; ++d) outer_size *= out_shape[d];
+            size_t inner_size = 1;
+            for (size_t d = dim + 1; d < rank; ++d) inner_size *= out_shape[d];
+
+            if (device.is_cpu()) {
+                HELIX_DISPATCH_ALL_TYPES(dtype, "cat", [&] {
+                    scalar_t* out_data = out.data_ptr<scalar_t>();
+                    size_t dim_offset = 0;
+
+                    for (const auto& t : tensors) {
+                        const size_t d_k = t.shape()[dim];
+                        if (d_k == 0) continue;
+
+                        if (t.is_contiguous()) {
+                            const scalar_t* src_data = t.data_ptr<scalar_t>();
+                            const size_t chunk_elems = d_k * inner_size;
+                            const size_t chunk_bytes = chunk_elems * sizeof(scalar_t);
+
+                            for (size_t i = 0; i < outer_size; ++i) {
+                                scalar_t* dst_ptr = out_data + (i * cat_dim_size + dim_offset) * inner_size;
+                                const scalar_t* src_ptr = src_data + i * chunk_elems;
+                                std::memcpy(dst_ptr, src_ptr, chunk_bytes);
+                            }
+                        } else {
+                            const scalar_t* src_data = t.data_ptr<scalar_t>();
+                            const auto& t_shape = t.shape();
+                            const auto& t_stride = t.stride();
+
+                            bool inner_contiguous = true;
+                            for (size_t d = dim + 1; d < rank; ++d) {
+                                const ptrdiff_t expected_stride =
+                                    (d + 1 < rank) ? static_cast<ptrdiff_t>(t_stride[d + 1] * t_shape[d + 1]) : 1;
+                                if (t_stride[d] != expected_stride) {
+                                    inner_contiguous = false;
+                                    break;
+                                }
+                            }
+
+                            if (inner_contiguous && inner_size > 0) {
+                                const size_t inner_bytes = inner_size * sizeof(scalar_t);
+                                for (size_t i = 0; i < outer_size; ++i) {
+                                    ptrdiff_t outer_offset = 0;
+                                    size_t rem = i;
+                                    for (size_t d = dim; d > 0; --d) {
+                                        size_t axis = d - 1;
+                                        size_t idx = rem % t_shape[axis];
+                                        rem /= t_shape[axis];
+                                        outer_offset += static_cast<ptrdiff_t>(idx) * t_stride[axis];
+                                    }
+
+                                    for (size_t j = 0; j < d_k; ++j) {
+                                        scalar_t* dst_ptr =
+                                            out_data + ((i * cat_dim_size + dim_offset + j) * inner_size);
+                                        const scalar_t* src_ptr =
+                                            src_data + outer_offset + static_cast<ptrdiff_t>(j) * t_stride[dim];
+                                        std::memcpy(dst_ptr, src_ptr, inner_bytes);
+                                    }
+                                }
+                            } else {
+                                for (size_t i = 0; i < outer_size; ++i) {
+                                    ptrdiff_t outer_offset = 0;
+                                    size_t rem = i;
+                                    for (size_t d = dim; d > 0; --d) {
+                                        size_t axis = d - 1;
+                                        size_t idx = rem % t_shape[axis];
+                                        rem /= t_shape[axis];
+                                        outer_offset += static_cast<ptrdiff_t>(idx) * t_stride[axis];
+                                    }
+
+                                    for (size_t j = 0; j < d_k; ++j) {
+                                        ptrdiff_t dim_src_offset =
+                                            outer_offset + static_cast<ptrdiff_t>(j) * t_stride[dim];
+                                        scalar_t* dst_ptr =
+                                            out_data + ((i * cat_dim_size + dim_offset + j) * inner_size);
+
+                                        for (size_t m = 0; m < inner_size; ++m) {
+                                            ptrdiff_t inner_offset = 0;
+                                            size_t inner_rem = m;
+                                            for (size_t d = rank; d > dim + 1; --d) {
+                                                size_t axis = d - 1;
+                                                size_t idx = inner_rem % t_shape[axis];
+                                                inner_rem /= t_shape[axis];
+                                                inner_offset += static_cast<ptrdiff_t>(idx) * t_stride[axis];
+                                            }
+                                            dst_ptr[m] = src_data[dim_src_offset + inner_offset];
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        dim_offset += d_k;
+                    }
+                });
+            } else {
+                throw std::runtime_error("Unsupported device");
+            }
+        }
+
+        if (g_graph_builder) {
+            std::unordered_map<std::string, std::any> attributes;
+            attributes["dim"] = dim;
+            std::vector<size_t> split_sizes;
+            split_sizes.reserve(tensors.size());
+            for (const auto& t : tensors) {
+                split_sizes.push_back(t.shape()[dim]);
+            }
+            attributes["split_sizes"] = std::move(split_sizes);
+            std::vector<std::reference_wrapper<const Tensor>> input_refs;
+            input_refs.reserve(tensors.size());
+            for (const auto& t : tensors) {
+                input_refs.push_back(std::cref(t));
+            }
+            g_graph_builder->build(OperationContext{
+                .category = OpCategory::View,
+                .type = OpType::Cat,
+                .out = out,
+                .inputs = std::move(input_refs),
+                .attributes = std::move(attributes)
+            });
+        }
+
         return out;
     }
 
@@ -971,12 +1161,57 @@ namespace helix {
         return out;
     }
 
+    Tensor Dispatcher::argmax(const Tensor& a, size_t dim) {
+        if (dim >= a.rank()) {
+            throw std::out_of_range("argmax dimension out of range");
+        }
+        if (a.shape()[dim] == 0) {
+            throw std::invalid_argument("argmax cannot be performed on an empty dimension");
+        }
+
+        Tensor lhs = ensure_contiguous(a);
+
+        Shape out_shape;
+        if (a.rank() > 1) {
+            std::vector<size_t> out_dims;
+            out_dims.reserve(a.rank() - 1);
+            for (size_t i = 0; i < a.rank(); ++i) {
+                if (i != dim) {
+                    out_dims.push_back(a.shape()[i]);
+                }
+            }
+            out_shape = Shape(std::move(out_dims));
+        }
+
+        Tensor out(out_shape, DType::Int64, a.device());
+
+        size_t outer_size = 1;
+        for (size_t i = 0; i < dim; ++i) outer_size *= a.shape()[i];
+        const size_t dim_size = a.shape()[dim];
+        size_t inner_size = 1;
+        for (size_t i = dim + 1; i < a.rank(); ++i) inner_size *= a.shape()[i];
+
+        if (a.device().is_cpu()) {
+            HELIX_DISPATCH_ALL_TYPES(a.dtype(), "argmax", [&] {
+                CPUBackend::argmax(lhs.data_ptr<scalar_t>(), out.data_ptr<int64_t>(), outer_size, dim_size, inner_size);
+            });
+        } else {
+            throw std::runtime_error("Unsupported device");
+        }
+
+        // Note: argmax is non-differentiable; autograd graph is not constructed.
+        return out;
+    }
+
     Tensor Dispatcher::cross_entropy(const Tensor& pred, const Tensor& target) {
         if (pred.rank() != 2 || target.rank() != 2) {
             throw std::invalid_argument("cross_entropy currently only supports 2D tensors");
         }
         if (pred.shape() != target.shape()) {
             throw std::invalid_argument("cross_entropy shapes incompatible");
+        }
+        if (pred.shape()[0] == 0 || pred.shape()[1] == 0) {
+            throw std::invalid_argument("cross_entropy batch size and class count must be non-zero");
         }
 
         const DType out_dtype = promote_to_float(promote_types(pred.dtype(), target.dtype()));

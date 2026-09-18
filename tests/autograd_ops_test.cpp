@@ -4,6 +4,7 @@
 #include "autograd/engine.hpp"
 #include "autograd/function.hpp"
 #include "core/tensor.hpp"
+#include "core/tensor_factory.hpp"
 #include "grad_check.hpp"
 
 using namespace helix;
@@ -183,4 +184,64 @@ TEST_F(AutogradOpsTest, BinaryOpNoHiddenBroadcastNode) {
     // already checking that `add()` didn't return `broadcast_to()`'s output directly. To be perfectly strict, the
     // number of nodes in the graph between Add and AccumulateGrad should be 0. We can just rely on the test passing and
     // memory not bloating.
+}
+
+TEST_F(AutogradOpsTest, CatDim0GradientCheck) {
+    Tensor a({1.0f, 2.0f, 3.0f, 4.0f}, Shape{2, 2});
+    Tensor b({5.0f, 6.0f, 7.0f, 8.0f, 9.0f, 10.0f}, Shape{3, 2});
+
+    auto func = [](const std::vector<Tensor>& inputs) {
+        Tensor c = cat({inputs[0], inputs[1]}, 0);
+        return (c * 2.0f).sum();
+    };
+
+    EXPECT_TRUE(gradient_check(func, {a, b}, 1e-3f, 5e-3f));
+}
+
+TEST_F(AutogradOpsTest, CatDim1GradientCheck) {
+    Tensor a({1.0f, 2.0f, 3.0f, 4.0f}, Shape{2, 2});
+    Tensor b({5.0f, 6.0f, 7.0f, 8.0f, 9.0f, 10.0f}, Shape{2, 3});
+
+    auto func = [](const std::vector<Tensor>& inputs) {
+        Tensor c = cat({inputs[0], inputs[1]}, 1);
+        Tensor weight = Tensor::ones(c.shape());
+        return (c * weight).sum();
+    };
+
+    EXPECT_TRUE(gradient_check(func, {a, b}, 1e-3f, 5e-3f));
+}
+
+TEST_F(AutogradOpsTest, CatDim0_SingleInputRequiresGrad) {
+    Tensor a({1.0f, 2.0f}, Shape{2});
+    Tensor b({3.0f, 4.0f}, Shape{2});
+    a.set_requires_grad(true);
+    // b requires_grad is false
+
+    Tensor c = cat({a, b}, 0);
+    EXPECT_TRUE(c.requires_grad());
+
+    Tensor loss = c.sum();
+    loss.backward();
+
+    EXPECT_TRUE(a.has_grad());
+    EXPECT_FALSE(b.has_grad());
+    EXPECT_FLOAT_EQ(a.grad().data_ptr()[0], 1.0f);
+    EXPECT_FLOAT_EQ(a.grad().data_ptr()[1], 1.0f);
+}
+
+TEST_F(AutogradOpsTest, CatBackwardWithEmptyInput) {
+    Tensor empty(Shape{0});
+    Tensor values({3.0f, 4.0f}, Shape{2});
+    empty.set_requires_grad(true);
+    values.set_requires_grad(true);
+
+    Tensor result = cat({empty, values}, 0);
+    ASSERT_EQ(result.shape(), Shape{2});
+    EXPECT_NO_THROW(result.sum().backward());
+    ASSERT_TRUE(empty.has_grad());
+    EXPECT_EQ(empty.grad().shape(), Shape{0});
+    EXPECT_EQ(empty.grad().numel(), 0);
+    ASSERT_TRUE(values.has_grad());
+    EXPECT_FLOAT_EQ(values.grad().data_ptr()[0], 1.0f);
+    EXPECT_FLOAT_EQ(values.grad().data_ptr()[1], 1.0f);
 }

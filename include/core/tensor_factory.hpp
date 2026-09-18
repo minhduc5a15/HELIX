@@ -27,4 +27,12 @@ namespace helix {
         );
     };
 
+    /**
+     * @brief Concatenates a sequence of tensors along a given dimension.
+     * @param tensors Non-empty list of tensors with matching shapes except along `dim`.
+     * @param dim Dimension along which to concatenate.
+     * @return A new contiguous tensor containing the concatenated data.
+     */
+    Tensor cat(const std::vector<Tensor>& tensors, size_t dim = 0);
+
 }  // namespace helix

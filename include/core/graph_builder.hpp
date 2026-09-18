@@ -39,7 +39,8 @@ namespace helix {
         AddScalar,
         SubScalar,
         MulScalar,
-        DivScalar
+        DivScalar,
+        Cat
     };
 
     struct OperationContext {

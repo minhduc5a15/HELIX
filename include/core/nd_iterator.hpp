@@ -42,11 +42,17 @@ namespace helix {
          * @param flat_index The logical 1D index to start from.
          */
         inline void init_from_flat(size_t flat_index) {
+            if (shape.numel() == 0) {
+                for (size_t i = 0; i < rank; ++i) {
+                    indices[i] = 0;
+                }
+                return;
+            }
             size_t current_idx = flat_index;
             for (int j = static_cast<int>(rank) - 1; j >= 0; --j) {
                 size_t dim_size = shape[j];
-                indices[j] = current_idx % dim_size;
-                current_idx /= dim_size;
+                indices[j] = (dim_size > 0) ? (current_idx % dim_size) : 0;
+                current_idx = (dim_size > 0) ? (current_idx / dim_size) : 0;
             }
         }
 
@@ -116,11 +122,17 @@ namespace helix {
          * @param flat_index The logical 1D index to start from.
          */
         inline void init_from_flat(size_t flat_index) {
+            if (shape.numel() == 0) {
+                for (size_t i = 0; i < rank; ++i) {
+                    indices[i] = 0;
+                }
+                return;
+            }
             size_t current_idx = flat_index;
             for (int j = static_cast<int>(rank) - 1; j >= 0; --j) {
                 size_t dim_size = shape[j];
-                indices[j] = current_idx % dim_size;
-                current_idx /= dim_size;
+                indices[j] = (dim_size > 0) ? (current_idx % dim_size) : 0;
+                current_idx = (dim_size > 0) ? (current_idx / dim_size) : 0;
             }
         }
 

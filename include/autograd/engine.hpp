@@ -1,11 +1,36 @@
 #pragma once
 
+#include <optional>
 #include <vector>
 
 #include "core/autograd_meta.hpp"  // For AutogradProvider
 #include "core/tensor.hpp"
 
 namespace helix {
+
+    class GraphBuilderInterface;
+
+    /**
+     * @class no_grad
+     * @brief Context-manager that disables gradient calculation.
+     *
+     * Disabling gradient calculation is useful for inference, when you are sure
+     * that you will not call Tensor::backward(). It reduces memory consumption
+     * and computational overhead.
+     */
+    class no_grad {
+    public:
+        no_grad();
+        ~no_grad() noexcept;
+
+        no_grad(const no_grad&) = delete;
+        auto operator=(const no_grad&) -> no_grad& = delete;
+        no_grad(no_grad&&) = delete;
+        auto operator=(no_grad&&) -> no_grad& = delete;
+
+    private:
+        std::optional<GraphBuilderInterface*> prev_builder_override_;
+    };
 
     class BackwardEngine {
     public:

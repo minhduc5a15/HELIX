@@ -25,4 +25,24 @@ namespace helix {
 #endif
     }
 
+    /**
+     * @brief Cross-platform addition overflow detection for size_t.
+     *
+     * @param a First operand.
+     * @param b Second operand.
+     * @param res Pointer to store the result of a + b.
+     * @return true if overflow occurred, false otherwise.
+     */
+    inline bool add_overflow(size_t a, size_t b, size_t* res) {
+#if defined(__GNUC__) || defined(__clang__)
+        return __builtin_add_overflow(a, b, res);
+#else
+        if (std::numeric_limits<size_t>::max() - a < b) {
+            return true;
+        }
+        *res = a + b;
+        return false;
+#endif
+    }
+
 }  // namespace helix

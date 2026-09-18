@@ -150,21 +150,13 @@ int main() {
 
             total_loss += loss.item();
 
-            // Calculate accuracy for current batch
-            const float* pred_data = preds.data_ptr();
+            // Calculate accuracy for current batch using argmax
+            Tensor batch_pred_classes = preds.argmax(1);
+            const int64_t* batch_pred_data = batch_pred_classes.data_ptr<int64_t>();
             for (size_t b = 0; b < batch_size; ++b) {
-                size_t true_label = Y_train_raw[start_idx + b];
-
-                float max_val = pred_data[b * 10];
-                size_t max_idx = 0;
-                for (size_t c = 1; c < 10; ++c) {
-                    if (pred_data[b * 10 + c] > max_val) {
-                        max_val = pred_data[b * 10 + c];
-                        max_idx = c;
-                    }
+                if (static_cast<size_t>(batch_pred_data[b]) == static_cast<size_t>(Y_train_raw[start_idx + b])) {
+                    correct_preds++;
                 }
-
-                if (max_idx == true_label) correct_preds++;
             }
         }
 
@@ -185,28 +177,22 @@ int main() {
 
     std::cout << "\nEvaluating on test set..." << std::endl;
 
-    // Evaluate in batches to prevent allocating too much memory if needed,
-    // but 10,000 samples fit easily in RAM. Let's process the whole test set at once.
-    Tensor test_preds = model(X_test);
-    Tensor test_loss = cross_entropy_loss(test_preds, Y_test_onehot);
-
+    Tensor test_loss;
     size_t correct_test_preds = 0;
     size_t num_test_samples = X_test.shape()[0];
-    const float* test_pred_data = test_preds.data_ptr();
 
-    for (size_t b = 0; b < num_test_samples; ++b) {
-        size_t true_label = Y_test_raw[b];
+    {
+        no_grad guard;
+        Tensor test_preds = model(X_test);
+        test_loss = cross_entropy_loss(test_preds, Y_test_onehot);
+        Tensor test_pred_classes = test_preds.argmax(1);
+        const int64_t* test_pred_data = test_pred_classes.data_ptr<int64_t>();
 
-        float max_val = test_pred_data[b * 10];
-        size_t max_idx = 0;
-        for (size_t c = 1; c < 10; ++c) {
-            if (test_pred_data[b * 10 + c] > max_val) {
-                max_val = test_pred_data[b * 10 + c];
-                max_idx = c;
+        for (size_t b = 0; b < num_test_samples; ++b) {
+            if (static_cast<size_t>(test_pred_data[b]) == static_cast<size_t>(Y_test_raw[b])) {
+                correct_test_preds++;
             }
         }
-
-        if (max_idx == true_label) correct_test_preds++;
     }
 
     float test_accuracy = static_cast<float>(correct_test_preds) / num_test_samples * 100.0f;

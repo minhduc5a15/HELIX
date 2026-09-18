@@ -2,6 +2,8 @@
 
 #include <random>
 
+#include "core/dispatcher.hpp"
+
 namespace helix {
 
     Tensor TensorFactory::empty(const Shape& shape, std::optional<DType> dtype, std::optional<Device> device) {
@@ -41,8 +43,8 @@ namespace helix {
         Tensor t(shape, dt, dev);
         const size_t n = t.numel();
 
-        // Use a fixed seed for reproducible tests, or random_device for true randomness.
-        static std::mt19937 gen(42);
+        // Use thread_local generator to eliminate cross-thread data races.
+        thread_local std::mt19937 gen(42);
         std::normal_distribution<float> dist(0.0f, 1.0f);
 
         HELIX_DISPATCH_ALL_TYPES(dt, "TensorFactory::randn", [&] {
@@ -53,5 +55,7 @@ namespace helix {
         });
         return t;
     }
+
+    Tensor cat(const std::vector<Tensor>& tensors, size_t dim) { return Dispatcher::cat(tensors, dim); }
 
 }  // namespace helix
