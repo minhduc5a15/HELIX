@@ -45,7 +45,7 @@ namespace helix {
             }
             ptrdiff_t offset = 0;
             for (size_t i = 0; i < strides_.size(); ++i) {
-                offset += indices[i] * strides_[i];
+                offset += static_cast<ptrdiff_t>(indices[i]) * strides_[i];
             }
             return offset;
         }

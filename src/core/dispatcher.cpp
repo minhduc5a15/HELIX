@@ -111,6 +111,9 @@ namespace helix {
                     }
                 }
             } else {
+                if (a.rank() > 8 || safe_b.rank() > 8) {
+                    throw std::invalid_argument("Operation on non-contiguous tensor with rank > 8 is not supported");
+                }
                 scalar_t* a_data = a.data_ptr<scalar_t>();
                 const scalar_t* b_data = safe_b.data_ptr<scalar_t>();
                 const size_t total_elements = a.numel();
@@ -186,6 +189,9 @@ namespace helix {
                     }
                 }
             } else {
+                if (param.rank() > 8 || safe_grad.rank() > 8) {
+                    throw std::invalid_argument("Operation on non-contiguous tensor with rank > 8 is not supported");
+                }
                 scalar_t* p_data = param.data_ptr<scalar_t>();
                 const scalar_t* g_data = safe_grad.data_ptr<scalar_t>();
                 const size_t total_elements = param.numel();
@@ -268,6 +274,9 @@ namespace helix {
                 }
             }
         } else {
+            if (a.rank() > 8) {
+                throw std::invalid_argument("Operation on non-contiguous tensor with rank > 8 is not supported");
+            }
             scalar_t* dst_data = new_tensor.data_ptr<scalar_t>();
             const scalar_t* src_data = a.data_ptr<scalar_t>();
             const size_t total_elements = a.numel();
@@ -352,7 +361,9 @@ namespace helix {
         new_dims[dim] = end - start;
 
         auto a_impl = a.impl();
-        size_t new_offset = a_impl->storage_offset() + start * a.stride()[dim];
+        size_t new_offset = static_cast<size_t>(
+            static_cast<ptrdiff_t>(a_impl->storage_offset()) + static_cast<ptrdiff_t>(start) * a.stride()[dim]
+        );
 
         const auto new_impl = std::make_shared<TensorImpl>(
             a_impl->storage(), new_offset, Shape(new_dims), a.stride(), a.dtype(), a.device()

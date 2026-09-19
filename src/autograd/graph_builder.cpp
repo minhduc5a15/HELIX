@@ -87,6 +87,9 @@ namespace helix {
                 break;
             }
             case OpType::CrossEntropy: {
+                if (ctx.inputs.size() > 1 && ctx.inputs[1].get().requires_grad()) {
+                    throw std::invalid_argument("CrossEntropyLoss does not currently support differentiable targets");
+                }
                 auto log_softmax = std::any_cast<Tensor>(ctx.attributes.at("log_softmax"));
                 node = std::make_shared<CrossEntropyLossBackward>(log_softmax, ctx.inputs[1].get());
                 break;

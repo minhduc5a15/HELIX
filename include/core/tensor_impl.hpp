@@ -1,6 +1,8 @@
 #pragma once
 
+#include <limits>
 #include <memory>
+#include <stdexcept>
 
 #include "core/autograd_meta.hpp"
 #include "core/device.hpp"
@@ -19,7 +21,11 @@ namespace helix {
               dtype_(dtype),
               device_(device),
               storage_offset_(0) {
-            size_t bytes = shape_.numel() * dtype_size(dtype_);
+            const size_t element_size = dtype_size(dtype_);
+            if (element_size > 0 && shape_.numel() > std::numeric_limits<size_t>::max() / element_size) {
+                throw std::overflow_error("Tensor allocation size in bytes exceeds addressable memory");
+            }
+            size_t bytes = shape_.numel() * element_size;
             storage_ = std::make_shared<Storage>(bytes);
         }
 

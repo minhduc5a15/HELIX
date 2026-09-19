@@ -53,9 +53,6 @@ namespace helix {
         std::unordered_map<size_t, std::unique_ptr<GlobalBin>> global_bins_;
         std::mutex global_map_mutex_;
 
-        std::unordered_set<ThreadCache*> all_caches_;
-        std::mutex caches_mutex_;
-
         std::atomic<uint64_t> current_epoch_{0};
 
         static constexpr size_t MAX_LOCAL_CACHE_SIZE = 64;

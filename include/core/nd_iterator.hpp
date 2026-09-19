@@ -177,10 +177,16 @@ namespace helix {
          * @brief Computes the memory offset from a flat index without needing state initialization.
          */
         static inline ptrdiff_t compute_offset_from_flat(size_t flat_index, const Shape& s, const Stride& st) {
+            if (s.numel() == 0) {
+                return 0;
+            }
             ptrdiff_t offset = 0;
             size_t current_idx = flat_index;
             for (int j = static_cast<int>(s.rank()) - 1; j >= 0; --j) {
                 size_t dim_size = s[j];
+                if (dim_size == 0) {
+                    continue;
+                }
                 size_t coord = current_idx % dim_size;
                 offset += static_cast<ptrdiff_t>(coord) * st[j];
                 current_idx /= dim_size;

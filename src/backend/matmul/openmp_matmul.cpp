@@ -26,6 +26,14 @@ namespace helix {
     }
 
     void openmp_matmul(const float* a, const float* b, float* out, const size_t M, const size_t K, const size_t N) {
+        if (M == 0 || N == 0) {
+            return;
+        }
+        if (K == 0) {
+            std::fill_n(out, M * N, 0.0f);
+            return;
+        }
+
         const bool use_avx2 = supports_avx2_internal();
         constexpr size_t BLOCK = MatMulConfig::block_size;
 

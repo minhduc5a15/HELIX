@@ -126,6 +126,9 @@ namespace helix {
         void copy_fallback_kernel(
             scalar_t* dst_data, const scalar_t* src_data, const Tensor& dst, const Tensor& safe_src
         ) {
+            if (dst.rank() > 8 || safe_src.rank() > 8) {
+                throw std::invalid_argument("Operation on non-contiguous tensor with rank > 8 is not supported");
+            }
             const size_t total_elements = dst.numel();
 
 #pragma omp parallel
@@ -157,6 +160,19 @@ namespace helix {
                 }
             }
         }
+
+        template <typename scalar_t>
+        void zero_2d_kernel(
+            scalar_t* dst_data, size_t rows, size_t cols, ptrdiff_t dst_stride0, ptrdiff_t dst_stride1
+        ) {
+#pragma omp parallel for
+            for (ptrdiff_t r = 0; r < static_cast<ptrdiff_t>(rows); ++r) {
+#pragma omp simd
+                for (size_t c = 0; c < cols; ++c) {
+                    dst_data[r * dst_stride0 + static_cast<ptrdiff_t>(c) * dst_stride1] = static_cast<scalar_t>(0);
+                }
+            }
+        }
     }  // namespace
 
     void Tensor::copy_(const Tensor& src) {
@@ -180,7 +196,10 @@ namespace helix {
         Tensor safe_src = (src.dtype() != dtype()) ? Dispatcher::cast(src, dtype()) : src;
 
         bool is_aliased = (impl_->storage() == safe_src.impl()->storage());
-        bool has_overlap = has_internal_overlap() || safe_src.has_internal_overlap() || is_aliased;
+        if (is_aliased) {
+            safe_src = safe_src.clone();
+        }
+        bool has_overlap = has_internal_overlap() || safe_src.has_internal_overlap();
 
         if (is_contiguous() && safe_src.is_contiguous() && !has_overlap) {
             // Both are contiguous and no overlap, safe to memcpy
@@ -198,6 +217,10 @@ namespace helix {
                         dst_data[i * dst_stride] = src_data[i * src_stride];
                     }
                 } else {
+                    if (shape().rank() > 8) {
+                        throw std::invalid_argument("Operation on non-contiguous tensor with rank > 8 is not supported"
+                        );
+                    }
                     // N-dimensional iterator approach
                     BinaryNDIterator it(shape());
                     it.init_from_flat(0);
@@ -237,16 +260,15 @@ namespace helix {
             const size_t cols = shape()[1];
             const ptrdiff_t dst_stride0 = stride()[0];
             const ptrdiff_t dst_stride1 = stride()[1];
-            float* dst_data = data_ptr();
 
-#pragma omp parallel for
-            for (ptrdiff_t r = 0; r < static_cast<ptrdiff_t>(rows); ++r) {
-#pragma omp simd
-                for (size_t c = 0; c < cols; ++c) {
-                    dst_data[r * dst_stride0 + c * dst_stride1] = 0.0f;
-                }
-            }
+            HELIX_DISPATCH_ALL_TYPES(dtype(), "zero_2d", [&] {
+                scalar_t* dst_data = data_ptr<scalar_t>();
+                zero_2d_kernel<scalar_t>(dst_data, rows, cols, dst_stride0, dst_stride1);
+            });
         } else {
+            if (rank() > 8) {
+                throw std::invalid_argument("Operation on non-contiguous tensor with rank > 8 is not supported");
+            }
             const size_t total_elements = numel();
 
 #pragma omp parallel
@@ -263,20 +285,19 @@ namespace helix {
                 const size_t end = std::min(start + chunk, total_elements);
 
                 if (start < end) {
-                    NDIterator it(shape());
                     HELIX_DISPATCH_ALL_TYPES(dtype(), "zero_", [&] {
                         scalar_t* dst_data = data_ptr<scalar_t>();
                         if (rank() == 1) {
-                            size_t dst_stride = stride()[0];
-                            for (size_t i = 0; i < shape()[0]; ++i) {
-                                dst_data[i * dst_stride] = 0;
+                            const ptrdiff_t dst_stride = stride()[0];
+                            for (size_t i = start; i < end; ++i) {
+                                dst_data[static_cast<ptrdiff_t>(i) * dst_stride] = static_cast<scalar_t>(0);
                             }
                         } else {
                             NDIterator it(shape());
-                            it.init_from_flat(0);
+                            it.init_from_flat(start);
                             ptrdiff_t offset_dst = it.compute_offset(stride());
-                            for (size_t i = 0; i < shape().numel(); ++i) {
-                                dst_data[offset_dst] = 0;
+                            for (size_t i = start; i < end; ++i) {
+                                dst_data[offset_dst] = static_cast<scalar_t>(0);
                                 it.advance(offset_dst, stride());
                             }
                         }

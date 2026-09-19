@@ -54,6 +54,16 @@ This file records notable user-visible and developer-facing changes to HELIX. It
 - Added coordinate bounds validation in `Tensor::item` and `Tensor::set_item`.
 - Added dimension validation in `Dispatcher::cross_entropy` to reject empty batch or class dimensions.
 - Fixed singleton memory leak on module unload in `AutogradEngineProvider` and `AutogradGraphBuilderProvider`.
+- Fixed forward-overlapping in-place self-copy data corruption in `Tensor::copy_` by cloning aliased sources.
+- Fixed type safety crash in rank-2 non-contiguous `Tensor::zero_()` by dispatching across all primitive dtypes.
+- Prevented uncatchable `SIGABRT` / `std::terminate` process aborts in OpenMP parallel regions by rejecting tensors with rank > 8 prior to parallel thread spawning.
+- Fixed hardware trap `SIGFPE` (integer division-by-zero) in `BinaryNDIterator::compute_offset_from_flat` on zero-sized shapes.
+- Fixed algorithmic work-sharing breakdown and duplicate writes in `Tensor::zero_()` OpenMP fallback by dividing elements into disjoint `[start, end)` chunks.
+- Fixed unchecked integer multiplication wraparound in `TensorImpl` storage allocation by adding checked size arithmetic against `SIZE_MAX`.
+- Guarded `CrossEntropyLoss` against differentiable targets during autograd graph construction to prevent invalid shape-mismatched optimizer states.
+- Fixed unsigned integer conversion of negative strides in `Stride::compute_offset` and `Dispatcher::slice` by explicitly casting to signed `ptrdiff_t`.
+- Removed dead `all_caches_` container and `caches_mutex_` from `MemoryPool`, eliminating lock contention during worker thread initialization and teardown.
+- Fixed uninitialized output memory in `openmp_matmul` fallback when $K = 0$ on non-AVX2 hardware targets.
 
 ### Removed
 

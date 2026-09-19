@@ -82,14 +82,7 @@ namespace helix {
 
                 // Note: The global_bins_ lock might be contended during process exit if many
                 // detached threads exit simultaneously, but it guarantees memory safety.
-                // Step 1: Remove the current thread's cache from the global list of all caches.
-                // This prevents `reset()` from trying to access a destructing cache.
-                {
-                    std::lock_guard<std::mutex> lock(pool.caches_mutex_);
-                    pool.all_caches_.erase(tls_cache_ptr);
-                }
-
-                // Step 2: Push remaining valid blocks from the thread-local cache back to the global bins,
+                // Step 1: Push remaining valid blocks from the thread-local cache back to the global bins,
                 // but ONLY if the cache epoch is not stale (i.e. reset() was not called since cache creation/clear).
                 const uint64_t global_epoch = pool.current_epoch_.load(std::memory_order_relaxed);
                 const bool is_stale = (tls_cache_ptr->epoch < global_epoch);
@@ -139,10 +132,8 @@ namespace helix {
         if (tls_teardown_initiated) {
             return nullptr;
         }
-        if (tls_cache_ptr == nullptr) {                       // Check if the current thread already has a cache.
-            tls_cache_ptr = new ThreadCache();                // Create a new cache if not.
-            std::lock_guard<std::mutex> lock(caches_mutex_);  // Protects access to all_caches_ set.
-            all_caches_.insert(tls_cache_ptr);                // Register the new cache with the MemoryPool.
+        if (tls_cache_ptr == nullptr) {         // Check if the current thread already has a cache.
+            tls_cache_ptr = new ThreadCache();  // Create a new cache if not.
         }
         tls_wrapper.touch();  // Ensure the thread-local wrapper's destructor is called on thread exit.
         return tls_cache_ptr;

@@ -15,10 +15,12 @@
 #include "core/nd_iterator.hpp"
 #include "core/tensor.hpp"
 #include "core/tensor_factory.hpp"
+#include "nn/loss.hpp"
 
 namespace helix {
     void avx2_dot_matmul(const float* a, const float* b, float* out, size_t M, size_t K, size_t N);
     void avx2_micro_matmul(const float* a, const float* b, float* out, size_t M, size_t K, size_t N);
+    void openmp_matmul(const float* a, const float* b, float* out, size_t M, size_t K, size_t N);
 }  // namespace helix
 
 using namespace helix;
@@ -233,4 +235,134 @@ TEST(AuditRemediationTest, AutogradCycleDetectionThrows) {
     // Running backward engine on cyclic graph must detect cycle and throw
     BackwardEngine engine;
     EXPECT_THROW(engine.run(root_tensor), std::runtime_error);
+}
+
+// -----------------------------------------------------------------------------
+// Suite 2: Technical Audit Report Remediations (10 New Issues)
+// -----------------------------------------------------------------------------
+
+// 1. Issue 01: Forward-Overlapping Self-Copy Aliasing
+TEST(AuditRemediationTest2, CopyForwardOverlapSelfAliasing) {
+    Tensor t(std::vector<float>{1.0f, 2.0f, 3.0f, 4.0f, 5.0f}, Shape{5});
+    Tensor dst = t.slice(0, 1, 5);  // points to t[1..4]
+    Tensor src = t.slice(0, 0, 4);  // points to t[0..3]
+    dst.copy_(src);
+
+    EXPECT_FLOAT_EQ(t.item({0}), 1.0f);
+    EXPECT_FLOAT_EQ(t.item({1}), 1.0f);
+    EXPECT_FLOAT_EQ(t.item({2}), 2.0f);
+    EXPECT_FLOAT_EQ(t.item({3}), 3.0f);
+    EXPECT_FLOAT_EQ(t.item({4}), 4.0f);
+}
+
+// 2. Issue 02: Zero Rank-2 Non-Contiguous DTypes
+TEST(AuditRemediationTest2, ZeroRank2NonContiguousDTypes) {
+    // Int32
+    Tensor t_i32 = Tensor::ones(Shape{3, 3}, DType::Int32);
+    Tensor sub_i32 = t_i32.slice(1, 0, 2);
+    EXPECT_NO_THROW(sub_i32.zero_());
+    EXPECT_FLOAT_EQ(sub_i32.item({0, 0}), 0.0f);
+    EXPECT_FLOAT_EQ(sub_i32.item({1, 1}), 0.0f);
+
+    // Int64
+    Tensor t_i64 = Tensor::ones(Shape{3, 3}, DType::Int64);
+    Tensor sub_i64 = t_i64.slice(1, 0, 2);
+    EXPECT_NO_THROW(sub_i64.zero_());
+    EXPECT_FLOAT_EQ(sub_i64.item({0, 0}), 0.0f);
+
+    // Float64
+    Tensor t_f64 = Tensor::ones(Shape{3, 3}, DType::Float64);
+    Tensor sub_f64 = t_f64.slice(1, 0, 2);
+    EXPECT_NO_THROW(sub_f64.zero_());
+    EXPECT_FLOAT_EQ(sub_f64.item({0, 0}), 0.0f);
+}
+
+// 3. Issue 03: Rank > 8 Throws Clean Exception Before OpenMP
+TEST(AuditRemediationTest2, RankGreaterThan8ThrowsBeforeOpenMP) {
+    Shape rank9_shape{2, 2, 2, 2, 2, 2, 2, 2, 2};
+    Tensor t = Tensor::ones(rank9_shape).transpose(0, 1);
+    EXPECT_THROW((void)t.clone(), std::invalid_argument);
+    EXPECT_THROW(t.zero_(), std::invalid_argument);
+
+    Tensor other = Tensor::ones(rank9_shape).transpose(0, 1);
+    EXPECT_THROW(t.add_(other), std::invalid_argument);
+}
+
+// 4. Issue 04: ComputeOffsetFromFlat Zero Shape Safety
+TEST(AuditRemediationTest2, ComputeOffsetFromFlatZeroShapeSafety) {
+    Shape zero_shape{2, 0};
+    Stride zero_stride = Stride::compute_contiguous(zero_shape);
+    ptrdiff_t off = BinaryNDIterator::compute_offset_from_flat(0, zero_shape, zero_stride);
+    EXPECT_EQ(off, 0);
+}
+
+// 5. Issue 05: Zero OpenMP Work Sharing Disjoint
+TEST(AuditRemediationTest2, ZeroOpenMPWorkSharingDisjoint) {
+    Tensor t = Tensor::ones(Shape{4, 4, 4});
+    Tensor sub = t.slice(0, 1, 3).slice(1, 1, 3);
+    sub.zero_();
+
+    for (size_t i = 0; i < sub.shape()[0]; ++i) {
+        for (size_t j = 0; j < sub.shape()[1]; ++j) {
+            for (size_t k = 0; k < sub.shape()[2]; ++k) {
+                EXPECT_FLOAT_EQ(sub.item({i, j, k}), 0.0f);
+            }
+        }
+    }
+}
+
+// 6. Issue 06: TensorImpl Allocation Size Wraparound Throws
+TEST(AuditRemediationTest2, TensorImplAllocationWraparoundThrows) {
+    size_t huge_dim = (std::numeric_limits<size_t>::max() / 8) + 10;
+    EXPECT_THROW((void)Tensor(Shape{huge_dim}, DType::Float64), std::overflow_error);
+}
+
+// 7. Issue 07: CrossEntropy Differentiable Target Throws
+TEST(AuditRemediationTest2, CrossEntropyDifferentiableTargetThrows) {
+    init_autograd();
+    Tensor pred = Tensor::randn(Shape{2, 3});
+    pred.set_requires_grad(true);
+    Tensor target = Tensor::zeros(Shape{2, 3});
+    target.set_requires_grad(true);
+
+    EXPECT_THROW((void)cross_entropy_loss(pred, target), std::invalid_argument);
+}
+
+// 8. Issue 08: Negative Stride Explicit Signed Cast
+TEST(AuditRemediationTest2, NegativeStrideExplicitSignedCast) {
+    Stride st({10, -5});
+    EXPECT_EQ(st.compute_offset({1, 2}), 0);
+    EXPECT_EQ(st.compute_offset({2, 5}), -5);
+}
+
+// 9. Issue 09: MemoryPool Worker Spawn No Mutex Contention
+TEST(AuditRemediationTest2, MemoryPoolWorkerSpawnNoMutexContention) {
+    constexpr size_t NUM_THREADS = 8;
+    std::vector<std::thread> threads;
+    for (size_t i = 0; i < NUM_THREADS; ++i) {
+        threads.emplace_back([]() {
+            MemoryPool& pool = MemoryPool::get_instance();
+            for (size_t k = 0; k < 100; ++k) {
+                void* p = pool.allocate(128);
+                pool.deallocate(p, 128);
+            }
+        });
+    }
+    for (auto& th : threads) {
+        th.join();
+    }
+}
+
+// 10. Issue 10: OpenMP MatMul K=0 Fallback Zeroed
+TEST(AuditRemediationTest2, OpenMPMatmulKZeroFallbackZeroed) {
+    constexpr size_t M = 128, K = 0, N = 128;
+    std::vector<float> A(1, 0.0f);
+    std::vector<float> B(1, 0.0f);
+    std::vector<float> C(M * N, 999.0f);
+
+    openmp_matmul(A.data(), B.data(), C.data(), M, K, N);
+
+    for (size_t i = 0; i < M * N; ++i) {
+        EXPECT_FLOAT_EQ(C[i], 0.0f);
+    }
 }
