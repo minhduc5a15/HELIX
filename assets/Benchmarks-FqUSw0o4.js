@@ -1,0 +1,40 @@
+import{t as e}from"./code-xml--2rzbqQv.js";import{n as t,t as n}from"./proxy-CyHgsS-S.js";import{t as r}from"./terminal-BoTewIyA.js";import{n as i,s as a,t as o,u as s}from"./index-BCXsjJfe.js";import{i as c,n as l,r as u,t as d}from"./vsc-dark-plus-0Clyiy4X.js";import{at as f,n as p,r as m,w as h}from"./CartesianChart-BcRXDMzz.js";import{i as g}from"./tooltipContext-D4e7NyDX.js";var _=s(a(),1),v=o();function y(){let[t,n]=(0,_.useState)(!1);return(0,v.jsxs)(v.Fragment,{children:[(0,v.jsxs)(`button`,{onClick:()=>n(!0),className:`mt-12 flex items-center justify-center gap-2 bg-primary/10 hover:bg-primary/20 text-primary px-6 py-3 rounded-full text-sm font-bold transition-all mx-auto border border-primary/20`,children:[(0,v.jsx)(e,{className:`w-4 h-4`}),`Verify Benchmark Authenticity`]}),t&&(0,v.jsx)(`div`,{className:`fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 text-left`,children:(0,v.jsxs)(`div`,{className:`bg-[#111] border border-white/10 rounded-2xl w-full md:w-[95%] max-w-4xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]`,children:[(0,v.jsxs)(`div`,{className:`flex items-center justify-between px-6 py-4 border-b border-white/5 bg-white/5`,children:[(0,v.jsx)(`h3`,{className:`text-lg font-bold`,children:`Benchmark Authenticity`}),(0,v.jsx)(`button`,{onClick:()=>n(!1),className:`text-zinc-500 hover:text-white transition-colors`,children:(0,v.jsx)(i,{className:`w-5 h-5`})})]}),(0,v.jsxs)(`div`,{className:`p-6 overflow-y-auto`,children:[(0,v.jsx)(`p`,{className:`text-zinc-400 mb-6 text-sm leading-relaxed`,children:`We believe in 100% transparency. These numbers are not fabricated marketing materials; they are raw hardware metrics measured by our rigorous C++ benchmark suite. Below is the exact execution logic we use to compute GFLOPS (Giga Floating-Point Operations Per Second).`}),(0,v.jsxs)(`div`,{className:`mb-6`,children:[(0,v.jsxs)(`div`,{className:`flex items-center gap-2 mb-3`,children:[(0,v.jsx)(`div`,{className:`w-3 h-3 rounded-full bg-emerald-500`}),(0,v.jsx)(`span`,{className:`font-bold tracking-wider text-sm text-zinc-300`,children:`C++ Benchmark Source`})]}),(0,v.jsx)(`div`,{className:`rounded-xl overflow-hidden border border-white/10 text-sm`,children:(0,v.jsx)(l,{language:`cpp`,style:d,customStyle:{margin:0,background:`#0d0d0d`,padding:`1rem`},children:`// benchmark/matmul_benchmark.cpp (Snippet)
+#include "backend/cpu_backend.hpp"
+#include "benchmark/benchmark_runner.hpp"
+
+// Strategies to benchmark
+std::vector<std::pair<MatMulStrategy, std::string>> strategies = {
+    {MatMulStrategy::Naive, "Naive"},
+    {MatMulStrategy::Blocked, "Blocked"},
+    {MatMulStrategy::AVX2, "AVX2"},
+    {MatMulStrategy::OpenMP, "OpenMP"}
+};
+
+for (size_t i = 0; i < strategies.size(); ++i) {
+    auto strategy = strategies[i].first;
+    
+    // Core benchmark loop execution
+    auto fn = [&]() { 
+        CPUBackend::matmul(A.data(), B_T.data(), C.data(), M, K, N, strategy); 
+    };
+
+    // 5 warmups, 30 iterations for stability
+    double ops = 2.0 * M * K * N;
+    BenchmarkResult res = BenchmarkRunner::run(name, fn, 30, 5, ops);
+    
+    // Compare OpenMP vs Naive (Speedup calculation)
+    if (i == strategies.size() - 1) {
+        double speedup_total = results[0].median_ms / res.median_ms;
+        std::cout << "-> Total Speedup (OpenMP vs Naive): " << speedup_total << "x\\n";
+    }
+}`})})]}),(0,v.jsxs)(`div`,{children:[(0,v.jsxs)(`div`,{className:`flex items-center gap-2 mb-3`,children:[(0,v.jsx)(r,{className:`w-4 h-4 text-cyan-400`}),(0,v.jsx)(`span`,{className:`font-bold tracking-wider text-sm text-zinc-300`,children:`Reproduce it yourself locally`})]}),(0,v.jsx)(`p`,{className:`text-zinc-500 text-sm mb-3`,children:`Don't trust our charts. Run it directly on your own hardware to see the speedup.`}),(0,v.jsx)(`div`,{className:`rounded-xl overflow-hidden border border-white/10 text-sm`,children:(0,v.jsx)(l,{language:`bash`,style:d,customStyle:{margin:0,background:`#0d0d0d`,padding:`1rem`},children:`# Clone the repository
+git clone https://github.com/minhduc5a15/HELIX.git
+cd HELIX
+
+# Create build directory and compile
+mkdir build && cd build
+cmake -DCMAKE_BUILD_TYPE=Release ..
+make benchmark_matmul
+
+# Run the benchmark yourself
+./benchmark/benchmark_matmul`})})]})]})]})})]})}var b=[{name:`Naive (Baseline)`,gflops:1.22,color:`#3f3f46`},{name:`Cache-Blocked`,gflops:13.19,color:`#06b6d4`},{name:`SIMD AVX2`,gflops:35.17,color:`#8b5cf6`},{name:`OpenMP`,gflops:93.52,color:`#10b981`}];function x(){return(0,v.jsxs)(`section`,{id:`benchmarks`,className:`py-24 relative bg-zinc-950/50`,children:[(0,v.jsxs)(`div`,{className:`max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-16 items-center`,children:[(0,v.jsxs)(n.div,{initial:{opacity:0,x:-30},whileInView:{opacity:1,x:0},viewport:{once:!0},transition:{duration:.6},children:[(0,v.jsx)(`h2`,{className:`text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-6`,children:`Unleashing Hardware Potential`}),(0,v.jsx)(`p`,{className:`text-zinc-400 text-lg leading-relaxed mb-6`,children:`HELIX features a custom JIT Hardware-Agnostic Micro-Autotuner that routes tensor operations to the most optimal backend.`}),(0,v.jsx)(`p`,{className:`text-zinc-400 text-lg leading-relaxed mb-8`,children:`Starting from a standard naive implementation, we applied cache-blocking (tiling) to improve memory locality, explicitly vectorized operations using 256-bit SIMD intrinsics, and finally orchestrated execution across all cores with OpenMP.`}),(0,v.jsx)(`div`,{className:`inline-block bg-primary/10 text-primary px-4 py-2 rounded-lg font-mono text-sm border border-primary/20 mb-6`,children:`76x Speedup over Baseline`}),(0,v.jsxs)(`div`,{className:`bg-white/5 border border-white/10 rounded-xl p-4 flex flex-col md:flex-row gap-4 mt-4`,children:[(0,v.jsx)(`div`,{className:`flex-shrink-0 flex items-center justify-center w-10 h-10 bg-primary/20 rounded-full`,children:(0,v.jsx)(t,{className:`w-5 h-5 text-primary`})}),(0,v.jsxs)(`div`,{children:[(0,v.jsx)(`h4`,{className:`font-bold text-white mb-1 text-sm`,children:`Test Environment`}),(0,v.jsxs)(`p`,{className:`text-xs text-zinc-400`,children:[`Chart numbers generated on `,(0,v.jsx)(`strong`,{children:`Intel Core i5-10500H @ 2.50GHz`}),` (6 Cores, 12 Threads) with 16GB RAM. Because the OpenMP backend utilizes all available CPU threads, `,(0,v.jsx)(`em`,{children:`your local speedup results will vary significantly based on your own CPU's core count.`})]})]})]})]}),(0,v.jsxs)(n.div,{initial:{opacity:0,scale:.95},whileInView:{opacity:1,scale:1},viewport:{once:!0},transition:{duration:.8},className:`glass-panel p-6 rounded-2xl h-[400px]`,children:[(0,v.jsx)(`h3`,{className:`text-zinc-300 font-semibold mb-6 text-center`,children:`Matrix Multiplication Performance (GFLOPS)`}),(0,v.jsx)(f,{width:`100%`,height:`100%`,children:(0,v.jsxs)(u,{data:b,layout:`vertical`,margin:{top:0,right:20,left:0,bottom:0},children:[(0,v.jsx)(m,{type:`number`,hide:!0}),(0,v.jsx)(p,{dataKey:`name`,type:`category`,axisLine:!1,tickLine:!1,tick:{fill:`#a1a1aa`,fontSize:11},width:100}),(0,v.jsx)(h,{cursor:{fill:`#27272a`,opacity:.4},contentStyle:{backgroundColor:`#18181b`,border:`1px solid #3f3f46`,borderRadius:`8px`,color:`#fff`}}),(0,v.jsx)(c,{dataKey:`gflops`,radius:[0,4,4,0],animationDuration:2e3,children:b.map((e,t)=>(0,v.jsx)(g,{fill:e.color},`cell-${t}`))})]})})]})]}),(0,v.jsx)(y,{})]})}function S(){return(0,v.jsxs)(`div`,{className:`animate-in fade-in duration-500`,children:[(0,v.jsxs)(`div`,{className:`max-w-7xl mx-auto pt-12 pb-24 text-center`,children:[(0,v.jsx)(`h2`,{className:`text-4xl font-bold mb-4`,children:`Performance Benchmarks`}),(0,v.jsx)(`p`,{className:`text-zinc-400`,children:`Comparing native AVX2 SIMD against standard implementations`})]}),(0,v.jsx)(x,{})]})}export{S as default};
