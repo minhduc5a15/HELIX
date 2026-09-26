@@ -114,7 +114,10 @@ TEST_F(ModuleTest, ShallowCopyParameters) {
 
     // Mutate the returned parameter tensor in-place
     Tensor new_data = Tensor::ones({2});
-    params[1].copy_(new_data);
+    {
+        no_grad guard;
+        params[1].copy_(new_data);
+    }
 
     // Verify the change is reflected in the module's parameter
     auto updated_named_params = module.named_parameters();

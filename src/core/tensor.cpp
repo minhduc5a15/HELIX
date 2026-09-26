@@ -97,7 +97,23 @@ namespace helix {
         return result;
     }
 
+    namespace {
+        inline void check_inplace_autograd_invariance(const Tensor& tensor) {
+            if (Dispatcher::get_graph_builder() && tensor.requires_grad()) {
+                if (tensor.is_leaf()) {
+                    throw std::runtime_error("a leaf Tensor that requires grad is being used in an in-place operation."
+                    );
+                }
+                throw std::runtime_error(
+                    "in-place operations on non-leaf tensors that require grad are currently not supported in HELIX "
+                    "Autograd."
+                );
+            }
+        }
+    }  // namespace
+
     void Tensor::set_item(const std::vector<size_t>& indices, const float value) {
+        check_inplace_autograd_invariance(*this);
         if (indices.size() != rank()) {
             throw std::invalid_argument("Indices rank must match tensor rank");
         }
@@ -176,6 +192,7 @@ namespace helix {
     }  // namespace
 
     void Tensor::copy_(const Tensor& src) {
+        check_inplace_autograd_invariance(*this);
         if (numel() != src.numel()) {
             throw std::invalid_argument("Size mismatch in copy_");
         }
@@ -244,6 +261,7 @@ namespace helix {
     }
 
     void Tensor::zero_() {
+        check_inplace_autograd_invariance(*this);
         if (has_internal_overlap()) {
             throw std::runtime_error(
                 "zero_: in-place operation on a tensor with overlapping memory (stride 0) is not supported."

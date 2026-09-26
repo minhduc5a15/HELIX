@@ -24,8 +24,11 @@ TEST_F(SGDTest, SharedStorageTest) {
     Tensor b = Tensor::zeros({2});
 
     // In-place copy into parameters
-    linear.parameters()[0].copy_(w);
-    linear.parameters()[1].copy_(b);
+    {
+        no_grad guard;
+        linear.parameters()[0].copy_(w);
+        linear.parameters()[1].copy_(b);
+    }
 
     // Retrieve references
     auto weight_ref = linear.named_parameters()[0].second;

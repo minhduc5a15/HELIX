@@ -91,8 +91,11 @@ TEST_F(SequentialTest, SequentialForward) {
     b1.data_ptr()[0] = 0.5f;
     b1.data_ptr()[1] = 1.0f;
 
-    net.parameters()[0].copy_(w1);
-    net.parameters()[1].copy_(b1);
+    {
+        no_grad guard;
+        net.parameters()[0].copy_(w1);
+        net.parameters()[1].copy_(b1);
+    }
 
     // Linear 2
     Tensor w2 = Tensor::zeros({2, 1});
@@ -102,8 +105,11 @@ TEST_F(SequentialTest, SequentialForward) {
     Tensor b2 = Tensor::zeros({1});
     b2.data_ptr()[0] = -0.5f;
 
-    net.parameters()[2].copy_(w2);
-    net.parameters()[3].copy_(b2);
+    {
+        no_grad guard;
+        net.parameters()[2].copy_(w2);
+        net.parameters()[3].copy_(b2);
+    }
 
     // Input [1, 2] values: [1.0, 2.0]
     Tensor x = Tensor::zeros({1, 2});

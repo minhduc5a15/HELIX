@@ -25,6 +25,9 @@ TEST_F(AutogradTest, InplaceOperationBreaksGraph) {
     // In-place modification on a leaf tensor requiring grad should throw immediately
     Tensor d = Tensor::ones(Shape({2, 2}));
     EXPECT_THROW(a.add_(d), std::runtime_error);
+    EXPECT_THROW(a.zero_(), std::runtime_error);
+    EXPECT_THROW(a.set_item({0, 0}, 10.0f), std::runtime_error);
+    EXPECT_THROW(a.copy_(d), std::runtime_error);
 }
 
 TEST_F(AutogradTest, InplaceOperationOnNonLeafThrows) {
@@ -36,6 +39,9 @@ TEST_F(AutogradTest, InplaceOperationOnNonLeafThrows) {
 
     // In-place on non-leaf requiring grad should throw until properly supported
     EXPECT_THROW(b.add_(c), std::runtime_error);
+    EXPECT_THROW(b.zero_(), std::runtime_error);
+    EXPECT_THROW(b.set_item({0, 0}, 10.0f), std::runtime_error);
+    EXPECT_THROW(b.copy_(c), std::runtime_error);
 }
 
 TEST_F(AutogradTest, InplaceOperationOnNoGradSucceeds) {
@@ -45,6 +51,9 @@ TEST_F(AutogradTest, InplaceOperationOnNoGradSucceeds) {
     // In-place on no-grad should succeed silently
     EXPECT_NO_THROW(a.add_(b));
     EXPECT_EQ(a.data_ptr<float>()[0], 2.0f);
+    EXPECT_NO_THROW(a.zero_());
+    EXPECT_NO_THROW(a.set_item({0, 0}, 10.0f));
+    EXPECT_NO_THROW(a.copy_(b));
 }
 
 TEST_F(AutogradTest, StandardTrainingLoopNoFalsePositive) {

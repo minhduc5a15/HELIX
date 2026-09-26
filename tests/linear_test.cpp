@@ -96,8 +96,11 @@ TEST_F(LinearTest, LinearForward) {
     b.data_ptr()[0] = 0.5f;
     b.data_ptr()[1] = 1.5f;
 
-    fc.parameters()[0].copy_(w);
-    fc.parameters()[1].copy_(b);
+    {
+        no_grad guard;
+        fc.parameters()[0].copy_(w);
+        fc.parameters()[1].copy_(b);
+    }
 
     Tensor x = Tensor::zeros({1, 2});
     x.data_ptr()[0] = 2.0f;
@@ -138,8 +141,11 @@ TEST_F(LinearTest, BiasBroadcasting) {
     b.data_ptr()[0] = 1.0f;
     b.data_ptr()[1] = 2.0f;
 
-    fc.parameters()[0].copy_(w);
-    fc.parameters()[1].copy_(b);
+    {
+        no_grad guard;
+        fc.parameters()[0].copy_(w);
+        fc.parameters()[1].copy_(b);
+    }
 
     Tensor x = Tensor::zeros({3, 2});
     // row 0: [10, 20]
