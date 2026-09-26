@@ -160,6 +160,12 @@ namespace helix {
 
         // Calculate the standardized allocation size (next multiple of 32 for AVX alignment).
         constexpr size_t kAlignment = 32;
+
+        // Prevent overflow when rounding up to the next multiple of 32
+        if (bytes > std::numeric_limits<size_t>::max() - (kAlignment - 1)) {
+            throw std::bad_alloc();
+        }
+
         size_t alloc_size = (bytes + kAlignment - 1) & ~(kAlignment - 1);
 
         // Get the current thread's local cache.
