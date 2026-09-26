@@ -123,3 +123,22 @@ TEST(TensorTest, DTypeAPI_ExceptionOnWrongTemplate) {
     EXPECT_NO_THROW(t_int32.data_ptr<int32_t>());
     EXPECT_NO_THROW(t_float.data_ptr<float>());
 }
+
+TEST(TensorTest, HasInternalOverlapMultiplicationOverflow) {
+    size_t s1 = 1ULL << 61;
+    size_t d1 = 10;
+    size_t s2 = 1ULL << 62;
+    size_t d2 = 4;
+
+    auto storage = std::make_shared<Storage>(0);
+    auto impl = std::make_shared<TensorImpl>(
+        storage,
+        0,
+        Shape{d2, d1},
+        Stride(std::vector<ptrdiff_t>{static_cast<ptrdiff_t>(s2), static_cast<ptrdiff_t>(s1)}),
+        DType::Float32,
+        Device(DeviceType::CPU)
+    );
+    Tensor t(impl);
+    EXPECT_TRUE(t.has_internal_overlap());
+}

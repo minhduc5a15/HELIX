@@ -1,5 +1,9 @@
 #include "core/tensor.hpp"
 
+#include <cstddef>
+
+#include "core/math_utils.hpp"
+
 #if defined(_OPENMP)
 #include <omp.h>
 #endif
@@ -353,11 +357,12 @@ namespace helix {
             // But we'd rather clone a few extra times than corrupt memory silently.
             // Life is too short for exact integer linear programming here.
             // (And PyTorch does it too, so if we're wrong, we're in good company.)
-            if (stride_shape[i + 1].first < stride_shape[i].first * stride_shape[i].second) {
+            size_t span = 0;
+            if (mul_overflow(stride_shape[i].first, stride_shape[i].second, &span) ||
+                stride_shape[i + 1].first < span) {
                 return true;
             }
         }
-
         // We're pretty sure there's no overlap. If there is, well, it's not our fault.
         return false;
     }
