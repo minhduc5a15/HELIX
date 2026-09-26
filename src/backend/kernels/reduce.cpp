@@ -1,3 +1,4 @@
+#include <cmath>
 #include <type_traits>
 
 #include "backend/cpu_backend.hpp"
@@ -54,13 +55,32 @@ namespace helix {
     ) {
         for (size_t i = 0; i < outer_size; ++i) {
             for (size_t k = 0; k < inner_size; ++k) {
-                T max_val = input[i * (dim_size * inner_size) + k];
-                int64_t max_idx = 0;
-                for (size_t j = 1; j < dim_size; ++j) {
+                size_t start_j = 0;
+                if constexpr (std::is_floating_point_v<T>) {
+                    while (start_j < dim_size &&
+                           std::isnan(input[i * (dim_size * inner_size) + start_j * inner_size + k])) {
+                        ++start_j;
+                    }
+                    if (start_j == dim_size) {
+                        output[i * inner_size + k] = 0;
+                        continue;
+                    }
+                }
+
+                T max_val = input[i * (dim_size * inner_size) + start_j * inner_size + k];
+                int64_t max_idx = static_cast<int64_t>(start_j);
+                for (size_t j = start_j + 1; j < dim_size; ++j) {
                     T val = input[i * (dim_size * inner_size) + j * inner_size + k];
-                    if (val > max_val) {
-                        max_val = val;
-                        max_idx = static_cast<int64_t>(j);
+                    if constexpr (std::is_floating_point_v<T>) {
+                        if (!std::isnan(val) && val > max_val) {
+                            max_val = val;
+                            max_idx = static_cast<int64_t>(j);
+                        }
+                    } else {
+                        if (val > max_val) {
+                            max_val = val;
+                            max_idx = static_cast<int64_t>(j);
+                        }
                     }
                 }
                 output[i * inner_size + k] = max_idx;

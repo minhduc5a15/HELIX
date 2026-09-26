@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cmath>
+#include <limits>
+
 #include "autograd/engine.hpp"
 #include "core/tensor.hpp"
 
@@ -178,4 +181,22 @@ TEST(ReduceTest, ArgMax_NoGradient) {
     Tensor idx = a.argmax(0);
     EXPECT_FALSE(idx.requires_grad());
     EXPECT_EQ(idx.impl()->autograd_meta(), nullptr);
+}
+
+TEST(ReduceTest, ArgMax_LeadingNaN) {
+    float nan = std::numeric_limits<float>::quiet_NaN();
+    std::vector<float> data = {nan, 10.0f, 50.0f, 2.0f};
+    Tensor a(data, Shape{4});
+
+    Tensor idx = a.argmax(0);
+    EXPECT_EQ(idx.data_ptr<int64_t>()[0], 2);
+}
+
+TEST(ReduceTest, ArgMax_AllNaN) {
+    float nan = std::numeric_limits<float>::quiet_NaN();
+    std::vector<float> data = {nan, nan, nan};
+    Tensor a(data, Shape{3});
+
+    Tensor idx = a.argmax(0);
+    EXPECT_EQ(idx.data_ptr<int64_t>()[0], 0);
 }
