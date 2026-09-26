@@ -87,7 +87,16 @@ TEST_F(AutogradOpsTest, MeanAxisKeepdimGradientCheck) {
     EXPECT_TRUE(gradient_check(func, {a}));
 }
 
+TEST_F(AutogradOpsTest, MeanBackwardZeroNumelSafety) {
+    MeanBackward node(Shape{0, 2}, std::nullopt, false);
+    Tensor grad_out(Shape{0});
+    auto res = node.backward({grad_out});
+    ASSERT_EQ(res.size(), 1);
+    EXPECT_EQ(res[0].shape().vec(), (std::vector<size_t>{0, 2}));
+}
+
 // 4. Additional Operations
+
 TEST_F(AutogradOpsTest, SubBroadcastGradientCheck) {
     Tensor a({1.0f, 2.0f, 3.0f, 4.0f}, Shape{2, 2});
     Tensor b({5.0f, 6.0f}, Shape{1, 2});

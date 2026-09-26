@@ -152,6 +152,9 @@ namespace helix {
     }
 
     std::vector<Tensor> MeanBackward::backward(const std::vector<Tensor>& grad_outputs) {
+        if (grad_outputs[0].numel() == 0 || input_shape_.numel() == 0) {
+            return {Tensor::zeros(input_shape_, grad_outputs[0].dtype(), grad_outputs[0].device())};
+        }
         Tensor grad = grad_outputs[0];
 
         if (axis_.has_value() && !keepdim_) {
@@ -164,8 +167,8 @@ namespace helix {
         grad = grad.broadcast_to(input_shape_);
 
         // Calculate reduction size
-        const float reduction_size =
-            static_cast<float>(input_shape_.numel()) / static_cast<float>(grad_outputs[0].numel());
+        const double reduction_size =
+            static_cast<double>(input_shape_.numel()) / static_cast<double>(grad_outputs[0].numel());
 
         // Divide straight by N using the new scalar operator
         return {grad / reduction_size};
