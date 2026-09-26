@@ -137,3 +137,10 @@ TEST_F(SequentialTest, SequentialParameters) {
     EXPECT_EQ(params[2].shape().vec(), (std::vector<size_t>{4, 1}));  // w2
     EXPECT_EQ(params[3].shape().vec(), (std::vector<size_t>{1}));     // b2
 }
+
+TEST_F(SequentialTest, NullptrLayerThrows) {
+    std::vector<std::shared_ptr<Module>> layers;
+    layers.push_back(std::make_shared<Linear>(2, 4));
+    layers.push_back(nullptr);
+    EXPECT_THROW((void)Sequential(layers), std::invalid_argument);
+}

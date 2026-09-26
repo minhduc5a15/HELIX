@@ -1,13 +1,25 @@
 #include "nn/sequential.hpp"
 
+#include <cstddef>
+#include <stdexcept>
+
 namespace helix {
 
-    Sequential::Sequential(std::vector<std::shared_ptr<Module>> layers) : layers_(std::move(layers)) {}
+    Sequential::Sequential(std::vector<std::shared_ptr<Module>> layers) : layers_(std::move(layers)) {
+        for (size_t i = 0; i < layers_.size(); ++i) {
+            if (!layers_[i]) {
+                throw std::invalid_argument("Sequential module at index " + std::to_string(i) + " is null.");
+            }
+        }
+    }
 
     Tensor Sequential::forward(const Tensor& input) {
         Tensor out = input;
-        for (const auto& layer : layers_) {
-            out = (*layer)(out);
+        for (size_t i = 0; i < layers_.size(); ++i) {
+            if (!layers_[i]) {
+                throw std::runtime_error("Sequential module at index " + std::to_string(i) + " is null.");
+            }
+            out = (*layers_[i])(out);
         }
         return out;
     }
