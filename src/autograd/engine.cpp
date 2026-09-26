@@ -210,6 +210,11 @@ namespace helix {
         }
 
         if (processed_nodes != visited.size()) {
+            if (!retain_graph) {
+                for (auto& node_ptr : nodes_to_process) {
+                    node_ptr->clear_next_edges();
+                }
+            }
             throw std::runtime_error("RuntimeError: Cycle detected in autograd computation graph.");
         }
 
