@@ -471,3 +471,29 @@ TEST(AuditRemediationTest2, TensorVersionNullStorageSafety) {
     EXPECT_NO_THROW(t.increment_version());
     EXPECT_EQ(t.version(), 0u);
 }
+
+// 17. Issue 07: TensorFactory::randn produces independent sequences across distinct threads
+TEST(AuditRemediationTest2, TensorRandnIndependentAcrossThreads) {
+    constexpr size_t kNumElements = 5;
+    std::vector<float> thread1_values(kNumElements);
+    std::vector<float> thread2_values(kNumElements);
+
+    std::thread t1([&]() {
+        Tensor r1 = Tensor::randn(Shape{kNumElements});
+        for (size_t i = 0; i < kNumElements; ++i) {
+            thread1_values[i] = r1.data_ptr<float>()[i];
+        }
+    });
+    t1.join();
+
+    std::thread t2([&]() {
+        Tensor r2 = Tensor::randn(Shape{kNumElements});
+        for (size_t i = 0; i < kNumElements; ++i) {
+            thread2_values[i] = r2.data_ptr<float>()[i];
+        }
+    });
+    t2.join();
+
+    // Distinct threads must not produce identical pseudo-random sequences
+    EXPECT_NE(thread1_values, thread2_values);
+}

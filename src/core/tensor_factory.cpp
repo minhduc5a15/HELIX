@@ -1,6 +1,8 @@
 #include "core/tensor_factory.hpp"
 
+#include <chrono>
 #include <random>
+#include <thread>
 
 #include "core/dispatcher.hpp"
 
@@ -44,7 +46,13 @@ namespace helix {
         const size_t n = t.numel();
 
         // Use thread_local generator to eliminate cross-thread data races.
-        thread_local std::mt19937 gen(42);
+        thread_local std::mt19937 gen([] {
+            std::random_device rd;
+            const auto tid = std::hash<std::thread::id>{}(std::this_thread::get_id());
+            const auto ts =
+                static_cast<unsigned int>(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+            return std::mt19937(rd() ^ static_cast<unsigned int>(tid) ^ ts);
+        }());
         std::normal_distribution<float> dist(0.0f, 1.0f);
 
         HELIX_DISPATCH_ALL_TYPES(dt, "TensorFactory::randn", [&] {
