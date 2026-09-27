@@ -232,8 +232,8 @@ namespace helix {
 
                 // Handle single dimension overlapping
                 if (rank() == 1) {
-                    size_t dst_stride = stride()[0];
-                    size_t src_stride = safe_src.stride()[0];
+                    ptrdiff_t dst_stride = stride()[0];
+                    ptrdiff_t src_stride = safe_src.stride()[0];
                     for (size_t i = 0; i < shape()[0]; ++i) {
                         dst_data[i * dst_stride] = src_data[i * src_stride];
                     }
