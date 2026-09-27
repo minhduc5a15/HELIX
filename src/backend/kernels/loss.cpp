@@ -10,6 +10,10 @@ namespace helix {
     void CPUBackend::cross_entropy(
         const T* pred, const T* target, T* loss_out, T* log_softmax_out, const size_t N, const size_t C
     ) {
+        if (N == 0 || C == 0) {
+            if (loss_out) loss_out[0] = static_cast<T>(0);
+            return;
+        }
         double total_loss = 0.0;
         const std::ptrdiff_t N_signed = static_cast<std::ptrdiff_t>(N);
 

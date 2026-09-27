@@ -9,6 +9,7 @@
 #include "autograd/autograd_meta.hpp"
 #include "autograd/engine.hpp"
 #include "autograd/node.hpp"
+#include "backend/cpu_backend.hpp"
 #include "core/allocator.hpp"
 #include "core/autotuner.hpp"
 #include "core/dispatcher.hpp"
@@ -380,4 +381,23 @@ TEST(AuditRemediationTest2, InplaceOperationsWithGradRHSThrows) {
     // dst.copy_(src) where src requires grad must also throw
     Tensor dst = Tensor::zeros(Shape{2, 2});
     EXPECT_THROW(dst.copy_(b), std::runtime_error);
+}
+
+// 12. Issue 12: CPUBackend CrossEntropy Zero Dimensions Safety
+TEST(AuditRemediationTest2, CPUBackendCrossEntropyZeroDimensionsSafety) {
+    float loss_out = 999.0f;
+    float pred[4] = {1.0f, 2.0f, 3.0f, 4.0f};
+    float target[4] = {0.0f, 0.0f, 1.0f, 0.0f};
+    float log_softmax_out[4] = {0.0f};
+
+    // Test N = 0 (prevents division by zero NaN)
+    CPUBackend::cross_entropy<float>(pred, target, &loss_out, log_softmax_out, 0, 4);
+    EXPECT_FLOAT_EQ(loss_out, 0.0f);
+    EXPECT_FALSE(std::isnan(loss_out));
+
+    // Test C = 0 (prevents out-of-bounds heap read)
+    loss_out = 999.0f;
+    CPUBackend::cross_entropy<float>(pred, target, &loss_out, log_softmax_out, 2, 0);
+    EXPECT_FLOAT_EQ(loss_out, 0.0f);
+    EXPECT_FALSE(std::isnan(loss_out));
 }
