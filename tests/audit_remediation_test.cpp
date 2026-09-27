@@ -447,3 +447,12 @@ TEST(AuditRemediationTest2, MemoryPoolDeallocateIntegerOverflowSafety) {
     pool.deallocate(ptr, 128);
     EXPECT_EQ(g_total_allocated.load(), initial_allocated);
 }
+
+// 15. Issue 05: Stride::compute_contiguous signed overflow protection
+TEST(AuditRemediationTest2, StrideComputeContiguousSignedOverflowThrows) {
+    // A shape whose dimension product exceeds PTRDIFF_MAX (e.g. 1ULL << 63)
+    // must throw std::overflow_error instead of silently wrapping into negative strides
+    const size_t huge_dim = 1ULL << 63;
+    Shape huge_shape({2, huge_dim});
+    EXPECT_THROW(Stride::compute_contiguous(huge_shape), std::overflow_error);
+}

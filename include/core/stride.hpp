@@ -1,5 +1,6 @@
 #pragma once
 
+#include <limits>
 #include <stdexcept>
 #include <vector>
 
@@ -19,8 +20,9 @@ namespace helix {
             std::vector<ptrdiff_t> st(shape.rank(), 1);
             for (int i = static_cast<int>(shape.rank()) - 2; i >= 0; --i) {
                 size_t next_stride;
-                if (mul_overflow(static_cast<size_t>(st[i + 1]), shape[i + 1], &next_stride)) {
-                    throw std::overflow_error("Stride offset exceeds maximum size_t");
+                if (mul_overflow(static_cast<size_t>(st[i + 1]), shape[i + 1], &next_stride) ||
+                    next_stride > static_cast<size_t>(std::numeric_limits<ptrdiff_t>::max())) {
+                    throw std::overflow_error("Stride offset exceeds maximum ptrdiff_t");
                 }
                 st[i] = static_cast<ptrdiff_t>(next_stride);
             }
