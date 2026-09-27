@@ -171,3 +171,12 @@ TEST_F(LinearTest, BiasBroadcasting) {
     EXPECT_FLOAT_EQ(y.data_ptr()[4], 51.0f);
     EXPECT_FLOAT_EQ(y.data_ptr()[5], 62.0f);
 }
+
+TEST_F(LinearTest, ZeroFeaturesThrows) {
+    constexpr size_t kZeroFeatures = 0;
+    constexpr size_t kValidFeatures = 4;
+
+    EXPECT_THROW((void)Linear(kZeroFeatures, kValidFeatures), std::invalid_argument);
+    EXPECT_THROW((void)Linear(kValidFeatures, kZeroFeatures), std::invalid_argument);
+    EXPECT_THROW((void)Linear(kZeroFeatures, kZeroFeatures), std::invalid_argument);
+}
