@@ -102,14 +102,22 @@ namespace helix {
     }
 
     namespace {
-        inline void check_inplace_autograd_invariance(const Tensor& tensor) {
-            if (Dispatcher::get_graph_builder() && tensor.requires_grad()) {
-                if (tensor.is_leaf()) {
-                    throw std::runtime_error("a leaf Tensor that requires grad is being used in an in-place operation."
+        inline void check_inplace_autograd_invariance(const Tensor& target, const Tensor* source = nullptr) {
+            if (Dispatcher::get_graph_builder() && (target.requires_grad() || (source && source->requires_grad()))) {
+                if (target.requires_grad()) {
+                    if (target.is_leaf()) {
+                        throw std::runtime_error(
+                            "a leaf Tensor that requires grad is being used in an in-place operation."
+                        );
+                    }
+                    throw std::runtime_error(
+                        "in-place operations on non-leaf tensors that require grad are currently not supported in "
+                        "HELIX "
+                        "Autograd."
                     );
                 }
                 throw std::runtime_error(
-                    "in-place operations on non-leaf tensors that require grad are currently not supported in HELIX "
+                    "in-place operations involving tensors that require grad are currently not supported in HELIX "
                     "Autograd."
                 );
             }
@@ -196,7 +204,7 @@ namespace helix {
     }  // namespace
 
     void Tensor::copy_(const Tensor& src) {
-        check_inplace_autograd_invariance(*this);
+        check_inplace_autograd_invariance(*this, &src);
         if (numel() != src.numel()) {
             throw std::invalid_argument("Size mismatch in copy_");
         }

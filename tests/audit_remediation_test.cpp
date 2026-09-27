@@ -366,3 +366,18 @@ TEST(AuditRemediationTest2, OpenMPMatmulKZeroFallbackZeroed) {
         EXPECT_FLOAT_EQ(C[i], 0.0f);
     }
 }
+
+// 11. Issue 11: Inplace Operations With Grad RHS Throws
+TEST(AuditRemediationTest2, InplaceOperationsWithGradRHSThrows) {
+    init_autograd();
+    Tensor a = Tensor::zeros(Shape{2, 2});  // requires_grad = false
+    Tensor b = Tensor::ones(Shape{2, 2});
+    b.set_requires_grad(true);
+
+    // a.add_(b) must throw because b requires grad and in-place tracking is unsupported
+    EXPECT_THROW(a.add_(b), std::runtime_error);
+
+    // dst.copy_(src) where src requires grad must also throw
+    Tensor dst = Tensor::zeros(Shape{2, 2});
+    EXPECT_THROW(dst.copy_(b), std::runtime_error);
+}
