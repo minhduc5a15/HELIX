@@ -75,18 +75,7 @@ namespace helix {
 
                 if (use_avx2) {
                     // AVX2 kernel overwrites directly, no initialization required
-                    avx2_matmul_block(
-                        a,
-                        b,
-                        out,
-                        i_end - i_begin,
-                        K,
-                        j_end - j_begin,
-                        static_cast<int>(i_begin),
-                        static_cast<int>(j_begin),
-                        static_cast<int>(N),
-                        static_cast<int>(K)
-                    );
+                    avx2_matmul_block(a, b, out, i_end - i_begin, K, j_end - j_begin, i_begin, j_begin, N, K);
                 } else {
                     // Fallback: needs element-wise zero initialization before accumulation
                     for (size_t kh = 0; kh < K; kh += BLOCK) {
