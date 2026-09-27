@@ -139,6 +139,22 @@ namespace helix {
             }
         }
 
+        // RAII Scope Guard: Guarantees graph edges are unconditionally cleared
+        // upon stack unwinding, even if curr->backward() or cycle detection throws.
+        struct GraphCleaner {
+            const std::vector<std::shared_ptr<Node>>& nodes;
+            bool retain;
+            ~GraphCleaner() {
+                if (!retain) {
+                    for (const auto& node_ptr : nodes) {
+                        if (node_ptr) {
+                            node_ptr->clear_next_edges();
+                        }
+                    }
+                }
+            }
+        } cleaner{nodes_to_process, retain_graph};
+
         // Step 2: Initialize gradients queue
         std::unordered_map<Node*, std::vector<Tensor>> node_gradients;
 
@@ -210,18 +226,7 @@ namespace helix {
         }
 
         if (processed_nodes != visited.size()) {
-            if (!retain_graph) {
-                for (auto& node_ptr : nodes_to_process) {
-                    node_ptr->clear_next_edges();
-                }
-            }
             throw std::runtime_error("RuntimeError: Cycle detected in autograd computation graph.");
-        }
-
-        if (!retain_graph) {
-            for (auto& node_ptr : nodes_to_process) {
-                node_ptr->clear_next_edges();
-            }
         }
     }
 

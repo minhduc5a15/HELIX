@@ -401,3 +401,28 @@ TEST(AuditRemediationTest2, CPUBackendCrossEntropyZeroDimensionsSafety) {
     EXPECT_FLOAT_EQ(loss_out, 0.0f);
     EXPECT_FALSE(std::isnan(loss_out));
 }
+
+// 13. Issue 13: Backward Exception Clears Graph Edges (RAII Scope Guard)
+TEST(AuditRemediationTest2, BackwardExceptionClearsGraphEdgesRAII) {
+    init_autograd();
+    Tensor a = Tensor::ones(Shape{2, 2});
+    a.set_requires_grad(true);
+    Tensor b = Tensor::ones(Shape{2, 2});
+    b.set_requires_grad(true);
+    Tensor c = a * b;
+    Tensor loss = c.sum();
+
+    // Mutate a's storage version so MulBackward's saved_a_.unpack() throws
+    a.increment_version();
+
+    auto meta_loss = static_cast<AutogradMeta*>(loss.impl()->autograd_meta());
+    auto grad_fn = meta_loss->grad_fn();
+    ASSERT_NE(grad_fn, nullptr);
+    EXPECT_FALSE(grad_fn->next_edges().empty());
+
+    // backward() must throw due to in-place mutation of saved tensor
+    EXPECT_THROW(loss.backward(), std::runtime_error);
+
+    // After exception unwinding, RAII GraphCleaner must have cleared next_edges_
+    EXPECT_TRUE(grad_fn->next_edges().empty());
+}
