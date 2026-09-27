@@ -497,3 +497,41 @@ TEST(AuditRemediationTest2, TensorRandnIndependentAcrossThreads) {
     // Distinct threads must not produce identical pseudo-random sequences
     EXPECT_NE(thread1_values, thread2_values);
 }
+
+// 18. Issue 08: Direct broadcast binary ops (add, sub, mul, div) across differing shapes and dtypes
+TEST(AuditRemediationTest2, BinaryBroadcastOpsDirectDispatchAccuracy) {
+    Tensor a = Tensor::ones(Shape{1, 4}, DType::Int32);
+    Tensor b = Tensor::full(Shape{3, 4}, 2.0f, DType::Float32);
+
+    // add
+    Tensor add_res = a + b;
+    EXPECT_EQ(add_res.shape(), Shape({3, 4}));
+    EXPECT_EQ(add_res.dtype(), DType::Float32);
+    for (size_t i = 0; i < add_res.numel(); ++i) {
+        EXPECT_FLOAT_EQ(add_res.data_ptr<float>()[i], 3.0f);
+    }
+
+    // sub
+    Tensor sub_res = b - a;
+    EXPECT_EQ(sub_res.shape(), Shape({3, 4}));
+    EXPECT_EQ(sub_res.dtype(), DType::Float32);
+    for (size_t i = 0; i < sub_res.numel(); ++i) {
+        EXPECT_FLOAT_EQ(sub_res.data_ptr<float>()[i], 1.0f);
+    }
+
+    // mul
+    Tensor mul_res = a * b;
+    EXPECT_EQ(mul_res.shape(), Shape({3, 4}));
+    EXPECT_EQ(mul_res.dtype(), DType::Float32);
+    for (size_t i = 0; i < mul_res.numel(); ++i) {
+        EXPECT_FLOAT_EQ(mul_res.data_ptr<float>()[i], 2.0f);
+    }
+
+    // div
+    Tensor div_res = b / a;
+    EXPECT_EQ(div_res.shape(), Shape({3, 4}));
+    EXPECT_EQ(div_res.dtype(), DType::Float32);
+    for (size_t i = 0; i < div_res.numel(); ++i) {
+        EXPECT_FLOAT_EQ(div_res.data_ptr<float>()[i], 2.0f);
+    }
+}

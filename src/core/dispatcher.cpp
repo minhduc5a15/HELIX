@@ -612,11 +612,8 @@ namespace helix {
     Tensor Dispatcher::add(const Tensor& a, const Tensor& b) {
         const Shape out_shape = compute_broadcast_shape(a.shape(), b.shape());
         const DType out_dtype = promote_types(a.dtype(), b.dtype());
-        Tensor lhs = a.broadcast_to_view(out_shape);
-        Tensor rhs = b.broadcast_to_view(out_shape);
-
-        if (lhs.dtype() != out_dtype) lhs = cast(lhs, out_dtype);
-        if (rhs.dtype() != out_dtype) rhs = cast(rhs, out_dtype);
+        Tensor lhs = (a.dtype() == out_dtype) ? a : cast(a, out_dtype);
+        Tensor rhs = (b.dtype() == out_dtype) ? b : cast(b, out_dtype);
 
         Tensor out(out_shape, out_dtype, a.device());
         if (a.device().is_cpu()) {
@@ -682,10 +679,8 @@ namespace helix {
     Tensor Dispatcher::sub(const Tensor& a, const Tensor& b) {
         const Shape out_shape = compute_broadcast_shape(a.shape(), b.shape());
         const DType out_dtype = promote_types(a.dtype(), b.dtype());
-        Tensor lhs = a.broadcast_to_view(out_shape);
-        Tensor rhs = b.broadcast_to_view(out_shape);
-        if (lhs.dtype() != out_dtype) lhs = cast(lhs, out_dtype);
-        if (rhs.dtype() != out_dtype) rhs = cast(rhs, out_dtype);
+        Tensor lhs = (a.dtype() == out_dtype) ? a : cast(a, out_dtype);
+        Tensor rhs = (b.dtype() == out_dtype) ? b : cast(b, out_dtype);
 
         Tensor out(out_shape, out_dtype, a.device());
         if (a.device().is_cpu()) {
@@ -708,10 +703,8 @@ namespace helix {
     Tensor Dispatcher::mul(const Tensor& a, const Tensor& b) {
         const Shape out_shape = compute_broadcast_shape(a.shape(), b.shape());
         const DType out_dtype = promote_types(a.dtype(), b.dtype());
-        Tensor lhs = a.broadcast_to_view(out_shape);
-        Tensor rhs = b.broadcast_to_view(out_shape);
-        if (lhs.dtype() != out_dtype) lhs = cast(lhs, out_dtype);
-        if (rhs.dtype() != out_dtype) rhs = cast(rhs, out_dtype);
+        Tensor lhs = (a.dtype() == out_dtype) ? a : cast(a, out_dtype);
+        Tensor rhs = (b.dtype() == out_dtype) ? b : cast(b, out_dtype);
 
         Tensor out(out_shape, out_dtype, a.device());
         if (a.device().is_cpu()) {
@@ -734,10 +727,8 @@ namespace helix {
     Tensor Dispatcher::div(const Tensor& a, const Tensor& b) {
         const Shape out_shape = compute_broadcast_shape(a.shape(), b.shape());
         const DType out_dtype = promote_to_float(promote_types(a.dtype(), b.dtype()));
-        Tensor lhs = a.broadcast_to_view(out_shape);
-        Tensor rhs = b.broadcast_to_view(out_shape);
-        if (lhs.dtype() != out_dtype) lhs = cast(lhs, out_dtype);
-        if (rhs.dtype() != out_dtype) rhs = cast(rhs, out_dtype);
+        Tensor lhs = (a.dtype() == out_dtype) ? a : cast(a, out_dtype);
+        Tensor rhs = (b.dtype() == out_dtype) ? b : cast(b, out_dtype);
 
         Tensor out(out_shape, out_dtype, a.device());
         if (a.device().is_cpu()) {
