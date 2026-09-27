@@ -83,8 +83,16 @@ namespace helix {
         return result;
     }
 
-    auto Tensor::version() const -> uint32_t { return impl_->storage()->version(); }
-    void Tensor::increment_version() { impl_->storage()->increment_version(); }
+    auto Tensor::version() const -> uint32_t {
+        if (!impl_ || !impl_->storage()) return 0;
+        return impl_->storage()->version();
+    }
+
+    void Tensor::increment_version() {
+        if (impl_ && impl_->storage()) {
+            impl_->storage()->increment_version();
+        }
+    }
 
     auto Tensor::item(const std::vector<size_t>& indices) const -> float {
         if (indices.size() != rank()) {

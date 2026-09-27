@@ -456,3 +456,18 @@ TEST(AuditRemediationTest2, StrideComputeContiguousSignedOverflowThrows) {
     Shape huge_shape({2, huge_dim});
     EXPECT_THROW(Stride::compute_contiguous(huge_shape), std::overflow_error);
 }
+
+// 16. Issue 06: Tensor::version and increment_version null storage safety
+TEST(AuditRemediationTest2, TensorVersionNullStorageSafety) {
+    // Construct unbacked TensorImpl with null storage
+    auto impl =
+        std::make_shared<TensorImpl>(nullptr, 0, Shape{2, 2}, Stride({2, 1}), DType::Float32, Device(DeviceType::CPU));
+    Tensor t(impl);
+
+    // Must return 0 without SIGSEGV
+    EXPECT_EQ(t.version(), 0u);
+
+    // Must safely no-op without SIGSEGV
+    EXPECT_NO_THROW(t.increment_version());
+    EXPECT_EQ(t.version(), 0u);
+}
