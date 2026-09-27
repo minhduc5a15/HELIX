@@ -426,3 +426,24 @@ TEST(AuditRemediationTest2, BackwardExceptionClearsGraphEdgesRAII) {
     // After exception unwinding, RAII GraphCleaner must have cleared next_edges_
     EXPECT_TRUE(grad_fn->next_edges().empty());
 }
+
+// 14. Issue 04: MemoryPool::deallocate integer overflow safety
+TEST(AuditRemediationTest2, MemoryPoolDeallocateIntegerOverflowSafety) {
+    MemoryPool& pool = MemoryPool::get_instance();
+    const size_t initial_allocated = g_total_allocated.load();
+
+    // Allocate a legitimate block
+    void* ptr = pool.allocate(128);
+    const size_t allocated = g_total_allocated.load();
+    EXPECT_GT(allocated, initial_allocated);
+
+    // Call deallocate with an extreme size that would overflow (bytes + 31)
+    const size_t huge_bytes = std::numeric_limits<size_t>::max() - 10;
+    // With defensive validation, this call must early-return without altering tracking or corrupting bins
+    pool.deallocate(ptr, huge_bytes);
+    EXPECT_EQ(g_total_allocated.load(), allocated);
+
+    // Clean up legitimate block
+    pool.deallocate(ptr, 128);
+    EXPECT_EQ(g_total_allocated.load(), initial_allocated);
+}

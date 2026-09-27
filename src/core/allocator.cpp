@@ -265,6 +265,12 @@ namespace helix {
 
         // Calculate the standardized allocation size, matching the allocate function.
         constexpr size_t kAlignment = 32;
+
+        // Defensive bounds validation: prevent integer wraparound and invalid bin corruption
+        if (bytes > std::numeric_limits<size_t>::max() - (kAlignment - 1)) {
+            return;
+        }
+
         const size_t alloc_size = (bytes + kAlignment - 1) & ~(kAlignment - 1);
 
         g_total_allocated.fetch_sub(alloc_size, std::memory_order_relaxed);
