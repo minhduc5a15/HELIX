@@ -17,9 +17,9 @@ namespace helix {
             result = result.sum(0, false);  // sum along axis 0, not keeping dim
         }
 
-        // 2. Reduce broadcasted dimensions where target shape is 1 but grad is > 1
+        // 2. Reduce broadcasted dimensions where target shape is 1 but grad is != 1
         for (size_t i = 0; i < target_shape.rank(); ++i) {
-            if (target_shape[i] == 1 && result.shape()[i] > 1) {
+            if (target_shape[i] == 1 && result.shape()[i] != 1) {
                 result = result.sum(i, true);  // sum along axis i, keep dim
             }
         }

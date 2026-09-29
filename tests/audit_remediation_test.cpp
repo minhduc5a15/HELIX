@@ -535,3 +535,21 @@ TEST(AuditRemediationTest2, BinaryBroadcastOpsDirectDispatchAccuracy) {
         EXPECT_FLOAT_EQ(div_res.data_ptr<float>()[i], 2.0f);
     }
 }
+
+// 19. Issue 01 (Comprehensive Audit): sum_to_shape zero-dimension broadcast reduction
+TEST(AuditRemediationTest2, SumToShapeZeroDimensionReduction) {
+    init_autograd();
+    Tensor a = Tensor::ones(Shape{1, 5});
+    a.set_requires_grad(true);
+
+    Tensor b = Tensor::empty(Shape{0, 5});
+    Tensor c = a + b;  // broadcasts to shape {0, 5}
+    EXPECT_EQ(c.shape(), Shape({0, 5}));
+    EXPECT_EQ(c.numel(), 0);
+
+    Tensor loss = c.sum();
+    loss.backward();
+
+    EXPECT_EQ(a.grad().shape(), Shape({1, 5}));
+    EXPECT_EQ(a.grad().numel(), 5);
+}
