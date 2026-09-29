@@ -587,3 +587,9 @@ TEST(AuditRemediationTest2, PowBackwardZeroBaseZeroExponent) {
     EXPECT_FLOAT_EQ(grad_ptr[0], 0.0f);
     EXPECT_FLOAT_EQ(grad_ptr[1], 0.0f);
 }
+
+// 22. Issue 06 (Comprehensive Audit): promote_types(Int64, Float32) yields Float64
+TEST(AuditRemediationTest2, PromoteTypesInt64Float32YieldsFloat64) {
+    EXPECT_EQ(promote_types(DType::Int64, DType::Float32), DType::Float64);
+    EXPECT_EQ(promote_types(DType::Float32, DType::Int64), DType::Float64);
+}

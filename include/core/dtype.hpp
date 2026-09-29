@@ -45,6 +45,9 @@ namespace helix {
     inline DType promote_types(DType a, DType b) {
         if (a == b) return a;
         if (a == DType::Float64 || b == DType::Float64) return DType::Float64;
+        if ((a == DType::Int64 && b == DType::Float32) || (a == DType::Float32 && b == DType::Int64)) {
+            return DType::Float64;
+        }
         if (a == DType::Float32 || b == DType::Float32) return DType::Float32;
         if (a == DType::Int64 || b == DType::Int64) return DType::Int64;
         return DType::Int32;
