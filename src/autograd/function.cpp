@@ -117,6 +117,9 @@ namespace helix {
 
     std::vector<Tensor> PowBackward::backward(const std::vector<Tensor>& grad_outputs) {
         const Tensor& a = saved_a_.unpack();
+        if (exponent_ == 0.0f) {
+            return {Tensor::zeros(a.shape(), a.dtype(), a.device())};
+        }
         // n * x^(n-1)
         const Tensor a_pow = a.pow(exponent_ - 1.0f);
         return {grad_outputs[0] * exponent_ * a_pow};

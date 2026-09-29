@@ -571,3 +571,19 @@ TEST(AuditRemediationTest2, AccumulateGradConcurrentBackwardThreadSafe) {
     EXPECT_TRUE(shared_w.grad().numel() > 0);
     EXPECT_FLOAT_EQ(shared_w.grad().data_ptr<float>()[0], 2.0f);
 }
+
+// 21. Issue 05 (Comprehensive Audit): PowBackward zero base and zero exponent
+TEST(AuditRemediationTest2, PowBackwardZeroBaseZeroExponent) {
+    init_autograd();
+    Tensor x({0.0f, 2.0f}, Shape{2});
+    x.set_requires_grad(true);
+
+    Tensor y = x.pow(0.0f);
+    Tensor loss = y.sum();
+    loss.backward();
+
+    const float* grad_ptr = x.grad().data_ptr<float>();
+    EXPECT_FALSE(std::isnan(grad_ptr[0]));
+    EXPECT_FLOAT_EQ(grad_ptr[0], 0.0f);
+    EXPECT_FLOAT_EQ(grad_ptr[1], 0.0f);
+}
