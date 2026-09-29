@@ -604,3 +604,20 @@ TEST(AuditRemediationTest2, DivScalarIntegerZeroDivisorThrows) {
     int64_t out64[4] = {0};
     EXPECT_THROW(CPUBackend::div_scalar<int64_t>(a64, 0, out64, 4), std::invalid_argument);
 }
+
+// 24. Issue 08 (Comprehensive Audit): Dispatcher::slice zero-extent slice supported
+TEST(AuditRemediationTest2, SliceZeroExtentDimensionSupported) {
+    init_autograd();
+    Tensor a = Tensor::ones(Shape{5, 10});
+    a.set_requires_grad(true);
+
+    Tensor s = a.slice(0, 2, 2);
+    EXPECT_EQ(s.shape(), Shape({0, 10}));
+    EXPECT_EQ(s.numel(), 0);
+
+    Tensor loss = s.sum();
+    loss.backward();
+
+    EXPECT_EQ(a.grad().shape(), Shape({5, 10}));
+    EXPECT_FLOAT_EQ(a.grad().data_ptr<float>()[0], 0.0f);
+}

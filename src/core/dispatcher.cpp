@@ -353,7 +353,7 @@ namespace helix {
         if (dim >= a.rank()) {
             throw std::out_of_range("slice dimension out of range");
         }
-        if (start >= end || end > a.shape()[dim]) {
+        if (start > end || end > a.shape()[dim]) {
             throw std::invalid_argument("invalid slice bounds");
         }
 
