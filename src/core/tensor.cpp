@@ -48,6 +48,7 @@ namespace helix {
     auto Tensor::randn(const Shape& shape, std::optional<DType> dtype, std::optional<Device> device) -> Tensor {
         return TensorFactory::randn(shape, dtype, device);
     }
+    void Tensor::manual_seed(uint64_t seed) { TensorFactory::manual_seed(seed); }
 
     Tensor::Tensor() : impl_(std::make_shared<TensorImpl>(Shape{}, DType::Float32, Device(DeviceType::CPU))) {}
 

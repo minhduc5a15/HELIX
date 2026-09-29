@@ -78,6 +78,7 @@ TEST_F(TrainingTest, LinearRegression_Convergence) {
 }
 
 TEST_F(TrainingTest, XOR_Convergence) {
+    Tensor::manual_seed(42);
     Tensor x({0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 1.0f}, Shape{4, 2});
     Tensor target({0.0f, 1.0f, 1.0f, 0.0f}, Shape{4, 1});
 

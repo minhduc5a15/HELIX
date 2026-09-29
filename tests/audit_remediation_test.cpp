@@ -621,3 +621,31 @@ TEST(AuditRemediationTest2, SliceZeroExtentDimensionSupported) {
     EXPECT_EQ(a.grad().shape(), Shape({5, 10}));
     EXPECT_FLOAT_EQ(a.grad().data_ptr<float>()[0], 0.0f);
 }
+
+// 25. Issue 04 (Comprehensive Audit): manual_seed ensures deterministic PRNG sequences
+TEST(AuditRemediationTest2, ManualSeedDeterministicSequence) {
+    helix::manual_seed(999);
+    Tensor t1 = Tensor::randn({10, 10});
+
+    helix::manual_seed(999);
+    Tensor t2 = Tensor::randn({10, 10});
+
+    const float* p1 = t1.data_ptr<float>();
+    const float* p2 = t2.data_ptr<float>();
+    for (size_t i = 0; i < 100; ++i) {
+        EXPECT_FLOAT_EQ(p1[i], p2[i]);
+    }
+
+    // Different seed produces different sequence
+    helix::manual_seed(12345);
+    Tensor t3 = Tensor::randn({10, 10});
+    const float* p3 = t3.data_ptr<float>();
+    bool has_diff = false;
+    for (size_t i = 0; i < 100; ++i) {
+        if (p1[i] != p3[i]) {
+            has_diff = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(has_diff);
+}

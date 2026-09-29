@@ -25,7 +25,14 @@ namespace helix {
         static Tensor randn(
             const Shape& shape, std::optional<DType> dtype = std::nullopt, std::optional<Device> device = std::nullopt
         );
+        static void manual_seed(uint64_t seed);
     };
+
+    /**
+     * @brief Sets the seed for generating pseudo-random numbers across tensor factory generators.
+     * @param seed The desired seed.
+     */
+    void manual_seed(uint64_t seed);
 
     /**
      * @brief Concatenates a sequence of tensors along a given dimension.

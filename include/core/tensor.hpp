@@ -68,6 +68,12 @@ namespace helix {
         ) -> Tensor;
 
         /**
+         * @brief Sets the seed for random number generation.
+         * @param seed The seed value.
+         */
+        static void manual_seed(uint64_t seed);
+
+        /**
          * @brief Constructs an empty (null) Tensor.
          */
         Tensor();
