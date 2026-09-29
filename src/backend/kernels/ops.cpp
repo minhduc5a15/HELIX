@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cmath>
+#include <stdexcept>
 #include <type_traits>
 
 #include "backend/cpu_backend.hpp"
@@ -100,6 +101,11 @@ namespace helix {
 
     template <typename T>
     void CPUBackend::div_scalar(const T* a, const T scalar, T* out, const size_t size) {
+        if constexpr (std::is_integral_v<T>) {
+            if (scalar == 0) {
+                throw std::invalid_argument("Integer division by zero in div_scalar");
+            }
+        }
         if constexpr (std::is_same_v<T, float>) {
             if (SIMDBackend::is_supported()) {
                 SIMDBackend::div_scalar(a, scalar, out, size);

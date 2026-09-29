@@ -593,3 +593,14 @@ TEST(AuditRemediationTest2, PromoteTypesInt64Float32YieldsFloat64) {
     EXPECT_EQ(promote_types(DType::Int64, DType::Float32), DType::Float64);
     EXPECT_EQ(promote_types(DType::Float32, DType::Int64), DType::Float64);
 }
+
+// 23. Issue 07 (Comprehensive Audit): CPUBackend::div_scalar integer division by zero throws
+TEST(AuditRemediationTest2, DivScalarIntegerZeroDivisorThrows) {
+    int32_t a[4] = {1, 2, 3, 4};
+    int32_t out[4] = {0};
+    EXPECT_THROW(CPUBackend::div_scalar<int32_t>(a, 0, out, 4), std::invalid_argument);
+
+    int64_t a64[4] = {1, 2, 3, 4};
+    int64_t out64[4] = {0};
+    EXPECT_THROW(CPUBackend::div_scalar<int64_t>(a64, 0, out64, 4), std::invalid_argument);
+}
