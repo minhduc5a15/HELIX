@@ -553,3 +553,21 @@ TEST(AuditRemediationTest2, SumToShapeZeroDimensionReduction) {
     EXPECT_EQ(a.grad().shape(), Shape({1, 5}));
     EXPECT_EQ(a.grad().numel(), 5);
 }
+
+// 20. Issue 02 (Comprehensive Audit): AccumulateGrad concurrent backward thread safety
+TEST(AuditRemediationTest2, AccumulateGradConcurrentBackwardThreadSafe) {
+    init_autograd();
+    Tensor shared_w = Tensor::ones(Shape{10, 10});
+    shared_w.set_requires_grad(true);
+
+    Tensor y1 = (shared_w * Tensor::ones(Shape{10, 10})).sum();
+    Tensor y2 = (shared_w * Tensor::ones(Shape{10, 10})).sum();
+
+    std::thread t1([&]() { y1.backward(); });
+    std::thread t2([&]() { y2.backward(); });
+    t1.join();
+    t2.join();
+
+    EXPECT_TRUE(shared_w.grad().numel() > 0);
+    EXPECT_FLOAT_EQ(shared_w.grad().data_ptr<float>()[0], 2.0f);
+}

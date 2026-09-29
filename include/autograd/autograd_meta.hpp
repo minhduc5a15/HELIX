@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <mutex>
 
 #include "autograd/node.hpp"
 #include "core/tensor.hpp"
@@ -20,6 +21,8 @@ namespace helix {
         void set_requires_grad(bool req) { requires_grad_ = req; }
 
         bool has_grad() const { return has_grad_; }
+
+        std::mutex& grad_mutex() const { return grad_mutex_; }
 
         Tensor& grad() { return grad_; }
         const Tensor& grad() const { return grad_; }
@@ -41,6 +44,7 @@ namespace helix {
         Tensor grad_;
         std::shared_ptr<Node> grad_fn_;
         std::shared_ptr<Node> grad_accumulator_;
+        mutable std::mutex grad_mutex_;
     };
 
 }  // namespace helix

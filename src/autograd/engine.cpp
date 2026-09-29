@@ -19,6 +19,7 @@ namespace helix {
         AccumulateGrad(std::weak_ptr<AutogradMeta> meta) : meta_(meta) {}
         std::vector<Tensor> backward(const std::vector<Tensor>& grad_outputs) override {
             if (auto meta = meta_.lock()) {
+                std::lock_guard<std::mutex> lock(meta->grad_mutex());
                 if (!meta->has_grad()) {
                     // Safe-guard: The parameter's gradient must be a safe, unique, and dense tensor
                     // so that future in-place optimizer operations (like .zero_() or .add_()) succeed.
