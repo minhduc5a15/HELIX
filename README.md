@@ -11,7 +11,7 @@ The current implementation is CPU-only. It can train multilayer perceptrons and 
 - Reductions including sum, mean, and index reduction (`Tensor::argmax`).
 - Dynamic reverse-mode autograd for tensor arithmetic, reductions, matrix multiplication, supported view operations, concatenation, and the provided losses.
 - RAII-based autograd control (`helix::no_grad`) with thread-local graph suppression for zero-overhead evaluation and inference.
-- `Linear`, `ReLU`, and `Sequential` neural-network components.
+- `Linear`, `ReLU`, `Flatten`, and `Sequential` neural-network components.
 - Mean squared error and numerically stable cross entropy with one-hot targets.
 - SGD and gradient clearing.
 - CPU matrix multiplication backends: naive, blocked, AVX2/FMA, and OpenMP.

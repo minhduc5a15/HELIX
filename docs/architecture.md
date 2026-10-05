@@ -97,6 +97,7 @@ The current high-level components are:
 - `Module`, with `forward`, `named_parameters`, and `parameters`;
 - `Linear`, storing a `[in_features, out_features]` weight and a bias;
 - `ReLU`;
+- `Flatten`;
 - `Sequential`;
 - free functions `mse_loss` and `cross_entropy_loss`;
 - `SGD`, without momentum or weight decay.

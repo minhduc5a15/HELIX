@@ -96,3 +96,8 @@ add_executable(audit_remediation_test audit_remediation_test.cpp)
 target_link_libraries(audit_remediation_test PRIVATE helix GTest::gtest_main)
 gtest_discover_tests(audit_remediation_test)
 
+add_executable(flatten_test flatten_test.cpp grad_check.cpp)
+target_link_libraries(flatten_test PRIVATE helix GTest::gtest_main)
+gtest_discover_tests(flatten_test)
+
+

@@ -48,6 +48,7 @@ add_library(helix
     src/nn/module.cpp
     src/nn/linear.cpp
     src/nn/relu.cpp
+    src/nn/flatten.cpp
     src/nn/sequential.cpp
     src/nn/loss.cpp
     src/optim/sgd.cpp
