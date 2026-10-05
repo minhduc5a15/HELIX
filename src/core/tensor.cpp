@@ -394,7 +394,62 @@ namespace helix {
         return clone().view(std::move(new_shape));
     }
 
-    auto Tensor::flatten() const -> Tensor { return reshape(Shape{numel()}); }
+    Tensor flatten(const Tensor& input, int64_t start_dim, int64_t end_dim) {
+        return input.flatten(start_dim, end_dim);
+    }
+
+    auto Tensor::flatten(int64_t start_dim, int64_t end_dim) const -> Tensor {
+        const int64_t r = static_cast<int64_t>(rank());
+
+        if (r == 0) {
+            if ((start_dim == 0 || start_dim == -1) && (end_dim == 0 || end_dim == -1)) {
+                return reshape(Shape{1});
+            }
+            throw std::out_of_range("flatten dimension out of range for scalar tensor (expected 0 or -1)");
+        }
+
+        const int64_t norm_start = start_dim < 0 ? start_dim + r : start_dim;
+        const int64_t norm_end = end_dim < 0 ? end_dim + r : end_dim;
+
+        if (norm_start < 0 || norm_start >= r) {
+            throw std::out_of_range("flatten start_dim out of range: " + std::to_string(start_dim));
+        }
+        if (norm_end < 0 || norm_end >= r) {
+            throw std::out_of_range("flatten end_dim out of range: " + std::to_string(end_dim));
+        }
+        if (norm_start > norm_end) {
+            throw std::invalid_argument(
+                "flatten: start_dim (" + std::to_string(start_dim) + ") cannot come after end_dim (" +
+                std::to_string(end_dim) + ")"
+            );
+        }
+
+        if (norm_start == norm_end) {
+            return *this;
+        }
+
+        std::vector<size_t> new_dims;
+        new_dims.reserve(static_cast<size_t>(r - (norm_end - norm_start)));
+
+        for (int64_t i = 0; i < norm_start; ++i) {
+            new_dims.push_back(shape()[static_cast<size_t>(i)]);
+        }
+
+        size_t collapsed = 1;
+        for (int64_t i = norm_start; i <= norm_end; ++i) {
+            const size_t dim_size = shape()[static_cast<size_t>(i)];
+            if (mul_overflow(collapsed, dim_size, &collapsed)) {
+                throw std::overflow_error("flatten dimension product overflowed size_t");
+            }
+        }
+        new_dims.push_back(collapsed);
+
+        for (int64_t i = norm_end + 1; i < r; ++i) {
+            new_dims.push_back(shape()[static_cast<size_t>(i)]);
+        }
+
+        return reshape(Shape(new_dims));
+    }
 
     auto Tensor::detach() const -> Tensor {
         // Detach creates a new Tensor that shares storage but has no autograd history.

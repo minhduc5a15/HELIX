@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -183,10 +184,12 @@ namespace helix {
         [[nodiscard]] auto transpose(size_t dim0, size_t dim1) const -> Tensor;
 
         /**
-         * @brief Flattens the tensor into a 1D tensor.
-         * @return A flattened tensor.
+         * @brief Flattens a consecutive range of dimensions into a single dimension.
+         * @param start_dim First dimension to flatten (default: 0).
+         * @param end_dim Last dimension to flatten (inclusive, default: -1).
+         * @return A flattened Tensor view or copy.
          */
-        [[nodiscard]] auto flatten() const -> Tensor;
+        [[nodiscard]] auto flatten(int64_t start_dim = 0, int64_t end_dim = -1) const -> Tensor;
 
         /**
          * @brief Slices the tensor along a specific dimension.
@@ -336,5 +339,14 @@ namespace helix {
     private:
         std::shared_ptr<TensorImpl> impl_;
     };
+
+    /**
+     * @brief Functional interface to flatten a consecutive range of dimensions into a single dimension.
+     * @param input Input tensor.
+     * @param start_dim First dimension to flatten (default: 0).
+     * @param end_dim Last dimension to flatten (inclusive, default: -1).
+     * @return Flattened tensor.
+     */
+    Tensor flatten(const Tensor& input, int64_t start_dim = 0, int64_t end_dim = -1);
 
 }  // namespace helix

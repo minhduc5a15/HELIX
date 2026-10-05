@@ -10,6 +10,7 @@
 #include "autograd/function.hpp"
 
 // Neural Networks
+#include "nn/flatten.hpp"
 #include "nn/linear.hpp"
 #include "nn/loss.hpp"
 #include "nn/module.hpp"

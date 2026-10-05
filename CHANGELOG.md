@@ -10,6 +10,8 @@ This file records notable user-visible and developer-facing changes to HELIX. It
 - Added `Tensor::argmax(size_t dim)` returning an `Int64` index tensor along a dimension (scalar for rank-1 tensors) supporting all dtypes and strided layouts.
 - Added `helix::cat` along any dimension with layout validation, overflow checks, fast contiguous block copying, and dynamic reverse-mode autograd (`CatBackward`).
 - Added `tanh` to the Tensor API, CPU kernels, autograd graph builder, backward functions, and gradient tests.
+- Added range-based `Tensor::flatten(start_dim, end_dim)` and functional `helix::flatten(input, start_dim, end_dim)` with negative indexing, overflow validation, zero-size extents, non-contiguous layouts, and autograd.
+- Added `nn::Flatten` module defaulting to `start_dim=1, end_dim=-1` for batch preservation in neural networks and `Sequential`.
 - Added autograd support for `clone`, `view`, `slice`, `transpose`, and `broadcast_to`.
 - Added operational support for `Float32`, `Float64`, `Int32`, and `Int64` across tensor factories, element-wise operations, reductions, matrix multiplication, and dtype promotion. Autograd remains restricted to floating-point tensors.
 - Added `TensorIterator` for broadcast-aware binary traversal with dimension coalescing, fixed-size traversal state, and parallel chunking.
