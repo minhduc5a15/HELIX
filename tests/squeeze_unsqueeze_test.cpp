@@ -24,6 +24,10 @@ TEST(CheckedStrideMulTest, CorrectCalculationsAndOverflow) {
     const ptrdiff_t max_val = std::numeric_limits<ptrdiff_t>::max();
     EXPECT_THROW(checked_stride_mul(max_val, 2), std::overflow_error);
     EXPECT_THROW(checked_stride_mul(-max_val, 2), std::overflow_error);
+
+    const ptrdiff_t min_val = std::numeric_limits<ptrdiff_t>::min();
+    EXPECT_EQ(checked_stride_mul(min_val, 1), min_val);
+    EXPECT_THROW(checked_stride_mul(min_val, 2), std::overflow_error);
 }
 
 // =============================================================================
@@ -93,15 +97,19 @@ TEST(TensorUnsqueezeTest, ScalarTensor) {
 TEST(TensorUnsqueezeTest, ZeroExtentTensor) {
     Tensor z = Tensor::zeros({0, 5});
     EXPECT_EQ(z.shape().vec(), (std::vector<size_t>{0, 5}));
+    EXPECT_EQ(z.stride().vec(), (std::vector<ptrdiff_t>{5, 1}));
 
     Tensor u0 = z.unsqueeze(0);
     EXPECT_EQ(u0.shape().vec(), (std::vector<size_t>{1, 0, 5}));
+    EXPECT_EQ(u0.stride().vec(), (std::vector<ptrdiff_t>{0, 5, 1}));
 
     Tensor u1 = z.unsqueeze(1);
     EXPECT_EQ(u1.shape().vec(), (std::vector<size_t>{0, 1, 5}));
+    EXPECT_EQ(u1.stride().vec(), (std::vector<ptrdiff_t>{5, 5, 1}));
 
     Tensor u2 = z.unsqueeze(2);
     EXPECT_EQ(u2.shape().vec(), (std::vector<size_t>{0, 5, 1}));
+    EXPECT_EQ(u2.stride().vec(), (std::vector<ptrdiff_t>{5, 1, 1}));
 }
 
 TEST(TensorUnsqueezeTest, OutOfRangeThrows) {
@@ -134,10 +142,18 @@ TEST(TensorUnsqueezeTest, NonContiguousAliasingAndStride) {
     EXPECT_EQ(y.impl()->storage_offset(), x.impl()->storage_offset());
     EXPECT_EQ(y.data_ptr<float>(), x.data_ptr<float>());
 
+    // Verify multi-coordinate reading consistency between aliased views
+    EXPECT_FLOAT_EQ(y.item({1, 0, 0, 2}), x.item({1, 0, 2}));
+    EXPECT_FLOAT_EQ(y.item({2, 0, 1, 3}), x.item({2, 1, 3}));
+
     // Verify in-place write through aliased view propagates to base and x
     y.data_ptr<float>()[0] = 999.0f;
     EXPECT_FLOAT_EQ(base.data_ptr<float>()[0], 999.0f);
     EXPECT_FLOAT_EQ(x.data_ptr<float>()[0], 999.0f);
+
+    y.set_item({2, 0, 1, 3}, 777.0f);
+    EXPECT_FLOAT_EQ(x.item({2, 1, 3}), 777.0f);
+    EXPECT_FLOAT_EQ(base.item({1, 2, 3}), 777.0f);
 }
 
 // =============================================================================
@@ -249,6 +265,15 @@ TEST(TensorSqueezeTest, NonContiguousAliasingAndStride) {
     EXPECT_EQ(y.impl()->storage(), x.impl()->storage());
     EXPECT_EQ(y.impl()->storage_offset(), x.impl()->storage_offset());
     EXPECT_EQ(y.data_ptr<float>(), x.data_ptr<float>());
+
+    // Verify multi-coordinate reading consistency
+    EXPECT_FLOAT_EQ(y.item({2, 1}), x.item({2, 0, 1}));
+    EXPECT_FLOAT_EQ(y.item({0, 1}), x.item({0, 0, 1}));
+
+    // Verify mutation through item/set_item
+    y.set_item({2, 1}, 888.0f);
+    EXPECT_FLOAT_EQ(x.item({2, 0, 1}), 888.0f);
+    EXPECT_FLOAT_EQ(base.item({1, 2}), 888.0f);
 }
 
 // =============================================================================

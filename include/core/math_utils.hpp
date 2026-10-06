@@ -60,11 +60,26 @@ namespace helix {
         }
         const size_t abs_stride = (stride < 0) ? static_cast<size_t>(-(stride + 1)) + 1 : static_cast<size_t>(stride);
         size_t product = 0;
-        if (mul_overflow(abs_stride, extent, &product) ||
-            product > static_cast<size_t>(std::numeric_limits<ptrdiff_t>::max())) {
+        if (mul_overflow(abs_stride, extent, &product)) {
             throw std::overflow_error("Stride multiplication overflowed ptrdiff_t");
         }
-        return (stride < 0) ? -static_cast<ptrdiff_t>(product) : static_cast<ptrdiff_t>(product);
+
+        const size_t max_positive = static_cast<size_t>(std::numeric_limits<ptrdiff_t>::max());
+        if (stride < 0) {
+            const size_t max_negative_mag = max_positive + 1;
+            if (product > max_negative_mag) {
+                throw std::overflow_error("Stride multiplication overflowed ptrdiff_t");
+            }
+            if (product == max_negative_mag) {
+                return std::numeric_limits<ptrdiff_t>::min();
+            }
+            return -static_cast<ptrdiff_t>(product);
+        }
+
+        if (product > max_positive) {
+            throw std::overflow_error("Stride multiplication overflowed ptrdiff_t");
+        }
+        return static_cast<ptrdiff_t>(product);
     }
 
 }  // namespace helix

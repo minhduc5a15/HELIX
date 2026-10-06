@@ -6,7 +6,7 @@ The current implementation is CPU-only. It can train multilayer perceptrons and 
 
 ## Implemented features
 
-- N-dimensional tensors with shapes, strides, broadcasting, slicing, transposition, reshaping, cloning, and concatenation (`helix::cat`).
+- N-dimensional tensors with shapes, strides, broadcasting, slicing, transposition, reshaping, cloning, zero-copy squeezing/unsqueezing views, and concatenation (`helix::cat`).
 - `Float32`, `Float64`, `Int32`, and `Int64` dtypes with type promotion.
 - Reductions including sum, mean, and index reduction (`Tensor::argmax`).
 - Dynamic reverse-mode autograd for tensor arithmetic, reductions, matrix multiplication, supported view operations, concatenation, and the provided losses.
