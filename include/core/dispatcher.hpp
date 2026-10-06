@@ -27,6 +27,9 @@ namespace helix {
         static Tensor slice(const Tensor& a, size_t dim, size_t start, size_t end);
         static Tensor transpose(const Tensor& a, size_t dim0, size_t dim1);
         static Tensor broadcast_to(const Tensor& a, Shape new_shape);
+        static Tensor unsqueeze(const Tensor& a, int64_t dim);
+        static Tensor squeeze(const Tensor& a);
+        static Tensor squeeze(const Tensor& a, int64_t dim);
         static Tensor cat(const std::vector<Tensor>& tensors, size_t dim);
 
         // Type Conversion

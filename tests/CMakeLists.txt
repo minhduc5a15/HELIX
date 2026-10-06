@@ -100,4 +100,9 @@ add_executable(flatten_test flatten_test.cpp grad_check.cpp)
 target_link_libraries(flatten_test PRIVATE helix GTest::gtest_main)
 gtest_discover_tests(flatten_test)
 
+add_executable(squeeze_unsqueeze_test squeeze_unsqueeze_test.cpp)
+target_link_libraries(squeeze_unsqueeze_test PRIVATE helix GTest::gtest_main)
+gtest_discover_tests(squeeze_unsqueeze_test)
+
+
 

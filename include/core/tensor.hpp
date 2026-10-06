@@ -208,6 +208,26 @@ namespace helix {
         [[nodiscard]] auto broadcast_to(Shape new_shape) const -> Tensor;
         [[nodiscard]] auto broadcast_to_view(Shape new_shape) const -> Tensor;
 
+        /**
+         * @brief Returns a new tensor with a dimension of size one inserted at the specified position.
+         * @param dim Index at which to insert the singleton dimension.
+         * @return A zero-copy view of the tensor.
+         */
+        [[nodiscard]] auto unsqueeze(int64_t dim) const -> Tensor;
+
+        /**
+         * @brief Returns a tensor with all dimensions of input of size 1 removed.
+         * @return A zero-copy view of the tensor, or *this if no dimensions of size 1 exist.
+         */
+        [[nodiscard]] auto squeeze() const -> Tensor;
+
+        /**
+         * @brief Returns a tensor with the specified dimension removed if it has size 1.
+         * @param dim The dimension to squeeze.
+         * @return A zero-copy view of the tensor, or *this if the dimension size is not 1.
+         */
+        [[nodiscard]] auto squeeze(int64_t dim) const -> Tensor;
+
         auto operator+(const Tensor& other) const -> Tensor;
         auto operator-(const Tensor& other) const -> Tensor;
         auto operator*(const Tensor& other) const -> Tensor;
@@ -348,5 +368,28 @@ namespace helix {
      * @return Flattened tensor.
      */
     Tensor flatten(const Tensor& input, int64_t start_dim = 0, int64_t end_dim = -1);
+
+    /**
+     * @brief Functional interface to insert a singleton dimension at the specified position.
+     * @param input Input tensor.
+     * @param dim Index at which to insert the singleton dimension.
+     * @return Zero-copy unsqueezed tensor view.
+     */
+    Tensor unsqueeze(const Tensor& input, int64_t dim);
+
+    /**
+     * @brief Functional interface to remove all dimensions of size 1.
+     * @param input Input tensor.
+     * @return Zero-copy squeezed tensor view.
+     */
+    Tensor squeeze(const Tensor& input);
+
+    /**
+     * @brief Functional interface to remove the specified dimension if it has size 1.
+     * @param input Input tensor.
+     * @param dim Dimension to squeeze.
+     * @return Zero-copy squeezed tensor view.
+     */
+    Tensor squeeze(const Tensor& input, int64_t dim);
 
 }  // namespace helix

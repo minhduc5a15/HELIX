@@ -11,6 +11,7 @@ This file records notable user-visible and developer-facing changes to HELIX. It
 - Added `helix::cat` along any dimension with layout validation, overflow checks, fast contiguous block copying, and dynamic reverse-mode autograd (`CatBackward`).
 - Added `tanh` to the Tensor API, CPU kernels, autograd graph builder, backward functions, and gradient tests.
 - Added range-based `Tensor::flatten(start_dim, end_dim)` and functional `helix::flatten(input, start_dim, end_dim)` with negative indexing, overflow validation, zero-size extents, non-contiguous layouts, and autograd.
+- Added zero-copy metadata-only views for Tensor methods and functional APIs: `Tensor::unsqueeze(dim)`, `Tensor::squeeze()`, `Tensor::squeeze(dim)`, `helix::unsqueeze(input, dim)`, `helix::squeeze(input)`, and `helix::squeeze(input, dim)`, preserving storage sharing, offset, and non-contiguous stride layouts with checked stride overflow protection and `ViewBackward` autograd integration.
 - Added `helix::Flatten` module defaulting to `start_dim=1, end_dim=-1` for batch preservation in neural networks and `Sequential`.
 - Added autograd support for `clone`, `view`, `slice`, `transpose`, and `broadcast_to`.
 - Added operational support for `Float32`, `Float64`, `Int32`, and `Int64` across tensor factories, element-wise operations, reductions, matrix multiplication, and dtype promotion. Autograd remains restricted to floating-point tensors.

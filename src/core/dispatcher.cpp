@@ -434,6 +434,159 @@ namespace helix {
         return out;
     }
 
+    Tensor Dispatcher::unsqueeze(const Tensor& a, int64_t dim) {
+        const size_t r = a.rank();
+        const int64_t max_dim = static_cast<int64_t>(r);
+        const int64_t min_dim = -static_cast<int64_t>(r + 1);
+
+        if (dim < min_dim || dim > max_dim) {
+            throw std::out_of_range("unsqueeze dimension out of range");
+        }
+
+        const size_t norm_dim = static_cast<size_t>(dim < 0 ? dim + static_cast<int64_t>(r + 1) : dim);
+
+        ptrdiff_t inserted_stride = 1;
+        if (norm_dim < r) {
+            inserted_stride = checked_stride_mul(a.stride()[norm_dim], a.shape()[norm_dim]);
+        }
+
+        std::vector<size_t> new_dims;
+        new_dims.reserve(r + 1);
+        for (size_t i = 0; i < norm_dim; ++i) {
+            new_dims.push_back(a.shape()[i]);
+        }
+        new_dims.push_back(1);
+        for (size_t i = norm_dim; i < r; ++i) {
+            new_dims.push_back(a.shape()[i]);
+        }
+
+        std::vector<ptrdiff_t> new_strides;
+        new_strides.reserve(r + 1);
+        for (size_t i = 0; i < norm_dim; ++i) {
+            new_strides.push_back(a.stride()[i]);
+        }
+        new_strides.push_back(inserted_stride);
+        for (size_t i = norm_dim; i < r; ++i) {
+            new_strides.push_back(a.stride()[i]);
+        }
+
+        auto a_impl = a.impl();
+        const auto new_impl = std::make_shared<TensorImpl>(
+            a_impl->storage(),
+            a_impl->storage_offset(),
+            Shape(std::move(new_dims)),
+            Stride(std::move(new_strides)),
+            a.dtype(),
+            a.device()
+        );
+        Tensor out(new_impl);
+
+        if (g_graph_builder) {
+            std::unordered_map<std::string, std::any> attributes;
+            attributes["original_shape"] = a.shape();
+            g_graph_builder->build(OperationContext{OpCategory::View, OpType::View, out, {a}, std::move(attributes)});
+        }
+        return out;
+    }
+
+    Tensor Dispatcher::squeeze(const Tensor& a) {
+        const size_t r = a.rank();
+        if (r == 0) {
+            return a;
+        }
+
+        bool has_singleton = false;
+        for (size_t i = 0; i < r; ++i) {
+            if (a.shape()[i] == 1) {
+                has_singleton = true;
+                break;
+            }
+        }
+
+        if (!has_singleton) {
+            return a;
+        }
+
+        std::vector<size_t> new_dims;
+        std::vector<ptrdiff_t> new_strides;
+        for (size_t i = 0; i < r; ++i) {
+            if (a.shape()[i] != 1) {
+                new_dims.push_back(a.shape()[i]);
+                new_strides.push_back(a.stride()[i]);
+            }
+        }
+
+        auto a_impl = a.impl();
+        const auto new_impl = std::make_shared<TensorImpl>(
+            a_impl->storage(),
+            a_impl->storage_offset(),
+            Shape(std::move(new_dims)),
+            Stride(std::move(new_strides)),
+            a.dtype(),
+            a.device()
+        );
+        Tensor out(new_impl);
+
+        if (g_graph_builder) {
+            std::unordered_map<std::string, std::any> attributes;
+            attributes["original_shape"] = a.shape();
+            g_graph_builder->build(OperationContext{OpCategory::View, OpType::View, out, {a}, std::move(attributes)});
+        }
+        return out;
+    }
+
+    Tensor Dispatcher::squeeze(const Tensor& a, int64_t dim) {
+        const size_t r = a.rank();
+        if (r == 0) {
+            if (dim == 0 || dim == -1) {
+                return a;
+            }
+            throw std::out_of_range("squeeze dimension out of range");
+        }
+
+        const int64_t max_dim = static_cast<int64_t>(r) - 1;
+        const int64_t min_dim = -static_cast<int64_t>(r);
+
+        if (dim < min_dim || dim > max_dim) {
+            throw std::out_of_range("squeeze dimension out of range");
+        }
+
+        const size_t norm_dim = static_cast<size_t>(dim < 0 ? dim + static_cast<int64_t>(r) : dim);
+
+        if (a.shape()[norm_dim] != 1) {
+            return a;
+        }
+
+        std::vector<size_t> new_dims;
+        new_dims.reserve(r - 1);
+        std::vector<ptrdiff_t> new_strides;
+        new_strides.reserve(r - 1);
+        for (size_t i = 0; i < r; ++i) {
+            if (i != norm_dim) {
+                new_dims.push_back(a.shape()[i]);
+                new_strides.push_back(a.stride()[i]);
+            }
+        }
+
+        auto a_impl = a.impl();
+        const auto new_impl = std::make_shared<TensorImpl>(
+            a_impl->storage(),
+            a_impl->storage_offset(),
+            Shape(std::move(new_dims)),
+            Stride(std::move(new_strides)),
+            a.dtype(),
+            a.device()
+        );
+        Tensor out(new_impl);
+
+        if (g_graph_builder) {
+            std::unordered_map<std::string, std::any> attributes;
+            attributes["original_shape"] = a.shape();
+            g_graph_builder->build(OperationContext{OpCategory::View, OpType::View, out, {a}, std::move(attributes)});
+        }
+        return out;
+    }
+
     Tensor Dispatcher::cat(const std::vector<Tensor>& tensors, size_t dim) {
         if (tensors.empty()) {
             throw std::invalid_argument("cat expects a non-empty list of tensors");

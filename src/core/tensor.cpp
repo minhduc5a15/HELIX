@@ -398,6 +398,12 @@ namespace helix {
         return input.flatten(start_dim, end_dim);
     }
 
+    Tensor unsqueeze(const Tensor& input, int64_t dim) { return input.unsqueeze(dim); }
+
+    Tensor squeeze(const Tensor& input) { return input.squeeze(); }
+
+    Tensor squeeze(const Tensor& input, int64_t dim) { return input.squeeze(dim); }
+
     auto Tensor::flatten(int64_t start_dim, int64_t end_dim) const -> Tensor {
         const int64_t r = static_cast<int64_t>(rank());
 
@@ -482,6 +488,12 @@ namespace helix {
         );
         return Tensor(new_impl);
     }
+
+    auto Tensor::unsqueeze(int64_t dim) const -> Tensor { return Dispatcher::unsqueeze(*this, dim); }
+
+    auto Tensor::squeeze() const -> Tensor { return Dispatcher::squeeze(*this); }
+
+    auto Tensor::squeeze(int64_t dim) const -> Tensor { return Dispatcher::squeeze(*this, dim); }
 
     auto Tensor::operator+(const Tensor& other) const -> Tensor { return Dispatcher::add(*this, other); }
     auto Tensor::add_(const Tensor& other) -> Tensor& {
