@@ -43,9 +43,11 @@ TEST_F(ReLUTest, Backward) {
 }
 
 TEST_F(ReLUTest, GradientCheck) {
-    Tensor x = Tensor::randn({4, 4});
-    // Add small offset to avoid exactly 0 (non-differentiable point)
-    x = x + 0.1f;
+    // Fixed deterministic inputs far from 0 to avoid non-differentiable point
+    Tensor x(
+        {-3.0f, -2.5f, -1.8f, -0.9f, 0.8f, 1.5f, 2.2f, 3.7f, -4.2f, -1.1f, -0.7f, -2.0f, 0.9f, 1.4f, 2.8f, 3.1f},
+        Shape{4, 4}
+    );
 
     auto func = [](const std::vector<Tensor>& args) { return relu(args[0]).sum(); };
 

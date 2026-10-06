@@ -108,6 +108,8 @@ TEST_F(TrainingTest, XOR_Convergence) {
 }
 
 TEST_F(TrainingTest, Classification_Convergence) {
+    Tensor::manual_seed(42);
+
     // 4 samples, 3 classes
     Tensor x({0.1f, 0.2f, 0.8f, 0.9f, 0.5f, 0.1f, 0.9f, 0.8f}, Shape{4, 2});
 
@@ -115,7 +117,25 @@ TEST_F(TrainingTest, Classification_Convergence) {
     Tensor target({1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f}, Shape{4, 3});
 
     Sequential model(Linear(2, 8), ReLU(), Linear(8, 3));
-    SGD optimizer(model.parameters(), 0.1f);
+    auto params = model.parameters();
+
+    // Deterministic parameter initialization to guarantee cross-platform convergence
+    // (std::normal_distribution is implementation-defined across standard libraries)
+    float* w1 = params[0].data_ptr();
+    for (size_t i = 0; i < 2 * 8; ++i) {
+        w1[i] = 0.2f * static_cast<float>((static_cast<int>(i) % 5) - 2);
+    }
+    float* b1 = params[1].data_ptr();
+    std::fill_n(b1, 8, 0.0f);
+
+    float* w2 = params[2].data_ptr();
+    for (size_t i = 0; i < 8 * 3; ++i) {
+        w2[i] = 0.2f * static_cast<float>((static_cast<int>(i) % 3) - 1);
+    }
+    float* b2 = params[3].data_ptr();
+    std::fill_n(b2, 3, 0.0f);
+
+    SGD optimizer(params, 0.1f);
 
     float initial_loss = 0.0f;
     float last_loss = 0.0f;

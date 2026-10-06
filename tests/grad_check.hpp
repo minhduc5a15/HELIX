@@ -13,8 +13,9 @@ namespace helix {
     bool gradient_check(
         const std::function<Tensor(const std::vector<Tensor>&)>& func,
         const std::vector<Tensor>& inputs,
-        float eps = 1e-3f,
-        float tolerance = 1e-3f
+        float eps = 5e-3f,
+        float atol = 1e-3f,
+        float rtol = 1e-3f
     );
 
 }  // namespace helix

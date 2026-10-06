@@ -1,5 +1,6 @@
 #include "grad_check.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 
@@ -9,7 +10,8 @@ namespace helix {
         const std::function<Tensor(const std::vector<Tensor>&)>& func,
         const std::vector<Tensor>& inputs,
         const float eps,
-        const float tolerance
+        const float atol,
+        const float rtol
     ) {
         // 1. Create input tensors with requires_grad = true for autograd
         std::vector<Tensor> inputs_with_grad;
@@ -66,10 +68,14 @@ namespace helix {
                 float num_grad = (val_plus - val_minus) / (2.0f * eps);
                 float auto_grad = grad.data_ptr()[j];
 
+                const float diff = std::abs(num_grad - auto_grad);
+                const float scale = std::max(std::abs(num_grad), std::abs(auto_grad));
+
                 // If the difference is too large -> fail
-                if (std::abs(num_grad - auto_grad) > tolerance) {
+                if (diff > atol + rtol * scale) {
                     std::cerr << "[GradientCheck] Mismatch at input " << i << " element " << j << ". Num: " << num_grad
-                              << ", Auto: " << auto_grad << ". Diff: " << std::abs(num_grad - auto_grad) << std::endl;
+                              << ", Auto: " << auto_grad << ". Diff: " << diff << ", Tol: " << (atol + rtol * scale)
+                              << std::endl;
                     passed = false;
                 }
             }

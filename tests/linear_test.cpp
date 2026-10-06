@@ -31,9 +31,23 @@ TEST_F(LinearTest, ParametersCount) {
 }
 
 TEST_F(LinearTest, GradientCheck) {
-    Tensor x = Tensor::randn({2, 4});
-    Tensor w = Tensor::randn({4, 8});
-    Tensor b = Tensor::randn({8});
+    // Fixed deterministic inputs for cross-platform stability
+    std::vector<float> x_data(2 * 4);
+    for (size_t i = 0; i < x_data.size(); ++i) {
+        x_data[i] = 0.1f * static_cast<float>(i + 1);
+    }
+    std::vector<float> w_data(4 * 8);
+    for (size_t i = 0; i < w_data.size(); ++i) {
+        w_data[i] = 0.05f * static_cast<float>(i + 1) - 0.8f;
+    }
+    std::vector<float> b_data(8);
+    for (size_t i = 0; i < b_data.size(); ++i) {
+        b_data[i] = 0.2f * static_cast<float>(i + 1);
+    }
+
+    Tensor x(x_data, Shape{2, 4});
+    Tensor w(w_data, Shape{4, 8});
+    Tensor b(b_data, Shape{8});
 
     auto func = [](const std::vector<Tensor>& args) { return (args[0].matmul(args[1]) + args[2]).sum(); };
 

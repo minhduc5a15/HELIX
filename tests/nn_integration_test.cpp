@@ -34,6 +34,7 @@ TEST_F(NNIntegrationTest, EndToEndForwardBackward) {
 }
 
 TEST_F(NNIntegrationTest, GradientCheck) {
+    Tensor::manual_seed(42);
     Sequential net(Linear(2, 8), ReLU(), Linear(8, 1));
 
     Tensor x = Tensor::randn({4, 2});  // smaller batch
