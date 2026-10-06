@@ -16,6 +16,18 @@
 #include "core/tensor.hpp"
 #include "core/tensor_iterator.hpp"
 
+#if defined(__has_feature)
+#if __has_feature(thread_sanitizer)
+#define HELIX_TSAN_ENABLED 1
+#endif
+#elif defined(__SANITIZE_THREAD__)
+#define HELIX_TSAN_ENABLED 1
+#endif
+
+#if defined(HELIX_TSAN_ENABLED)
+extern "C" const char* __tsan_default_options() { return "ignore_noninstrumented_modules=1"; }
+#endif
+
 namespace helix {
     namespace {
         template <typename scalar_t, typename Operation>
