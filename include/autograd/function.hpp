@@ -108,6 +108,16 @@ namespace helix {
         SavedTensor saved_b_;
     };
 
+    class BmmBackward : public Node {
+    public:
+        BmmBackward(const Tensor& a, const Tensor& b) : saved_a_(a), saved_b_(b) {}
+        std::vector<Tensor> backward(const std::vector<Tensor>& grad_outputs) override;
+
+    private:
+        SavedTensor saved_a_;
+        SavedTensor saved_b_;
+    };
+
     class NegBackward : public Node {
     public:
         NegBackward() = default;

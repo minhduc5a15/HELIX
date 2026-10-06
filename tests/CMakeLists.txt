@@ -104,5 +104,9 @@ add_executable(squeeze_unsqueeze_test squeeze_unsqueeze_test.cpp)
 target_link_libraries(squeeze_unsqueeze_test PRIVATE helix GTest::gtest_main)
 gtest_discover_tests(squeeze_unsqueeze_test)
 
+add_executable(bmm_test bmm_test.cpp grad_check.cpp)
+target_link_libraries(bmm_test PRIVATE helix GTest::gtest_main)
+gtest_discover_tests(bmm_test)
+
 
 

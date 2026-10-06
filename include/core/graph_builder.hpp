@@ -20,6 +20,7 @@ namespace helix {
         Sum,
         Mean,
         MatMul,
+        Bmm,
         Neg,
         View,
         Reshape,

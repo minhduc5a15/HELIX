@@ -47,6 +47,7 @@ namespace helix {
         static Tensor mul_scalar(const Tensor& a, float scalar);
         static Tensor div_scalar(const Tensor& a, float scalar);
         static Tensor matmul(const Tensor& a, const Tensor& b);
+        static Tensor bmm(const Tensor& a, const Tensor& b);
 
         // Unary Operations
         static Tensor neg(const Tensor& a);

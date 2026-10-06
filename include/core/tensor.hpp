@@ -247,6 +247,14 @@ namespace helix {
         [[nodiscard]] auto matmul(const Tensor& other) const -> Tensor;
 
         /**
+         * @brief Performs batched matrix multiplication between this Tensor and another (Phase 1: strict 3D, no
+         * broadcasting).
+         * @param other The right-hand side Tensor.
+         * @return The resulting Tensor.
+         */
+        [[nodiscard]] auto bmm(const Tensor& other) const -> Tensor;
+
+        /**
          * @brief Element-wise negation.
          * @return The negated tensor.
          */
@@ -391,5 +399,13 @@ namespace helix {
      * @return Zero-copy squeezed tensor view.
      */
     Tensor squeeze(const Tensor& input, int64_t dim);
+
+    /**
+     * @brief Functional interface for batched matrix multiplication of two 3D tensors.
+     * @param input First batch of matrices [B, M, K].
+     * @param mat2 Second batch of matrices [B, K, N].
+     * @return Resulting batch of matrices [B, M, N].
+     */
+    Tensor bmm(const Tensor& input, const Tensor& mat2);
 
 }  // namespace helix

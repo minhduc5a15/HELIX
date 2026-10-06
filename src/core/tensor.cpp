@@ -404,6 +404,8 @@ namespace helix {
 
     Tensor squeeze(const Tensor& input, int64_t dim) { return input.squeeze(dim); }
 
+    Tensor bmm(const Tensor& input, const Tensor& mat2) { return input.bmm(mat2); }
+
     auto Tensor::flatten(int64_t start_dim, int64_t end_dim) const -> Tensor {
         const int64_t r = static_cast<int64_t>(rank());
 
@@ -517,6 +519,7 @@ namespace helix {
     auto Tensor::relu() const -> Tensor { return Dispatcher::relu(*this); }
     auto Tensor::pow(const float exponent) const -> Tensor { return Dispatcher::pow(*this, exponent); }
     auto Tensor::matmul(const Tensor& other) const -> Tensor { return Dispatcher::matmul(*this, other); }
+    auto Tensor::bmm(const Tensor& other) const -> Tensor { return Dispatcher::bmm(*this, other); }
 
     auto Tensor::sum(const std::optional<size_t> axis, const bool keepdim) const -> Tensor {
         return Dispatcher::sum(*this, axis, keepdim);

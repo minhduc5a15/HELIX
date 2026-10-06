@@ -90,6 +90,19 @@ namespace helix {
         return {grad_outputs[0].matmul(b_t), a_t.matmul(grad_outputs[0])};
     }
 
+    std::vector<Tensor> BmmBackward::backward(const std::vector<Tensor>& grad_outputs) {
+        // Y = bmm(A, B) where A in [B, M, K], B in [B, K, N], grad_out in [B, M, N]
+        // dL/dA = bmm(grad_out, B^T), where B^T = B.transpose(1, 2) in [B, N, K]
+        // dL/dB = bmm(A^T, grad_out), where A^T = A.transpose(1, 2) in [B, K, M]
+        const Tensor& a = saved_a_.unpack();
+        const Tensor& b = saved_b_.unpack();
+
+        const Tensor b_t = b.transpose(1, 2);
+        const Tensor a_t = a.transpose(1, 2);
+
+        return {grad_outputs[0].bmm(b_t), a_t.bmm(grad_outputs[0])};
+    }
+
     std::vector<Tensor> NegBackward::backward(const std::vector<Tensor>& grad_outputs) { return {-grad_outputs[0]}; }
 
     std::vector<Tensor> ExpBackward::backward(const std::vector<Tensor>& grad_outputs) {

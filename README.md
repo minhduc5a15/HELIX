@@ -21,7 +21,7 @@ The current implementation is CPU-only. It can train multilayer perceptrons and 
 ## Current scope and limitations
 
 - Computation is implemented only for `DeviceType::CPU`. `DeviceType::CUDA` is declared as API metadata, but no CUDA allocator or kernels exist.
-- `matmul` accepts two 2D tensors; batched matrix multiplication is not implemented.
+- `matmul` currently supports 2D tensors; `bmm` supports strict rank-3 batched multiplication without batch broadcasting.
 - `cross_entropy_loss` expects predictions and one-hot targets with the same `[batch, classes]` shape.
 - Integer tensors cannot require gradients.
 - Autograd must be initialized by calling `init_autograd()` before creating tensors or modules that require gradients.

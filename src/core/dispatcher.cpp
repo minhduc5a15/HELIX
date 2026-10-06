@@ -1217,6 +1217,60 @@ namespace helix {
         return out;
     }
 
+    Tensor Dispatcher::bmm(const Tensor& a, const Tensor& b) {
+        if (a.rank() != 3 || b.rank() != 3) {
+            throw std::invalid_argument(
+                "bmm expects 3D tensors, but got rank " + std::to_string(a.rank()) + " and " + std::to_string(b.rank())
+            );
+        }
+        if (a.shape()[0] != b.shape()[0]) {
+            throw std::invalid_argument(
+                "bmm batch dimensions must match: " + std::to_string(a.shape()[0]) + " vs " +
+                std::to_string(b.shape()[0])
+            );
+        }
+        if (a.shape()[2] != b.shape()[1]) {
+            throw std::invalid_argument(
+                "bmm inner matrix dimensions must match: " + std::to_string(a.shape()[2]) + " vs " +
+                std::to_string(b.shape()[1])
+            );
+        }
+        if (a.device() != b.device()) {
+            throw std::invalid_argument("bmm tensors must be on the same device");
+        }
+        if (!a.device().is_cpu()) {
+            throw std::runtime_error("Unsupported device");
+        }
+
+        const DType out_dtype = promote_types(a.dtype(), b.dtype());
+        Tensor lhs = (a.dtype() == out_dtype) ? ensure_contiguous(a) : cast(a, out_dtype);
+        Tensor rhs = (b.dtype() == out_dtype) ? ensure_contiguous(b) : cast(b, out_dtype);
+
+        const size_t B = a.shape()[0];
+        const size_t M = a.shape()[1];
+        const size_t K = a.shape()[2];
+        const size_t N = b.shape()[2];
+
+        Tensor out(Shape{B, M, N}, out_dtype, a.device());
+
+        if (out.numel() == 0) {
+            // Zero-extent tensor: numel is 0, nothing to execute in backend
+        } else {
+            HELIX_DISPATCH_ALL_TYPES(out_dtype, "bmm", [&] {
+                CPUBackend::bmm(
+                    lhs.data_ptr<scalar_t>(), rhs.data_ptr<scalar_t>(), out.data_ptr<scalar_t>(), B, M, K, N
+                );
+            });
+        }
+
+        if (g_graph_builder) {
+            g_graph_builder->build(
+                OperationContext{.category = OpCategory::Matrix, .type = OpType::Bmm, .out = out, .inputs = {a, b}}
+            );
+        }
+        return out;
+    }
+
     Tensor Dispatcher::sum(const Tensor& a, std::optional<size_t> axis, bool keepdim) {
         Tensor lhs = ensure_contiguous(a);
 

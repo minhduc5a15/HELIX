@@ -66,6 +66,18 @@ namespace helix {
             const T* a, const T* b, T* out, size_t M, size_t K, size_t N, MatMulStrategy strategy = MatMulStrategy::Auto
         );
 
+        template <typename T>
+        static void bmm(
+            const T* a,
+            const T* b,
+            T* out,
+            size_t B,
+            size_t M,
+            size_t K,
+            size_t N,
+            MatMulStrategy strategy = MatMulStrategy::Auto
+        );
+
         // Reduce Operations
         template <typename T>
         static void sum(const T* input, T* output, size_t outer_size, size_t dim_size, size_t inner_size);
