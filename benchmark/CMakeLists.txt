@@ -9,3 +9,7 @@ target_link_libraries(nn_benchmark PRIVATE helix)
 
 add_executable(training_benchmark training_benchmark.cpp)
 target_link_libraries(training_benchmark PRIVATE helix)
+
+add_executable(bmm_benchmark bmm_benchmark.cpp)
+target_link_libraries(bmm_benchmark PRIVATE helix)
+target_include_directories(bmm_benchmark PRIVATE ${PROJECT_SOURCE_DIR}/src)
