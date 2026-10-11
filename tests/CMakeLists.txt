@@ -106,6 +106,7 @@ gtest_discover_tests(squeeze_unsqueeze_test)
 
 add_executable(bmm_test bmm_test.cpp grad_check.cpp)
 target_link_libraries(bmm_test PRIVATE helix GTest::gtest_main)
+target_include_directories(bmm_test PRIVATE ${PROJECT_SOURCE_DIR}/src)
 gtest_discover_tests(bmm_test)
 
 

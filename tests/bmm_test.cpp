@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "autograd/engine.hpp"
+#include "backend/matmul/bmm_internal.hpp"
 #include "core/tensor.hpp"
 #include "grad_check.hpp"
 
@@ -562,5 +563,126 @@ TEST_F(BmmAutogradTest, GradientAccumulation) {
         for (size_t i = 0; i < b.numel(); ++i) {
             EXPECT_FLOAT_EQ(b.grad().data_ptr<float>()[i], grad_b_1.data_ptr<float>()[i] * 2.0f);
         }
+    }
+}
+
+// =============================================================================
+// Batch-Parallel Kernel Tests (Internal Experimental Path)
+// =============================================================================
+
+TEST(BmmParallelBatchTest, ParallelBatchNumericalParity) {
+    auto test_parity = [](size_t B, size_t M, size_t K, size_t N) {
+        std::vector<float> a_data(B * M * K);
+        for (size_t i = 0; i < a_data.size(); ++i) {
+            a_data[i] = static_cast<float>(static_cast<int>(i % 17) - 8) * 0.125f;
+        }
+
+        std::vector<float> b_data(B * K * N);
+        for (size_t i = 0; i < b_data.size(); ++i) {
+            b_data[i] = static_cast<float>(static_cast<int>(i % 13) - 6) * 0.25f;
+        }
+
+        std::vector<float> out_serial(B * M * N, 0.0f);
+        std::vector<float> out_parallel(B * M * N, 0.0f);
+
+        internal::bmm_serial_batches(a_data.data(), b_data.data(), out_serial.data(), B, M, K, N, MatMulStrategy::Auto);
+        internal::bmm_parallel_batches_float(a_data.data(), b_data.data(), out_parallel.data(), B, M, K, N);
+
+        for (size_t i = 0; i < out_serial.size(); ++i) {
+            EXPECT_NEAR(out_parallel[i], out_serial[i], 1e-4f);
+        }
+    };
+
+    // 1. Regular shape
+    test_parity(8, 32, 32, 32);
+
+    // 2. Odd-tail shape (SIMD tail check)
+    test_parity(7, 65, 63, 17);
+
+    // 3. Rectangular attention-like shape
+    test_parity(4, 128, 64, 128);
+}
+
+TEST(BmmParallelBatchTest, ParallelBatchZeroExtents) {
+    // B = 0
+    {
+        std::vector<float> a_data(10, 1.0f);
+        std::vector<float> b_data(10, 1.0f);
+        std::vector<float> out(10, 0.0f);
+        internal::bmm_parallel_batches_float(a_data.data(), b_data.data(), out.data(), 0, 3, 4, 5);
+    }
+
+    // M = 0
+    {
+        std::vector<float> a_data(10, 1.0f);
+        std::vector<float> b_data(10, 1.0f);
+        std::vector<float> out(10, 0.0f);
+        internal::bmm_parallel_batches_float(a_data.data(), b_data.data(), out.data(), 2, 0, 4, 5);
+    }
+
+    // N = 0
+    {
+        std::vector<float> a_data(10, 1.0f);
+        std::vector<float> b_data(10, 1.0f);
+        std::vector<float> out(10, 0.0f);
+        internal::bmm_parallel_batches_float(a_data.data(), b_data.data(), out.data(), 2, 3, 4, 0);
+    }
+
+    // K = 0 (Must zero-fill output)
+    {
+        std::vector<float> a_data(10, 1.0f);
+        std::vector<float> b_data(10, 1.0f);
+        std::vector<float> out(2 * 3 * 5, 99.0f);
+        internal::bmm_parallel_batches_float(a_data.data(), b_data.data(), out.data(), 2, 3, 0, 5);
+        for (float val : out) {
+            EXPECT_FLOAT_EQ(val, 0.0f);
+        }
+    }
+}
+
+TEST(BmmParallelBatchTest, ParallelBatchSingleBatch) {
+    std::vector<float> a_data(32 * 32);
+    for (size_t i = 0; i < a_data.size(); ++i) {
+        a_data[i] = static_cast<float>(static_cast<int>(i % 17) - 8) * 0.125f;
+    }
+    std::vector<float> b_data(32 * 32);
+    for (size_t i = 0; i < b_data.size(); ++i) {
+        b_data[i] = static_cast<float>(static_cast<int>(i % 13) - 6) * 0.25f;
+    }
+
+    std::vector<float> out_serial(32 * 32, 0.0f);
+    std::vector<float> out_parallel(32 * 32, 0.0f);
+
+    internal::bmm_serial_batches(a_data.data(), b_data.data(), out_serial.data(), 1, 32, 32, 32, MatMulStrategy::Auto);
+    internal::bmm_parallel_batches_float(a_data.data(), b_data.data(), out_parallel.data(), 1, 32, 32, 32);
+
+    for (size_t i = 0; i < out_serial.size(); ++i) {
+        EXPECT_NEAR(out_parallel[i], out_serial[i], 1e-4f);
+    }
+}
+
+TEST(BmmParallelBatchTest, ParallelBatchStressTSan) {
+    const size_t B = 64;
+    const size_t M = 32;
+    const size_t K = 32;
+    const size_t N = 32;
+
+    std::vector<float> a_data(B * M * K);
+    for (size_t i = 0; i < a_data.size(); ++i) {
+        a_data[i] = static_cast<float>(static_cast<int>(i % 17) - 8) * 0.125f;
+    }
+    std::vector<float> b_data(B * K * N);
+    for (size_t i = 0; i < b_data.size(); ++i) {
+        b_data[i] = static_cast<float>(static_cast<int>(i % 13) - 6) * 0.25f;
+    }
+
+    std::vector<float> out_serial(B * M * N, 0.0f);
+    std::vector<float> out_parallel(B * M * N, 0.0f);
+
+    internal::bmm_serial_batches(a_data.data(), b_data.data(), out_serial.data(), B, M, K, N, MatMulStrategy::Auto);
+    internal::bmm_parallel_batches_float(a_data.data(), b_data.data(), out_parallel.data(), B, M, K, N);
+
+    for (size_t i = 0; i < out_serial.size(); ++i) {
+        EXPECT_NEAR(out_parallel[i], out_serial[i], 1e-4f);
     }
 }
