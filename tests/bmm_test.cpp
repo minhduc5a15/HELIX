@@ -686,3 +686,60 @@ TEST(BmmParallelBatchTest, ParallelBatchStressTSan) {
         EXPECT_NEAR(out_parallel[i], out_serial[i], 1e-4f);
     }
 }
+
+// =============================================================================
+// Execution Policy Heuristic Tests (Milestone 5)
+// =============================================================================
+
+TEST(BmmExecutionPolicyTest, SingleBatchOrSingleThreadFallback) {
+    EXPECT_EQ(internal::choose_bmm_execution_policy(1, 128, 128, 128, 8), internal::BmmExecutionPolicy::SerialAuto);
+    EXPECT_EQ(internal::choose_bmm_execution_policy(0, 128, 128, 128, 8), internal::BmmExecutionPolicy::SerialAuto);
+    EXPECT_EQ(internal::choose_bmm_execution_policy(8, 128, 128, 128, 1), internal::BmmExecutionPolicy::SerialAuto);
+    EXPECT_EQ(internal::choose_bmm_execution_policy(8, 128, 128, 128, 0), internal::BmmExecutionPolicy::SerialAuto);
+}
+
+TEST(BmmExecutionPolicyTest, SmallWorkFallback) {
+    // 2 * 4 * 4 * 4 = 128 < 16384 -> SerialAuto
+    EXPECT_EQ(internal::choose_bmm_execution_policy(2, 4, 4, 4, 4), internal::BmmExecutionPolicy::SerialAuto);
+    // 2 * 16 * 16 * 16 = 8192 < 16384 -> SerialAuto
+    EXPECT_EQ(internal::choose_bmm_execution_policy(2, 16, 16, 16, 4), internal::BmmExecutionPolicy::SerialAuto);
+    // 4 * 16 * 16 * 16 = 16384 >= 16384 -> ParallelBatch
+    EXPECT_EQ(internal::choose_bmm_execution_policy(4, 16, 16, 16, 4), internal::BmmExecutionPolicy::ParallelBatch);
+}
+
+TEST(BmmExecutionPolicyTest, OverflowFallback) {
+    EXPECT_EQ(internal::choose_bmm_execution_policy(2, SIZE_MAX, 2, 2, 4), internal::BmmExecutionPolicy::SerialAuto);
+}
+
+TEST(BmmExecutionPolicyTest, MultiBatchParallelBatchSelected) {
+    EXPECT_EQ(internal::choose_bmm_execution_policy(8, 32, 32, 32, 4), internal::BmmExecutionPolicy::ParallelBatch);
+    EXPECT_EQ(internal::choose_bmm_execution_policy(16, 64, 64, 64, 6), internal::BmmExecutionPolicy::ParallelBatch);
+}
+
+TEST(BmmExecutionPolicyTest, AutoDispatchEndToEndParity) {
+    const size_t B = 8;
+    const size_t M = 32;
+    const size_t K = 32;
+    const size_t N = 32;
+
+    std::vector<float> a_data(B * M * K);
+    for (size_t i = 0; i < a_data.size(); ++i) {
+        a_data[i] = static_cast<float>(static_cast<int>(i % 17) - 8) * 0.125f;
+    }
+    std::vector<float> b_data(B * K * N);
+    for (size_t i = 0; i < b_data.size(); ++i) {
+        b_data[i] = static_cast<float>(static_cast<int>(i % 13) - 6) * 0.25f;
+    }
+
+    Tensor a(a_data, Shape{B, M, K});
+    Tensor b(b_data, Shape{B, K, N});
+    Tensor c = a.bmm(b);
+
+    std::vector<float> ref_out(B * M * N, 0.0f);
+    internal::bmm_serial_batches(a_data.data(), b_data.data(), ref_out.data(), B, M, K, N, MatMulStrategy::Auto);
+
+    const float* c_ptr = c.data_ptr<float>();
+    for (size_t i = 0; i < ref_out.size(); ++i) {
+        EXPECT_NEAR(c_ptr[i], ref_out[i], 1e-4f);
+    }
+}

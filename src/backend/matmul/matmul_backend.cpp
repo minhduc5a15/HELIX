@@ -7,6 +7,10 @@
 #include "core/shape.hpp"
 #include "matmul_kernel.hpp"
 
+#if defined(_OPENMP)
+#include <omp.h>
+#endif
+
 namespace helix {
     template <typename T>
     void generic_blocked_matmul(const T* a, const T* b, T* out, const size_t M, const size_t K, const size_t N) {
@@ -108,6 +112,18 @@ namespace helix {
         const size_t N,
         MatMulStrategy strategy
     ) {
+#if defined(_OPENMP)
+        if constexpr (std::is_same_v<T, float>) {
+            if (supports_avx2_backend() && strategy == MatMulStrategy::Auto) {
+                const size_t threads = static_cast<size_t>(omp_get_max_threads());
+                if (internal::choose_bmm_execution_policy(B, M, K, N, threads) ==
+                    internal::BmmExecutionPolicy::ParallelBatch) {
+                    internal::bmm_parallel_batches_float(a, b, out, B, M, K, N);
+                    return;
+                }
+            }
+        }
+#endif
         internal::bmm_serial_batches(a, b, out, B, M, K, N, strategy);
     }
 

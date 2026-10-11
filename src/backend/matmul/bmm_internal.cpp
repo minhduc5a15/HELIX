@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include "core/cpu_utils.hpp"
+#include "core/math_utils.hpp"
 #include "core/shape.hpp"
 #include "matmul_kernel.hpp"
 
@@ -89,6 +90,26 @@ namespace helix::internal {
                 blocked_matmul(a_batch, b_batch, out_batch, M, K, N);
             }
         }
+    }
+
+    BmmExecutionPolicy choose_bmm_execution_policy(
+        const size_t B, const size_t M, const size_t K, const size_t N, const size_t num_threads
+    ) {
+        // Serial fallback when batch size or available threads cannot exploit outer concurrency
+        if (B <= 1 || num_threads <= 1) {
+            return BmmExecutionPolicy::SerialAuto;
+        }
+
+        // Avoid thread scheduling and barrier latency for very small overall work
+        // Benchmarked: total FLOP volume < 16384 executes faster on 1 core without OpenMP overhead
+        size_t matrix_work = 0;
+        size_t total_work = 0;
+        if (mul_overflow(M, K, &matrix_work) || mul_overflow(matrix_work, N, &matrix_work) ||
+            mul_overflow(matrix_work, B, &total_work) || total_work < 16384) {
+            return BmmExecutionPolicy::SerialAuto;
+        }
+
+        return BmmExecutionPolicy::ParallelBatch;
     }
 
 }  // namespace helix::internal
