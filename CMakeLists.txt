@@ -40,6 +40,7 @@ add_library(helix
     src/backend/matmul/avx2_micro_matmul.cpp
     src/backend/matmul/openmp_matmul.cpp
     src/backend/matmul/matmul_backend.cpp
+    src/backend/matmul/bmm_internal.cpp
     src/backend/simd/simd_backend.cpp
     src/autograd/autograd_meta.cpp
     src/autograd/function.cpp

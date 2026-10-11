@@ -11,7 +11,9 @@ namespace helix {
      * @return true if the CPU supports both AVX2 and FMA, false otherwise.
      */
     inline bool cpu_supports_avx2_fma() {
-#if defined(__EMSCRIPTEN__)
+#if !defined(__x86_64__) && !defined(_M_X64)
+        return false;
+#elif defined(__EMSCRIPTEN__)
         return false;
 #elif defined(__GNUC__) || defined(__clang__)
         return __builtin_cpu_supports("avx2") && __builtin_cpu_supports("fma");
@@ -30,5 +32,11 @@ namespace helix {
         return false;
 #endif
     }
+
+    /**
+     * @brief Normalized backend helper to check for AVX2 and FMA support.
+     * @return true if running on x86_64 with both AVX2 and FMA support.
+     */
+    inline bool supports_avx2_backend() { return cpu_supports_avx2_fma(); }
 
 }  // namespace helix
