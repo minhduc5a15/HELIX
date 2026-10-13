@@ -38,6 +38,9 @@ jobs:
         echo "Running Unit Tests and saving to XML..."
         ctest --test-dir build -C ${{matrix.build_type}} --output-on-failure --output-junit "$TEST_OUT"
         
+        echo "Running Python BMM Analyzer Tests..."
+        python3 -m unittest discover -s tests -p "test_analyze_bmm_benchmark.py" -v
+        
         echo "Running Google Benchmark and saving to JSON..."
         BENCHMARK_BIN=$(find build -type f \( -name "matmul_benchmark" -o -name "matmul_benchmark.exe" \) | head -n 1)
         if [ -n "$BENCHMARK_BIN" ]; then

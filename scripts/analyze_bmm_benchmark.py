@@ -13,6 +13,9 @@ from pathlib import Path
 import statistics
 import sys
 from collections import defaultdict
+from typing import Dict, List, Tuple, Any
+
+UINT64_MAX = 0xFFFFFFFFFFFFFFFF
 
 
 def parse_args():
@@ -23,6 +26,12 @@ def parse_args():
         type=int,
         default=32768,
         help="Candidate minimum total MAC threshold for ParallelBatch (default: 32768).",
+    )
+    parser.add_argument(
+        "--enable-large-guard",
+        action="store_true",
+        default=False,
+        help="Enable experimental guard falling back to SerialAuto when B < threads and per-matrix MAC >= large-matrix-mac (default: False, matching C++ production).",
     )
     parser.add_argument(
         "--large-matrix-mac",
@@ -46,23 +55,68 @@ def parse_args():
     return parser.parse_args()
 
 
-def load_and_validate_csvs(filepaths):
+def simulate_policy(
+    b: int,
+    m: int,
+    k: int,
+    n: int,
+    threads: int,
+    min_total_mac: int = 32768,
+    enable_large_guard: bool = False,
+    large_matrix_mac: int = 512**3,
+) -> str:
+    """
+    Simulate the C++ choose_bmm_execution_policy logic.
+    Faithfully simulates 64-bit unsigned mul_overflow semantics.
+    """
+    if b <= 1 or threads <= 1:
+        return "serial_auto"
+
+    # Simulate C++ mul_overflow(M, K, &matrix_mac) || mul_overflow(matrix_mac, N, &matrix_mac)
+    mk = m * k
+    if mk > UINT64_MAX:
+        return "serial_auto"
+
+    matrix_mac = mk * n
+    if matrix_mac > UINT64_MAX:
+        return "serial_auto"
+
+    # Simulate mul_overflow(matrix_mac, B, &total_mac)
+    total_mac = matrix_mac * b
+    if total_mac > UINT64_MAX:
+        return "serial_auto"
+
+    if total_mac < min_total_mac:
+        return "serial_auto"
+
+    if enable_large_guard and b < threads and matrix_mac >= large_matrix_mac:
+        return "serial_auto"
+
+    return "parallel_batch_serial_inner"
+
+
+def load_and_validate_csvs(filepaths: List[str]) -> Tuple[Dict[Tuple[int, int, int, int, int], Dict[str, Any]], int]:
+    """
+    Load benchmark CSVs, validate formats and contents, enforce the duplicate contract:
+    - Same-file duplicates for the same (B, M, K, N, threads, mode) are strictly rejected with ValueError.
+    - Cross-file duplicates are aggregated by calculating the median of per-file medians with full provenance.
+    """
     required_cols = {"B", "M", "K", "N", "threads", "mode", "median_ms"}
-    records_by_config = defaultdict(dict)
+    raw_by_config = defaultdict(lambda: defaultdict(list))
     total_rows = 0
 
     for path_str in filepaths:
         p = Path(path_str)
         if not p.is_file():
-            print(f"Error: CSV file not found: {path_str}", file=sys.stderr)
-            sys.exit(1)
+            raise FileNotFoundError(f"CSV file not found: {path_str}")
+
+        file_seen_keys = set()
 
         with open(p, mode="r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
             missing = required_cols - set(reader.fieldnames or [])
             if missing:
-                print(f"Error: {path_str} is missing required columns: {missing}", file=sys.stderr)
-                sys.exit(1)
+                raise ValueError(f"{path_str} is missing required columns: {sorted(missing)}")
 
             for line_no, row in enumerate(reader, start=2):
                 total_rows += 1
@@ -75,46 +129,61 @@ def load_and_validate_csvs(filepaths):
                     mode = row["mode"].strip()
                     median_ms = float(row["median_ms"])
                 except (ValueError, TypeError) as e:
-                    print(f"Error: Invalid data in {path_str}:{line_no}: {e}", file=sys.stderr)
-                    sys.exit(1)
+                    raise ValueError(f"Invalid numeric data in {path_str}:{line_no}: {e}")
 
                 if median_ms <= 0 or not math.isfinite(median_ms):
-                    print(
-                        f"Error: Non-positive or non-finite timing in {path_str}:{line_no}: {median_ms}",
-                        file=sys.stderr,
-                    )
-                    sys.exit(1)
+                    raise ValueError(f"Non-positive or non-finite timing in {path_str}:{line_no}: {median_ms}")
 
-                key = (b, m, k, n, threads)
-                records_by_config[key][mode] = median_ms
+                key_with_mode = (b, m, k, n, threads, mode)
+                if key_with_mode in file_seen_keys:
+                    raise ValueError(
+                        f"Duplicate configuration in same file {path_str}:{line_no}: "
+                        f"(B={b}, M={m}, K={k}, N={n}, threads={threads}, mode='{mode}')"
+                    )
+                file_seen_keys.add(key_with_mode)
+
+                config_key = (b, m, k, n, threads)
+                raw_by_config[config_key][mode].append((median_ms, str(p)))
+
+    records_by_config = defaultdict(dict)
+    for config_key, modes_dict in raw_by_config.items():
+        for mode, measurements in modes_dict.items():
+            vals = [m[0] for m in measurements]
+            srcs = sorted(list(set(m[1] for m in measurements)))
+            agg_median = statistics.median(vals)
+            records_by_config[config_key][mode] = {
+                "median_ms": agg_median,
+                "sample_count": len(measurements),
+                "source_files": srcs,
+                "raw_medians": vals,
+            }
 
     return records_by_config, total_rows
 
 
-def simulate_policy(b, m, k, n, threads, min_total_mac, large_matrix_mac):
-    if b <= 1 or threads <= 1:
-        return "serial_auto"
-
-    matrix_mac = m * k * n
-    total_mac = b * matrix_mac
-
-    if total_mac < min_total_mac:
-        return "serial_auto"
-
-    if b < threads and matrix_mac >= large_matrix_mac:
-        return "serial_auto"
-
-    return "parallel_batch_serial_inner"
-
-
-def analyze_configurations(records_by_config, min_total_mac, large_matrix_mac, tie_tol):
+def analyze_configurations(
+    records_by_config: Dict[Tuple[int, int, int, int, int], Dict[str, Any]],
+    min_total_mac: int = 32768,
+    enable_large_guard: bool = False,
+    large_matrix_mac: int = 512**3,
+    tie_tol: float = 0.03,
+) -> Dict[str, Any]:
     paired = []
     missing_paired = 0
 
     for (b, m, k, n, threads), modes in records_by_config.items():
         if "serial_auto" in modes and "parallel_batch_serial_inner" in modes:
-            s_time = modes["serial_auto"]
-            p_time = modes["parallel_batch_serial_inner"]
+            s_entry = modes["serial_auto"]
+            p_entry = modes["parallel_batch_serial_inner"]
+
+            s_time = s_entry["median_ms"] if isinstance(s_entry, dict) else float(s_entry)
+            p_time = p_entry["median_ms"] if isinstance(p_entry, dict) else float(p_entry)
+
+            s_count = s_entry.get("sample_count", 1) if isinstance(s_entry, dict) else 1
+            p_count = p_entry.get("sample_count", 1) if isinstance(p_entry, dict) else 1
+            s_srcs = s_entry.get("source_files", []) if isinstance(s_entry, dict) else []
+            p_srcs = p_entry.get("source_files", []) if isinstance(p_entry, dict) else []
+
             matrix_mac = m * k * n
             total_mac = b * matrix_mac
             paired.append({
@@ -127,13 +196,14 @@ def analyze_configurations(records_by_config, min_total_mac, large_matrix_mac, t
                 "total_mac": total_mac,
                 "serial_auto_ms": s_time,
                 "parallel_batch_ms": p_time,
+                "sample_count": max(s_count, p_count),
+                "source_files": sorted(list(set(s_srcs + p_srcs))),
             })
         else:
             missing_paired += 1
 
     if not paired:
-        print("Error: No valid paired configurations (serial_auto vs parallel_batch_serial_inner) found.", file=sys.stderr)
-        sys.exit(1)
+        raise ValueError("No valid paired configurations (serial_auto vs parallel_batch_serial_inner) found.")
 
     # 1. Win-Rate Analysis
     parallel_wins = 0
@@ -164,7 +234,7 @@ def analyze_configurations(records_by_config, min_total_mac, large_matrix_mac, t
     # 2. Policy Regret Analysis
     regrets = []
     regrets_by_thread = defaultdict(list)
-    regrets_by_work = defaultdict(list)  # small (<32k), mid (<512k), large
+    regrets_by_work = defaultdict(list)
     policy_misses = []
 
     for item in paired:
@@ -177,7 +247,12 @@ def analyze_configurations(records_by_config, min_total_mac, large_matrix_mac, t
         p_time = item["parallel_batch_ms"]
 
         oracle_ms = min(s_time, p_time)
-        chosen_mode = simulate_policy(b, m, k, n, threads, min_total_mac, large_matrix_mac)
+        chosen_mode = simulate_policy(
+            b, m, k, n, threads,
+            min_total_mac=min_total_mac,
+            enable_large_guard=enable_large_guard,
+            large_matrix_mac=large_matrix_mac,
+        )
         chosen_ms = s_time if chosen_mode == "serial_auto" else p_time
 
         regret = (chosen_ms / oracle_ms) - 1.0
@@ -242,6 +317,7 @@ def analyze_configurations(records_by_config, min_total_mac, large_matrix_mac, t
         "missing_paired_configurations": missing_paired,
         "candidate_policy": {
             "min_total_mac": min_total_mac,
+            "enable_large_guard": enable_large_guard,
             "large_matrix_mac": large_matrix_mac,
         },
         "win_rates": {
@@ -268,7 +344,7 @@ def analyze_configurations(records_by_config, min_total_mac, large_matrix_mac, t
     }
 
 
-def print_text_report(res):
+def print_text_report(res: Dict[str, Any]):
     cp = res["candidate_policy"]
     wr = res["win_rates"]
     pr = res["policy_regret"]
@@ -276,18 +352,21 @@ def print_text_report(res):
     print("=" * 78)
     print(" HELIX BMM Scheduling Policy Analysis Report")
     print("=" * 78)
-    print(f"Candidate Policy Parameters:")
+    print("Candidate Policy Parameters:")
     print(f"  Minimum Total MAC Threshold : {cp['min_total_mac']:,} MACs (~{cp['min_total_mac']*2:,} FLOPs)")
-    print(f"  Large-Matrix MAC Guard      : {cp['large_matrix_mac']:,} MACs (when B < threads)")
+    if cp.get("enable_large_guard", False):
+        print(f"  Large-Matrix MAC Guard      : ENABLED ({cp['large_matrix_mac']:,} MACs when B < threads)")
+    else:
+        print("  Large-Matrix MAC Guard      : DISABLED (matching C++ production)")
     print(f"Evaluated Configurations      : {res['total_valid_configurations']} paired cases")
     print("-" * 78)
-    print(f"Pairwise Win-Rate vs SerialAuto:")
+    print("Pairwise Win-Rate vs SerialAuto:")
     print(f"  ParallelBatch Wins          : {wr['parallel_batch_wins']:>4} ({wr['parallel_batch_win_rate']:5.1f}%)")
     print(f"  SerialAuto Wins             : {wr['serial_auto_wins']:>4} ({wr['serial_auto_win_rate']:5.1f}%)")
     print(f"  Near-Ties (within 3%)       : {wr['ties']:>4} ({wr['tie_rate']:5.1f}%)")
     print(f"  Median Speedup (PBatch/Auto): {wr['median_speedup']:5.2f}x (p95: {wr['p95_speedup']:5.2f}x)")
     print("-" * 78)
-    print(f"Candidate Policy Regret vs Oracle:")
+    print("Candidate Policy Regret vs Oracle:")
     print(f"  Median Regret               : {pr['median_regret_percent']:5.2f}%")
     print(f"  p95 Regret                  : {pr['p95_regret_percent']:5.2f}%")
     print(f"  Max Regret (Worst Case)     : {pr['max_regret_percent']:5.2f}%")
@@ -319,13 +398,99 @@ def print_text_report(res):
     print("=" * 78)
 
 
+def print_markdown_report(res: Dict[str, Any]):
+    cp = res["candidate_policy"]
+    wr = res["win_rates"]
+    pr = res["policy_regret"]
+
+    guard_status = (
+        f"ENABLED ({cp['large_matrix_mac']:,} MACs when B < threads)"
+        if cp.get("enable_large_guard", False)
+        else "DISABLED (matching C++ production)"
+    )
+
+    lines = []
+    lines.append("# HELIX BMM Scheduling Policy Analysis Report")
+    lines.append("")
+    lines.append("## Candidate Policy Parameters")
+    lines.append("")
+    lines.append("| Parameter | Value |")
+    lines.append("| :--- | :--- |")
+    lines.append(f"| Minimum Total MAC Threshold | {cp['min_total_mac']:,} MACs (~{cp['min_total_mac']*2:,} FLOPs) |")
+    lines.append(f"| Large-Matrix MAC Guard | {guard_status} |")
+    lines.append(f"| Evaluated Configurations | {res['total_valid_configurations']} paired cases |")
+    lines.append("")
+    lines.append("## Win-Rate vs SerialAuto")
+    lines.append("")
+    lines.append("| Metric | Count / Value | Ratio (%) |")
+    lines.append("| :--- | :--- | :--- |")
+    lines.append(f"| ParallelBatch Wins | {wr['parallel_batch_wins']} | {wr['parallel_batch_win_rate']:.1f}% |")
+    lines.append(f"| SerialAuto Wins | {wr['serial_auto_wins']} | {wr['serial_auto_win_rate']:.1f}% |")
+    lines.append(f"| Near-Ties (within 3%) | {wr['ties']} | {wr['tie_rate']:.1f}% |")
+    lines.append(f"| Median Speedup (PBatch/Auto) | {wr['median_speedup']:.2f}x | - |")
+    lines.append(f"| p90 Speedup | {wr['p90_speedup']:.2f}x | - |")
+    lines.append(f"| p95 Speedup | {wr['p95_speedup']:.2f}x | - |")
+    lines.append("")
+    lines.append("## Candidate Policy Regret vs Oracle")
+    lines.append("")
+    lines.append("| Metric | Value |")
+    lines.append("| :--- | :--- |")
+    lines.append(f"| Median Regret | {pr['median_regret_percent']:.2f}% |")
+    lines.append(f"| p95 Regret | {pr['p95_regret_percent']:.2f}% |")
+    lines.append(f"| Max Regret (Worst Case) | {pr['max_regret_percent']:.2f}% |")
+    lines.append(f"| Cases with Regret > 5% | {pr['regret_gt_5_percent']:.1f}% |")
+    lines.append(f"| Cases with Regret > 10% | {pr['regret_gt_10_percent']:.1f}% |")
+    lines.append("")
+    lines.append("## Regret by Thread Count")
+    lines.append("")
+    lines.append("| Threads | Cases | Median Regret (%) | p95 Regret (%) | Max Regret (%) |")
+    lines.append("| :--- | :--- | :--- | :--- | :--- |")
+    for t, data in res["by_thread"].items():
+        lines.append(f"| {t} | {data['count']} | {data['median_regret']:.2f}% | {data['p95_regret']:.2f}% | {data['max_regret']:.2f}% |")
+    lines.append("")
+    lines.append("## Regret by Workload Volume")
+    lines.append("")
+    lines.append("| Volume Bucket | Cases | Median Regret (%) | p95 Regret (%) | Max Regret (%) |")
+    lines.append("| :--- | :--- | :--- | :--- | :--- |")
+    for wb, data in res["by_work_volume"].items():
+        lines.append(f"| {wb} | {data['count']} | {data['median_regret']:.2f}% | {data['p95_regret']:.2f}% | {data['max_regret']:.2f}% |")
+    lines.append("")
+    lines.append("## Top Policy Misses (Regret > 3%)")
+    lines.append("")
+    if res["top_misses"]:
+        lines.append("| Shape [B, M×K×N] | Threads | Total MACs | Chosen | Oracle | Regret (%) |")
+        lines.append("| :--- | :--- | :--- | :--- | :--- | :--- |")
+        for m in res["top_misses"][:10]:
+            shape_str = f"[{m['B']}, {m['M']}x{m['K']}x{m['N']}]"
+            lines.append(f"| {shape_str} | {m['threads']} | {m['total_mac']:,} | `{m['chosen']}` | `{m['oracle']}` | {m['regret_percent']:.2f}% |")
+    else:
+        lines.append("None (all decisions within 3% of oracle).")
+    lines.append("")
+    lines.append("> **Note on Aggregation:** `aggregated_median_ms` represents the median of per-file summary medians across calibration runs in the same environment, not a pooled raw measurement median.")
+    lines.append("")
+    print("\n".join(lines))
+
+
 def main():
     args = parse_args()
-    records_by_config, _ = load_and_validate_csvs(args.csv_files)
-    analysis = analyze_configurations(records_by_config, args.min_total_mac, args.large_matrix_mac, args.near_tie_tolerance)
+    try:
+        records_by_config, _ = load_and_validate_csvs(args.csv_files)
+        analysis = analyze_configurations(
+            records_by_config,
+            min_total_mac=args.min_total_mac,
+            enable_large_guard=args.enable_large_guard,
+            large_matrix_mac=args.large_matrix_mac,
+            tie_tol=args.near_tie_tolerance,
+        )
+    except (ValueError, FileNotFoundError) as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
 
     if args.format in ("text", "both"):
         print_text_report(analysis)
+
+    if args.format in ("markdown", "both"):
+        print_markdown_report(analysis)
 
     if args.output:
         out_p = Path(args.output)
