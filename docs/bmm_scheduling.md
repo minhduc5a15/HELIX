@@ -24,7 +24,7 @@ When invoking `Tensor::bmm` or `CPUBackend::bmm` with `MatMulStrategy::Auto` on 
    Executes a single outer `#pragma omp parallel for schedule(static)` loop over the batch dimension $B$. Within each thread worker, a single-threaded AVX2 FMA micro-kernel (`avx2_micro_matmul`) computes the matrix slice.
    - *Invariant:* **Strict No-Nested-OpenMP**. The outer batch loop is the only parallel region; workers never invoke OpenMP internally.
    - *Advantage:* Distributes independent batch slices across CPU cores with a single fork-join barrier for the entire operation.
-   - *Drawback:* If total compute volume is tiny ($B \times M \times K \times N < 32,768$), the OpenMP thread scheduling and barrier latency dominates the runtime, performing slower than single-threaded serial execution.
+   - *Drawback:* If total compute volume is small ($B \times M \times K \times N < 32,768$), the OpenMP thread scheduling and barrier latency dominates the runtime, performing slower than single-threaded serial execution.
 
 ---
 
@@ -45,7 +45,7 @@ All calibration benchmarks were executed in the following hardware and software 
 
 ## 4. Benchmark Methodology & Noise Control
 
-Four benchmark suites were designed and evaluated:
+Four backend calibration suites were designed and evaluated:
 1. **Scout Benchmark (`--scout`):** Broad exploratory matrix across $B \in \{1, 2, 4, 8, 16, 32, 64\}$ and dimensions from $16^3$ to $512^3$.
 2. **Refined Benchmark (`--refined`):** Fine-grained boundary exploration around intermediate dimensions ($64^3$ to $192^3$).
 3. **Low-Work Crossover Benchmark (`--low-work`):** Microsecond-scale grid measuring total work from 128 to 524,288 MACs ($B \in \{2, 4, 8, 16\}$, $\text{dim} \in [4, 32]$).
@@ -54,11 +54,12 @@ Four benchmark suites were designed and evaluated:
 ### Noise Control Techniques:
 - **Batch Repetition Normalization:** For micro-workloads ($< 65,536$ MACs), invocations are repeated inside the timed region ($3\times$ to $80\times$), normalizing elapsed time by the repetition factor to overcome monotonic clock discretization noise.
 - **Thread Pool Pre-Warmup:** An explicit parallel region warms up OpenMP worker threads before timing begins, preventing first-touch kernel thread allocation latency from skewing measurements.
-- **Reference Output Verification:** Every workload verifies candidate outputs against double-precision / serial reference outputs prior to timing.
+- **Reference Output Verification:** Every workload verifies candidate outputs against Float32 SerialAuto reference outputs prior to timing.
+- **Duplicate Aggregation Contract:** When aggregating multiple benchmark files from the calibration environment, same-file duplicate entries are strictly rejected, and cross-file duplicate keys are aggregated using the median of per-file medians (`aggregated_median_ms`) with complete provenance tracking.
 
 ---
 
-## 5. Empirical Results
+## 5. Empirical Backend Results
 
 ### 5.1 Representative Measurements
 
@@ -88,25 +89,50 @@ $$\text{MAC Work} = B \times M \times K \times N \text{ Multiply-Accumulate unit
 $1\text{ MAC} = 2\text{ FLOPs}$. To avoid ambiguity, the code strictly uses MAC units: `kMinParallelTotalMacWork = 32768` (corresponding to approximately $65,536$ FLOPs).
 
 ### 6.2 Selection of 32,768 MACs Threshold
-Across 625 paired configurations:
-- At **16,384 MACs**, `ParallelBatch` loses to `SerialAuto` by $1.5\times$ to $2.2\times$ on aligned SIMD shapes ($16\times 16\times 16$) because AVX2 processes $16^3$ in under $0.5\ \mu s$, which is less than OpenMP barrier synchronization latency.
-- At **32,768 MACs**, the transition stabilizes across non-vector dimensions ($M=20$, $M=24$, rectangular shapes).
-- Evaluating candidate thresholds with `scripts/analyze_bmm_benchmark.py`:
-  - `Threshold = 16384`: $T=2$ p95 regret = $23.65\%$, $T=6$ p95 regret = $27.12\%$.
-  - `Threshold = 32768`: $T=2$ p95 regret = **$9.75\%$**, $T=6$ p95 regret = **$10.35\%$**, median regret = **$0.00\%$**.
-  - `Threshold = 65536`: unnecessarily leaves $1.5\times\text{--}2.5\times$ speedups on the table for workloads between 32K and 64K MACs.
-- Therefore, **`32768 MACs`** is selected as the mathematically and empirically optimal crossover boundary.
+Across 625 paired configurations analyzed with `scripts/analyze_bmm_benchmark.py`:
+- **Win-Rate vs SerialAuto:**
+  - `ParallelBatch` Wins: **397 (63.5%)**
+  - `SerialAuto` Wins: **180 (28.8%)**
+  - Near-Ties (within 3%): **48 (7.7%)**
+  - Median Speedup: **1.55x** (p90: **3.94x**, p95: **5.14x**)
+- **Empirical Compromise:**
+  **32,768 MACs is an empirically selected global compromise threshold for the calibration environment. Shape-specific outliers remain, and the policy is not guaranteed to select the fastest execution mode for every workload.**
+- **Physical Core Regret vs Logical Core Oversubscription:**
+  - On physical cores ($T=2, 4, 6$), the policy achieves near-zero median regret ($0.00\%$) and very low p95 regret:
+    - $T=2$: p95 regret = **$9.75\%$**
+    - $T=4$: p95 regret = **$16.93\%$**
+    - $T=6$: p95 regret = **$9.12\%$**
+  - On 12 threads (hyperthreaded / oversubscribed), small workloads ($\le 64\text{K MACs}$) exhibit higher tail regret due to OpenMP barrier synchronization across logical core pairs.
 
 ### 6.3 Analysis of Large GEMM Under-Utilization ($B < \text{threads}$)
 We evaluated the hypothesis: *When $B < \text{threads}$ on large matrices ($\ge 512^3$), should HELIX fall back to `SerialAuto`?*
 - **Empirical finding:** No. In HELIX, single-GEMM `Auto` dispatches to `AutoTuner`. Because `AutoTuner` sets its OpenMP threshold based on single-matrix profiling (often $\ge 512^3$ or $1024^3$), falling back to `SerialAuto` causes each batch slice to run **single-threaded** sequentially.
 - On $B=4, 512^3$ at $T=6$: `SerialAuto` takes **$32.54\text{ ms}$** (1 core sequentially), whereas `ParallelBatch` takes **$13.06\text{ ms}$** (4 cores in parallel). Falling back to `SerialAuto` would inflict a **$2.49\times$ slowdown ($149\%$ regret)**.
 - Even at $B=2, 512^3$: `ParallelBatch` ($11.09\text{ ms}$) is faster than `SerialAuto` ($18.14\text{ ms}$).
-- Therefore, a fallback guard when $B < \text{threads}$ for large matrices is counterproductive and was intentionally omitted.
+- Therefore, a fallback guard when $B < \text{threads}$ for large matrices is counterproductive and was intentionally omitted from production.
 
 ---
 
-## 7. Policy Contract & Implementation
+## 7. End-to-End Tensor API & Autograd Benchmark Validation
+
+To evaluate user-level performance and verify graph lifecycles without confounding layers of abstraction, `benchmark/bmm_e2e_benchmark.cpp` measures high-level `Tensor::bmm` in two isolated modes on a clean Release build:
+1. `forward_only_ms`: Inference under `helix::no_grad` scope.
+2. `forward_backward_ms`: Training pass creating a fresh graph each iteration, followed by `loss.backward()` and per-iteration gradient reset (`a.grad().zero_()`).
+
+### E2E Results on Release Build ($T=12$):
+
+| Shape ($B \times M \times K \times N$) | Category | Dispatched Policy | Forward Only (ms) | FW + BW (ms) | Ratio (BW/FW) | Forward GFLOPS |
+| :--- | :--- | :--- | ---: | ---: | ---: | ---: |
+| $[4, 16\times 16\times 16]$ | Below threshold ($< 32\text{K MACs}$) | `SerialAuto` | 0.0011 ms | 0.0366 ms | 33.58x | 30.05 |
+| $[8, 16\times 16\times 16]$ | At threshold ($= 32\text{K MACs}$) | `ParallelBatch` | 0.0020 ms | 0.0619 ms | 30.48x | 32.25 |
+| $[4, 20\times 20\times 20]$ | Known outlier ($< 32\text{K MACs}$) | `SerialAuto` | 0.0039 ms | 0.0527 ms | 13.45x | 16.33 |
+| $[4, 128\times 64\times 128]$ | Attention-like rectangular | `ParallelBatch` | 0.0343 ms | 2.6199 ms | 76.30x | 244.29 |
+| $[4, 256\times 256\times 256]$ | Standard compute-intensive | `ParallelBatch` | 1.0493 ms | 6.2292 ms | 5.94x | 127.92 |
+| $[2, 512\times 512\times 512]$ | Large GEMM ($B < \text{threads}$) | `ParallelBatch` | 9.5014 ms | 33.7015 ms | 3.55x | 56.50 |
+
+---
+
+## 8. Policy Contract & Implementation
 
 ```cpp
 BmmExecutionPolicy choose_bmm_execution_policy(
@@ -134,34 +160,44 @@ BmmExecutionPolicy choose_bmm_execution_policy(
 
 ---
 
-## 8. Limitations & Future Work
+## 9. Limitations & Future Work
 
 1. **Architecture Scope:** This policy is calibrated specifically for x86_64 CPUs with AVX2/FMA and OpenMP. Non-AVX2 and ARM64 platforms (Apple Silicon) safely fall back to the serial batch loop.
 2. **Data Types:** Restricted to `Float32`. `Float64`, `Int32`, and `Int64` continue using the serial batch loop.
-3. **Static Threshold:** The threshold $32,768$ MACs is a calibrated constant. Future phases may integrate dynamic calibration into `.helix_autotune` if hardware heterogeneity demands per-machine tuning.
+3. **Static Threshold:** The threshold $32,768$ MACs is an empirical global compromise. Future phases may integrate dynamic calibration into `.helix_autotune` if hardware heterogeneity demands per-machine tuning.
 
 ---
 
-## 9. Reproduction Instructions
+## 10. Reproduction Instructions
 
-To reproduce the benchmark data and analysis:
+To reproduce the benchmark data, policy analysis, and E2E validation:
 
 ```bash
-# 1. Clean build
-./build.sh --clean
+# 1. Clean Release build (Mandatory for accurate performance timing)
+./build.sh --clean --release
 
-# 2. Run benchmark suites
+# 2. Run backend benchmark suites
 ./build/benchmark/bmm_benchmark --scout --output output/bmm_benchmark_scout.csv
 ./build/benchmark/bmm_benchmark --refined --output output/bmm_benchmark_refined.csv
 ./build/benchmark/bmm_benchmark --low-work --output output/bmm_benchmark_low_work.csv
 ./build/benchmark/bmm_benchmark --large-boundary --output output/bmm_benchmark_large_boundary.csv
 
-# 3. Run analyzer tool
+# 3. Run policy analyzer tool
 python3 scripts/analyze_bmm_benchmark.py \
   output/bmm_benchmark_scout.csv \
   output/bmm_benchmark_refined.csv \
   output/bmm_benchmark_low_work.csv \
   output/bmm_benchmark_large_boundary.csv \
-  --min-total-mac 32768 \
+  --format markdown \
   --output output/bmm_policy_analysis.json
+
+# 4. Run Python analyzer unit tests
+python3 -m unittest discover -s tests -p "test_analyze_bmm_benchmark.py" -v
+
+# 5. Run End-to-End Tensor BMM benchmark
+./build/benchmark/bmm_e2e_benchmark --full --output output/bmm_benchmark_e2e.csv
+
+# 6. Concurrency verification with ThreadSanitizer (Separate build)
+./build.sh --clean --tsan
+./run_tests.sh -R Bmm
 ```
