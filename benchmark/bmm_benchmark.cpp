@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -54,6 +55,12 @@ static void fill_deterministic(std::vector<float>& vec, float offset) {
 }
 
 static void export_bmm_csv(const std::vector<BmmBenchmarkRecord>& records, const std::string& filepath) {
+    const std::filesystem::path p(filepath);
+    if (p.has_parent_path()) {
+        std::error_code ec;
+        std::filesystem::create_directories(p.parent_path(), ec);
+    }
+
     std::ofstream file(filepath);
     if (!file.is_open()) {
         std::cerr << "Failed to open " << filepath << " for writing\n";
@@ -66,9 +73,10 @@ static void export_bmm_csv(const std::vector<BmmBenchmarkRecord>& records, const
 
     for (const auto& r : records) {
         file << r.B << "," << r.M << "," << r.K << "," << r.N << "," << r.threads << "," << r.mode << "," << std::fixed
-             << std::setprecision(4) << r.median_ms << "," << r.average_ms << "," << r.stddev_ms << "," << r.gflops
-             << "," << r.speedup_vs_serial_auto << "," << r.matrix_work << "," << r.effective_batch_parallelism << ","
-             << r.matrix_footprint_bytes << "," << r.aggregate_active_footprint_bytes << "," << r.inner_kernel << "\n";
+             << std::setprecision(6) << r.median_ms << "," << r.average_ms << "," << r.stddev_ms << "," << r.gflops
+             << "," << std::setprecision(4) << r.speedup_vs_serial_auto << "," << r.matrix_work << ","
+             << r.effective_batch_parallelism << "," << r.matrix_footprint_bytes << ","
+             << r.aggregate_active_footprint_bytes << "," << r.inner_kernel << "\n";
     }
     file.close();
     std::cout << "Successfully exported benchmark results to " << filepath << "\n";
@@ -84,6 +92,9 @@ static void benchmark_workload(
 ) {
 #if defined(_OPENMP)
     omp_set_num_threads(static_cast<int>(threads));
+// Warm up thread team to eliminate first-touch OS thread pool spawn latency
+#pragma omp parallel
+    { (void)omp_get_thread_num(); }
 #endif
 
     const size_t B = wl.B;
@@ -99,6 +110,7 @@ static void benchmark_workload(
     const double operations =
         2.0 * static_cast<double>(B) * static_cast<double>(M) * static_cast<double>(K) * static_cast<double>(N);
     const size_t matrix_work = M * K * N;
+    const size_t total_mac = B * matrix_work;
     const size_t effective_batch_parallelism = std::min(B, threads);
     const size_t matrix_footprint_bytes = sizeof(float) * (M * K + K * N + M * N);
     const size_t aggregate_active_footprint_bytes = effective_batch_parallelism * matrix_footprint_bytes;
@@ -118,6 +130,20 @@ static void benchmark_workload(
         }
     }
 
+    // Determine batch repetition count to control microsecond timing noise
+    size_t repetitions = 1;
+    if (total_mac < 4096) {
+        repetitions = 80;
+    } else if (total_mac < 16384) {
+        repetitions = 30;
+    } else if (total_mac < 65536) {
+        repetitions = 10;
+    } else if (total_mac < 262144) {
+        repetitions = 3;
+    } else {
+        repetitions = 1;
+    }
+
     struct ModeDef {
         std::string name;
         std::function<void()> fn;
@@ -125,31 +151,59 @@ static void benchmark_workload(
 
     std::vector<float> out(B * M * N, 0.0f);
 
-    std::vector<ModeDef> modes = {
-        {"serial_auto",
-         [&]() { internal::bmm_serial_batches(a.data(), b.data(), out.data(), B, M, K, N, MatMulStrategy::Auto); }},
-        {"serial_avx2",
-         [&]() { internal::bmm_serial_batches(a.data(), b.data(), out.data(), B, M, K, N, MatMulStrategy::AVX2); }},
-        {"serial_openmp",
-         [&]() { internal::bmm_serial_batches(a.data(), b.data(), out.data(), B, M, K, N, MatMulStrategy::OpenMP); }},
-        {"parallel_batch_serial_inner",
-         [&]() { internal::bmm_parallel_batches_float(a.data(), b.data(), out.data(), B, M, K, N); }}
-    };
+    std::vector<ModeDef> modes;
+    modes.push_back({"serial_auto", [&]() {
+                         for (size_t rep = 0; rep < repetitions; ++rep) {
+                             internal::bmm_serial_batches(
+                                 a.data(), b.data(), out.data(), B, M, K, N, MatMulStrategy::Auto
+                             );
+                         }
+                     }});
 
+    if (supports_avx2_backend()) {
+        modes.push_back({"serial_avx2", [&]() {
+                             for (size_t rep = 0; rep < repetitions; ++rep) {
+                                 internal::bmm_serial_batches(
+                                     a.data(), b.data(), out.data(), B, M, K, N, MatMulStrategy::AVX2
+                                 );
+                             }
+                         }});
+    }
+
+    modes.push_back({"serial_openmp", [&]() {
+                         for (size_t rep = 0; rep < repetitions; ++rep) {
+                             internal::bmm_serial_batches(
+                                 a.data(), b.data(), out.data(), B, M, K, N, MatMulStrategy::OpenMP
+                             );
+                         }
+                     }});
+
+    modes.push_back({"parallel_batch_serial_inner", [&]() {
+                         for (size_t rep = 0; rep < repetitions; ++rep) {
+                             internal::bmm_parallel_batches_float(a.data(), b.data(), out.data(), B, M, K, N);
+                         }
+                     }});
+
+    const double total_operations = operations * static_cast<double>(repetitions);
     double serial_auto_median = 1.0;
 
     for (size_t i = 0; i < modes.size(); ++i) {
         std::string test_name = modes[i].name + " [B=" + std::to_string(B) + " " + std::to_string(M) + "x" +
                                 std::to_string(K) + "x" + std::to_string(N) + "] T=" + std::to_string(threads);
 
-        BenchmarkResult res = BenchmarkRunner::run(test_name, modes[i].fn, iterations, warmups, operations);
+        BenchmarkResult res = BenchmarkRunner::run(test_name, modes[i].fn, iterations, warmups, total_operations);
 
-        if (i == 0) {
-            serial_auto_median = res.median_ms;
+        const double normalized_median_ms = res.median_ms / static_cast<double>(repetitions);
+        const double normalized_average_ms = res.average_ms / static_cast<double>(repetitions);
+        const double normalized_stddev_ms = res.stddev_ms / static_cast<double>(repetitions);
+
+        if (modes[i].name == "serial_auto") {
+            serial_auto_median = normalized_median_ms;
         }
 
-        const double speedup =
-            (serial_auto_median > 0.0 && res.median_ms > 0.0) ? (serial_auto_median / res.median_ms) : 1.0;
+        const double speedup = (serial_auto_median > 0.0 && normalized_median_ms > 0.0)
+                                   ? (serial_auto_median / normalized_median_ms)
+                                   : 1.0;
 
         BmmBenchmarkRecord rec;
         rec.B = B;
@@ -158,9 +212,9 @@ static void benchmark_workload(
         rec.N = N;
         rec.threads = threads;
         rec.mode = modes[i].name;
-        rec.median_ms = res.median_ms;
-        rec.average_ms = res.average_ms;
-        rec.stddev_ms = res.stddev_ms;
+        rec.median_ms = normalized_median_ms;
+        rec.average_ms = normalized_average_ms;
+        rec.stddev_ms = normalized_stddev_ms;
         rec.gflops = res.gflops;
         rec.speedup_vs_serial_auto = speedup;
         rec.matrix_work = matrix_work;
@@ -176,17 +230,25 @@ static void benchmark_workload(
 int main(int argc, char** argv) {
     BenchmarkReporter::print_header("HELIX Float32 BMM Scheduling Policy Benchmark");
 
-    bool run_refined = false;
+    enum class BenchmarkSuite { Scout, Refined, LowWork, LargeBoundary };
+
+    BenchmarkSuite suite = BenchmarkSuite::Scout;
     std::string output_path = "output/bmm_benchmark_scout.csv";
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (arg == "--refined") {
-            run_refined = true;
+            suite = BenchmarkSuite::Refined;
             output_path = "output/bmm_benchmark_refined.csv";
         } else if (arg == "--scout") {
-            run_refined = false;
+            suite = BenchmarkSuite::Scout;
             output_path = "output/bmm_benchmark_scout.csv";
+        } else if (arg == "--low-work") {
+            suite = BenchmarkSuite::LowWork;
+            output_path = "output/bmm_benchmark_low_work.csv";
+        } else if (arg == "--large-boundary") {
+            suite = BenchmarkSuite::LargeBoundary;
+            output_path = "output/bmm_benchmark_large_boundary.csv";
         } else if (arg == "--output" && i + 1 < argc) {
             output_path = argv[++i];
         }
@@ -223,56 +285,105 @@ int main(int argc, char** argv) {
     std::cout << "\n";
 
     std::vector<BmmWorkload> workloads;
+    size_t warmups = 4;
+    size_t iterations = 10;
 
-    if (!run_refined) {
-        // --- STAGE A: SCOUT WORKLOADS ---
-        std::cout << "Running Stage A: Scout Benchmark Suite...\n";
+    switch (suite) {
+        case BenchmarkSuite::Scout: {
+            std::cout << "Running Stage A: Scout Benchmark Suite...\n";
+            warmups = 2;
+            iterations = 7;
 
-        // 1. Tiny GEMM: 16x16x16, 32x32x32 with varied batches
-        for (size_t B : {8, 16, 32, 64}) {
-            workloads.push_back({B, 16, 16, 16, "tiny_16"});
-            workloads.push_back({B, 32, 32, 32, "tiny_32"});
+            // 1. Tiny GEMM: 16x16x16, 32x32x32 with varied batches
+            for (size_t B : {8, 16, 32, 64}) {
+                workloads.push_back({B, 16, 16, 16, "tiny_16"});
+                workloads.push_back({B, 32, 32, 32, "tiny_32"});
+            }
+
+            // 2. Small/Medium GEMM: 64x64x64, 128x128x128 with varied batches
+            for (size_t B : {2, 4, 8, 16, 32}) {
+                workloads.push_back({B, 64, 64, 64, "small_64"});
+                workloads.push_back({B, 128, 128, 128, "medium_128"});
+            }
+
+            // 3. Large GEMM: 256x256x256 with varied batches
+            for (size_t B : {1, 2, 4, 8, 16}) {
+                workloads.push_back({B, 256, 256, 256, "large_256"});
+            }
+
+            // 4. Very Large GEMM: 512x512x512
+            for (size_t B : {1, 2, 4}) {
+                workloads.push_back({B, 512, 512, 512, "vlarge_512"});
+            }
+
+            // 5. Rectangular Attention-Like Workloads
+            for (size_t B : {2, 4, 8, 16}) {
+                workloads.push_back({B, 128, 64, 128, "attn_128_64_128"});
+                workloads.push_back({B, 128, 128, 64, "attn_128_128_64"});
+                workloads.push_back({B, 256, 64, 256, "attn_256_64_256"});
+                workloads.push_back({B, 64, 128, 64, "attn_64_128_64"});
+            }
+            break;
         }
 
-        // 2. Small/Medium GEMM: 64x64x64, 128x128x128 with varied batches
-        for (size_t B : {2, 4, 8, 16, 32}) {
-            workloads.push_back({B, 64, 64, 64, "small_64"});
-            workloads.push_back({B, 128, 128, 128, "medium_128"});
+        case BenchmarkSuite::Refined: {
+            std::cout << "Running Stage B: Refined Crossover Benchmark Suite...\n";
+            warmups = 4;
+            iterations = 15;
+
+            for (size_t B : {2, 3, 4, 5, 6, 8, 12, 16}) {
+                workloads.push_back({B, 64, 64, 64, "refined_64"});
+                workloads.push_back({B, 96, 96, 96, "refined_96"});
+                workloads.push_back({B, 128, 128, 128, "refined_128"});
+                workloads.push_back({B, 160, 160, 160, "refined_160"});
+                workloads.push_back({B, 192, 192, 192, "refined_192"});
+            }
+            break;
         }
 
-        // 3. Large GEMM: 256x256x256 with varied batches
-        for (size_t B : {1, 2, 4, 8, 16}) {
-            workloads.push_back({B, 256, 256, 256, "large_256"});
+        case BenchmarkSuite::LowWork: {
+            std::cout << "Running Stage C: Low-Work Crossover Benchmark Suite...\n";
+            warmups = 5;
+            iterations = 15;
+
+            // Target MACs: 2048, 4096, 8192, 16384, 32768, 65536, 131072
+            // 1. Square small matrices
+            for (size_t B : {2, 4, 8, 16}) {
+                workloads.push_back({B, 4, 4, 4, "low_work_4"});
+                workloads.push_back({B, 8, 8, 8, "low_work_8"});
+                workloads.push_back({B, 12, 12, 12, "low_work_12"});
+                workloads.push_back({B, 16, 16, 16, "low_work_16"});
+                workloads.push_back({B, 20, 20, 20, "low_work_20"});
+                workloads.push_back({B, 24, 24, 24, "low_work_24"});
+                workloads.push_back({B, 28, 28, 28, "low_work_28"});
+                workloads.push_back({B, 32, 32, 32, "low_work_32"});
+            }
+
+            // 2. Rectangular small matrices around crossover
+            for (size_t B : {2, 4, 8, 16}) {
+                workloads.push_back({B, 16, 8, 16, "low_rect_16_8_16"});
+                workloads.push_back({B, 32, 16, 32, "low_rect_32_16_32"});
+                workloads.push_back({B, 32, 32, 16, "low_rect_32_32_16"});
+                workloads.push_back({B, 16, 32, 16, "low_rect_16_32_16"});
+            }
+            break;
         }
 
-        // 4. Very Large GEMM: 512x512x512
-        for (size_t B : {1, 2, 4}) {
-            workloads.push_back({B, 512, 512, 512, "vlarge_512"});
-        }
+        case BenchmarkSuite::LargeBoundary: {
+            std::cout << "Running Stage D: Large-GEMM Boundary Benchmark Suite...\n";
+            warmups = 2;
+            iterations = 5;
 
-        // 5. Rectangular Attention-Like Workloads
-        for (size_t B : {2, 4, 8, 16}) {
-            workloads.push_back({B, 128, 64, 128, "attn_128_64_128"});
-            workloads.push_back({B, 128, 128, 64, "attn_128_128_64"});
-            workloads.push_back({B, 256, 64, 256, "attn_256_64_256"});
-            workloads.push_back({B, 64, 128, 64, "attn_64_128_64"});
-        }
-    } else {
-        // --- STAGE B: REFINED WORKLOADS ---
-        std::cout << "Running Stage B: Refined Crossover Benchmark Suite...\n";
-
-        // Focused boundary exploration around crossover regions
-        for (size_t B : {2, 3, 4, 5, 6, 8, 12, 16}) {
-            workloads.push_back({B, 64, 64, 64, "refined_64"});
-            workloads.push_back({B, 96, 96, 96, "refined_96"});
-            workloads.push_back({B, 128, 128, 128, "refined_128"});
-            workloads.push_back({B, 160, 160, 160, "refined_160"});
-            workloads.push_back({B, 192, 192, 192, "refined_192"});
+            // Shapes: 256x256x256, 384x384x384, 512x512x512
+            // Batches: 2, 4, 6, 8
+            for (size_t B : {2, 4, 6, 8}) {
+                workloads.push_back({B, 256, 256, 256, "boundary_256"});
+                workloads.push_back({B, 384, 384, 384, "boundary_384"});
+                workloads.push_back({B, 512, 512, 512, "boundary_512"});
+            }
+            break;
         }
     }
-
-    const size_t warmups = run_refined ? 4 : 2;
-    const size_t iterations = run_refined ? 15 : 7;
 
     std::vector<BmmBenchmarkRecord> all_records;
 
