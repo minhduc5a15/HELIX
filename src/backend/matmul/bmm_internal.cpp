@@ -100,12 +100,18 @@ namespace helix::internal {
             return BmmExecutionPolicy::SerialAuto;
         }
 
-        // Avoid thread scheduling and barrier latency for very small overall work
-        // Benchmarked: total FLOP volume < 16384 executes faster on 1 core without OpenMP overhead
-        size_t matrix_work = 0;
-        size_t total_work = 0;
-        if (mul_overflow(M, K, &matrix_work) || mul_overflow(matrix_work, N, &matrix_work) ||
-            mul_overflow(matrix_work, B, &total_work) || total_work < 16384) {
+        // Avoid thread scheduling and barrier latency for very small overall work.
+        // Benchmarked: total MAC work < 32,768 (approx. 65,536 FLOPs) executes faster on 1 core
+        // without OpenMP thread team scheduling and barrier synchronization latency.
+        size_t matrix_mac = 0;
+        size_t total_mac = 0;
+        if (mul_overflow(M, K, &matrix_mac) || mul_overflow(matrix_mac, N, &matrix_mac) ||
+            mul_overflow(matrix_mac, B, &total_mac)) {
+            return BmmExecutionPolicy::SerialAuto;
+        }
+
+        constexpr size_t kMinParallelTotalMacWork = 32768;
+        if (total_mac < kMinParallelTotalMacWork) {
             return BmmExecutionPolicy::SerialAuto;
         }
 

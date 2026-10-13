@@ -699,12 +699,18 @@ TEST(BmmExecutionPolicyTest, SingleBatchOrSingleThreadFallback) {
 }
 
 TEST(BmmExecutionPolicyTest, SmallWorkFallback) {
-    // 2 * 4 * 4 * 4 = 128 < 16384 -> SerialAuto
+    // 2 * 4 * 4 * 4 = 128 < 32768 -> SerialAuto
     EXPECT_EQ(internal::choose_bmm_execution_policy(2, 4, 4, 4, 4), internal::BmmExecutionPolicy::SerialAuto);
-    // 2 * 16 * 16 * 16 = 8192 < 16384 -> SerialAuto
+    // 2 * 16 * 16 * 16 = 8192 < 32768 -> SerialAuto
     EXPECT_EQ(internal::choose_bmm_execution_policy(2, 16, 16, 16, 4), internal::BmmExecutionPolicy::SerialAuto);
-    // 4 * 16 * 16 * 16 = 16384 >= 16384 -> ParallelBatch
-    EXPECT_EQ(internal::choose_bmm_execution_policy(4, 16, 16, 16, 4), internal::BmmExecutionPolicy::ParallelBatch);
+    // 4 * 16 * 16 * 16 = 16384 < 32768 -> SerialAuto (below calibrated boundary)
+    EXPECT_EQ(internal::choose_bmm_execution_policy(4, 16, 16, 16, 4), internal::BmmExecutionPolicy::SerialAuto);
+    // 4 * 20 * 20 * 20 = 32000 < 32768 -> SerialAuto
+    EXPECT_EQ(internal::choose_bmm_execution_policy(4, 20, 20, 20, 4), internal::BmmExecutionPolicy::SerialAuto);
+    // 8 * 16 * 16 * 16 = 32768 >= 32768 -> ParallelBatch (at boundary)
+    EXPECT_EQ(internal::choose_bmm_execution_policy(8, 16, 16, 16, 4), internal::BmmExecutionPolicy::ParallelBatch);
+    // 8 * 20 * 20 * 20 = 64000 >= 32768 -> ParallelBatch
+    EXPECT_EQ(internal::choose_bmm_execution_policy(8, 20, 20, 20, 4), internal::BmmExecutionPolicy::ParallelBatch);
 }
 
 TEST(BmmExecutionPolicyTest, OverflowFallback) {
