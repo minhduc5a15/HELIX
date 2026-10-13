@@ -61,3 +61,5 @@ format.sh
 commit_msg.txt
 helix-web
 venv
+__pycache__/
+*.pyc
